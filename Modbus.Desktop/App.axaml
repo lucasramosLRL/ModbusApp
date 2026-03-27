@@ -1,0 +1,24 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:Modbus.Desktop.Views"
+             xmlns:vm="using:Modbus.Desktop.ViewModels"
+             x:Class="Modbus.Desktop.App">
+
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+    </Application.Styles>
+
+    <Application.DataTemplates>
+        <DataTemplate DataType="{x:Type vm:DeviceListViewModel}">
+            <views:DeviceListView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DeviceDetailViewModel}">
+            <views:DeviceDetailView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:AddDeviceViewModel}">
+            <views:AddDeviceView />
+        </DataTemplate>
+    </Application.DataTemplates>
+
+</Application>

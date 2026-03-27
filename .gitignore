@@ -1,0 +1,83 @@
+# Build output
+bin/
+obj/
+
+# .NET / NuGet
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+packages/
+*.nuget.props
+*.nuget.targets
+
+# Visual Studio
+.vs/
+*.rsuser
+*.vsp
+*.vspx
+*.sap
+*.publishsettings
+PublishScripts/
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# SQLite databases (EF Core runtime files)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# EF Core migrations snapshots are tracked, but exclude local override files
+# (keep Migrations/ folder tracked)
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage*/
+
+# Avalonia designer
+.avalonia/
+
+# MAUI / Android / iOS build artifacts
+*.apk
+*.aab
+*.ipa
+*.dSYM/
+*.xcarchive/
+google-services.json
+GoogleService-Info.plist
+
+# Publish output
+publish/
+**/publish/
+
+# User secrets
+secrets.json
+appsettings.Local.json
