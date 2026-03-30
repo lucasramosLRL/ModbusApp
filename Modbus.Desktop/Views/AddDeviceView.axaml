@@ -35,12 +35,13 @@
                 <Border Padding="16"
                         CornerRadius="8"
                         BorderThickness="1"
-                        BorderBrush="#E0E0E0"
-                        Background="White">
-                    <StackPanel Spacing="8" Foreground="#1F1F1F">
+                        BorderBrush="#1A1A2E"
+                        Background="#1A1A2E">
+                    <StackPanel Spacing="8">
                         <TextBlock Text="Transport Type"
                                    FontSize="13"
-                                   FontWeight="SemiBold" />
+                                   FontWeight="SemiBold"
+                                   Foreground="#FFFFFF" />
                         <StackPanel Orientation="Horizontal" Spacing="24">
                             <RadioButton Content="RTU (Serial Port)"
                                          IsChecked="{Binding IsRtu, Mode=TwoWay}"
@@ -57,17 +58,18 @@
                         Padding="16"
                         CornerRadius="8"
                         BorderThickness="1"
-                        BorderBrush="#E0E0E0"
-                        Background="White">
-                    <StackPanel Spacing="12" Foreground="#1F1F1F">
+                        BorderBrush="#1A1A2E"
+                        Background="#1A1A2E">
+                    <StackPanel Spacing="12">
                         <TextBlock Text="Serial Port Settings"
                                    FontSize="13"
-                                   FontWeight="SemiBold" />
+                                   FontWeight="SemiBold"
+                                   Foreground="#FFFFFF" />
                         <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto">
 
                             <!-- Row 0 -->
                             <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
-                                <TextBlock Text="COM Port" FontSize="11" Opacity="0.55" />
+                                <TextBlock Text="COM Port" FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
                                 <Grid ColumnDefinitions="*,Auto">
                                     <ComboBox Grid.Column="0"
                                               ItemsSource="{Binding AvailablePorts}"
@@ -83,13 +85,13 @@
                                 </Grid>
                             </StackPanel>
                             <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" Margin="12,0,0,0">
-                                <TextBlock Text="Baud Rate" FontSize="11" Opacity="0.55" />
+                                <TextBlock Text="Baud Rate" FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
                                 <ComboBox ItemsSource="{Binding AvailableBaudRates}"
                                           SelectedItem="{Binding SelectedBaudRate}"
                                           HorizontalAlignment="Stretch" />
                             </StackPanel>
                             <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4" Margin="12,0,0,0">
-                                <TextBlock Text="Data Bits" FontSize="11" Opacity="0.55" />
+                                <TextBlock Text="Data Bits" FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
                                 <NumericUpDown Value="{Binding DataBits}"
                                                Minimum="7" Maximum="8" Increment="1"
                                                FormatString="0"
@@ -98,19 +100,19 @@
 
                             <!-- Row 1 -->
                             <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,12,0,0">
-                                <TextBlock Text="Parity" FontSize="11" Opacity="0.55" />
+                                <TextBlock Text="Parity" FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
                                 <ComboBox ItemsSource="{Binding AvailableParities}"
                                           SelectedItem="{Binding SelectedParity}"
                                           HorizontalAlignment="Stretch" />
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4" Margin="12,12,0,0">
-                                <TextBlock Text="Stop Bits" FontSize="11" Opacity="0.55" />
+                                <TextBlock Text="Stop Bits" FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
                                 <ComboBox ItemsSource="{Binding AvailableStopBits}"
                                           SelectedItem="{Binding SelectedStopBits}"
                                           HorizontalAlignment="Stretch" />
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="2" Spacing="4" Margin="12,12,0,0">
-                                <TextBlock Text="Address Range" FontSize="11" Opacity="0.55" />
+                                <TextBlock Text="Address Range" FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <NumericUpDown Value="{Binding StartAddress}"
                                                    Minimum="1" Maximum="247" Increment="1"
@@ -133,22 +135,17 @@
                         Padding="16"
                         CornerRadius="8"
                         BorderThickness="1"
-                        BorderBrush="#E0E0E0"
-                        Background="White">
-                    <StackPanel Spacing="12" Foreground="#1F1F1F">
+                        BorderBrush="#1A1A2E"
+                        Background="#1A1A2E">
+                    <StackPanel Spacing="12">
                         <TextBlock Text="Network Settings"
                                    FontSize="13"
-                                   FontWeight="SemiBold" />
+                                   FontWeight="SemiBold"
+                                   Foreground="#FFFFFF" />
                         <TextBlock Text="Discovery uses UDP broadcast (255.255.255.255). Devices on the local network will respond automatically."
                                    FontSize="12"
                                    Opacity="0.6"
                                    TextWrapping="Wrap" />
-                        <StackPanel Spacing="4" Width="120" HorizontalAlignment="Left">
-                            <TextBlock Text="Port" FontSize="11" Opacity="0.55" />
-                            <NumericUpDown Value="{Binding TcpPort}"
-                                           Minimum="1" Maximum="65535" Increment="1"
-                                           FormatString="0" />
-                        </StackPanel>
                     </StackPanel>
                 </Border>
 
@@ -223,20 +220,21 @@
                 <Border Padding="16"
                         CornerRadius="8"
                         BorderThickness="1"
-                        BorderBrush="#E0E0E0"
-                        Background="White">
-                    <StackPanel Spacing="12" Foreground="#1F1F1F">
+                        BorderBrush="#1A1A2E"
+                        Background="#1A1A2E">
+                    <StackPanel Spacing="12">
                         <TextBlock Text="Device Details"
                                    FontSize="13"
-                                   FontWeight="SemiBold" />
+                                   FontWeight="SemiBold"
+                                   Foreground="#FFFFFF" />
                         <Grid ColumnDefinitions="*,200,200" RowDefinitions="Auto">
                             <StackPanel Grid.Column="0" Spacing="4">
-                                <TextBlock Text="Name" FontSize="11" Opacity="0.55" />
+                                <TextBlock Text="Name" FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
                                 <TextBox Text="{Binding DeviceName}"
                                          Watermark="e.g. KS-3000 #00012345" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
-                                <TextBlock Text="Slave ID (1–247)" FontSize="11" Opacity="0.55" />
+                                <TextBlock Text="Slave ID (1–247)" FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
                                 <NumericUpDown Value="{Binding SlaveId}"
                                                Minimum="1" Maximum="247" Increment="1"
                                                FormatString="0"
@@ -244,7 +242,7 @@
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="4" Margin="12,0,0,0"
                                         IsVisible="{Binding IsTcp}">
-                                <TextBlock Text="Device IP" FontSize="11" Opacity="0.55" />
+                                <TextBlock Text="Device IP" FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
                                 <TextBox Text="{Binding DeviceIp}"
                                          Watermark="e.g. 192.168.1.42" />
                             </StackPanel>

@@ -40,24 +40,24 @@
                 Margin="0,0,0,16"
                 CornerRadius="8"
                 BorderThickness="1"
-                BorderBrush="#E0E0E0"
-                Background="White">
-            <Grid ColumnDefinitions="*,*,*,*">
+                BorderBrush="#1A1A2E"
+                Background="#1A1A2E">
+            <Grid ColumnDefinitions="*,*,*,*" >
                 <StackPanel Grid.Column="0" Spacing="4">
-                    <TextBlock Text="Transport" FontSize="11" Opacity="0.55" />
-                    <TextBlock Text="{Binding Device.TransportType}" FontWeight="Medium" />
+                    <TextBlock Text="Transport" FontSize="11" Opacity="0.55" Foreground="#FFFFFF" />
+                    <TextBlock Text="{Binding Device.TransportType}" FontWeight="Medium" Foreground="#FFFFFF" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4">
-                    <TextBlock Text="Address" FontSize="11" Opacity="0.55" />
-                    <TextBlock Text="{Binding Device.ConnectionAddress}" FontWeight="Medium" />
+                    <TextBlock Text="Address" FontSize="11" Opacity="0.55" Foreground="#FFFFFF" />
+                    <TextBlock Text="{Binding Device.ConnectionAddress}" FontWeight="Medium" Foreground="#FFFFFF" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Spacing="4">
-                    <TextBlock Text="Slave ID" FontSize="11" Opacity="0.55" />
-                    <TextBlock Text="{Binding Device.SlaveId}" FontWeight="Medium" />
+                    <TextBlock Text="Slave ID" FontSize="11" Opacity="0.55" Foreground="#FFFFFF" />
+                    <TextBlock Text="{Binding Device.SlaveId}" FontWeight="Medium" Foreground="#FFFFFF" />
                 </StackPanel>
                 <StackPanel Grid.Column="3" Spacing="4">
-                    <TextBlock Text="Model" FontSize="11" Opacity="0.55" />
-                    <TextBlock Text="{Binding Device.ModelName, FallbackValue='Unknown'}" FontWeight="Medium" />
+                    <TextBlock Text="Model" FontSize="11" Opacity="0.55" Foreground="#FFFFFF" />
+                    <TextBlock Text="{Binding Device.ModelName, FallbackValue='Unknown'}" FontWeight="Medium" Foreground="#FFFFFF" />
                 </StackPanel>
             </Grid>
         </Border>

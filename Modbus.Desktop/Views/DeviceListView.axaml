@@ -47,29 +47,33 @@
                                 Margin="0,0,0,8"
                                 CornerRadius="8"
                                 BorderThickness="1"
-                                BorderBrush="#E0E0E0"
-                                Background="White">
+                                BorderBrush="#1A1A2E"
+                                Background="#1A1A2E">
                             <Grid ColumnDefinitions="*,Auto">
 
                                 <!-- Left: device info -->
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="{Binding Name}"
                                                FontSize="16"
-                                               FontWeight="SemiBold" />
+                                               FontWeight="SemiBold"
+                                               Foreground="#FFFFFF" />
                                     <TextBlock Text="{Binding ConnectionAddress}"
                                                FontSize="13"
-                                               Opacity="0.65" />
+                                               Opacity="0.65"
+                                               Foreground="#FFFFFF" />
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <TextBlock Text="{Binding TransportType}"
                                                    FontSize="12"
-                                                   Opacity="0.55" />
-                                        <TextBlock Text="·" Opacity="0.35" />
+                                                   Opacity="0.55"
+                                                   Foreground="#FFFFFF" />
+                                        <TextBlock Text="·" Opacity="0.35" Foreground="#FFFFFF" />
                                         <TextBlock Text="{Binding ModelName, FallbackValue='Unknown model'}"
                                                    FontSize="12"
-                                                   Opacity="0.55" />
-                                        <TextBlock Text="·" Opacity="0.35" />
-                                        <TextBlock Text="Slave " FontSize="12" Opacity="0.55" />
-                                        <TextBlock Text="{Binding SlaveId}" FontSize="12" Opacity="0.55" />
+                                                   Opacity="0.55"
+                                                   Foreground="#FFFFFF" />
+                                        <TextBlock Text="·" Opacity="0.35" Foreground="#FFFFFF" />
+                                        <TextBlock Text="Slave " FontSize="12" Opacity="0.55" Foreground="#FFFFFF" />
+                                        <TextBlock Text="{Binding SlaveId}" FontSize="12" Opacity="0.55" Foreground="#FFFFFF" />
                                     </StackPanel>
                                 </StackPanel>
 
@@ -81,11 +85,13 @@
                                     <TextBlock Text="{Binding StatusText}"
                                                HorizontalAlignment="Right"
                                                FontSize="13"
-                                               FontWeight="Medium" />
+                                               FontWeight="Medium"
+                                               Foreground="#FFFFFF" />
                                     <TextBlock Text="{Binding LastSeenAt, StringFormat='{}{0:HH:mm:ss}', FallbackValue='Never seen'}"
                                                FontSize="11"
                                                Opacity="0.6"
-                                               HorizontalAlignment="Right" />
+                                               HorizontalAlignment="Right"
+                                               Foreground="#FFFFFF" />
                                     <Button Content="Open →"
                                             HorizontalAlignment="Right"
                                             Padding="12,6"
