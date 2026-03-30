@@ -287,9 +287,8 @@
 Now the software is adding devices using de UDP search broadcast
     
 Whats we need now next:
-  - Theres no way to remove a added device from the software
   - Added device keep showing as disconnected on the device info card
-  - Model name isn't beeing filled, for exemple, F2 = KS-3000
+  - Model name isn't beeing filled in DeviceDetail, for exemple, F2 return should be a KS-3000
   - Device added as "slave 1", this description should be given by the user
   
   

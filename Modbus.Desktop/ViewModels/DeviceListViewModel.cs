@@ -73,6 +73,14 @@ public partial class DeviceListViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task DeleteDeviceAsync(DeviceItemViewModel device)
+    {
+        _pollingEngine.RemoveDevice(device.Id);
+        await _deviceRepository.DeleteAsync(device.Id);
+        Devices.Remove(device);
+    }
+
+    [RelayCommand]
     private void OpenDeviceDetail(DeviceItemViewModel device)
     {
         var detail = new DeviceDetailViewModel(device, _registerValueRepository, this);

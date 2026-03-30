@@ -92,11 +92,18 @@
                                                Opacity="0.6"
                                                HorizontalAlignment="Right"
                                                Foreground="#FFFFFF" />
-                                    <Button Content="Open →"
-                                            HorizontalAlignment="Right"
-                                            Padding="12,6"
-                                            Command="{Binding #DeviceList.DataContext.OpenDeviceDetailCommand}"
-                                            CommandParameter="{Binding}" />
+                                    <StackPanel Orientation="Horizontal"
+                                              HorizontalAlignment="Right"
+                                              Spacing="6">
+                                        <Button Content="Open →"
+                                                Padding="12,6"
+                                                Command="{Binding #DeviceList.DataContext.OpenDeviceDetailCommand}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Content="Delete"
+                                                Padding="12,6"
+                                                Command="{Binding #DeviceList.DataContext.DeleteDeviceCommand}"
+                                                CommandParameter="{Binding}" />
+                                    </StackPanel>
                                 </StackPanel>
 
                             </Grid>
