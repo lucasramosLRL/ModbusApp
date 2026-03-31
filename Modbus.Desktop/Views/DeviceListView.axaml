@@ -101,8 +101,8 @@
                                                 CommandParameter="{Binding}" />
                                         <Button Content="Delete"
                                                 Padding="12,6"
-                                                Command="{Binding #DeviceList.DataContext.DeleteDeviceCommand}"
-                                                CommandParameter="{Binding}" />
+                                                Click="OnDeleteClick"
+                                                Tag="{Binding}" />
                                     </StackPanel>
                                 </StackPanel>
 
