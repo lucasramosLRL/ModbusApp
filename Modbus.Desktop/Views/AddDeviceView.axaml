@@ -117,12 +117,12 @@
                                     <NumericUpDown Value="{Binding StartAddress}"
                                                    Minimum="1" Maximum="247" Increment="1"
                                                    FormatString="0"
-                                                   Width="90" />
+                                                   Width="112" />
                                     <TextBlock Text="—" VerticalAlignment="Center" Opacity="0.55" />
                                     <NumericUpDown Value="{Binding EndAddress}"
                                                    Minimum="1" Maximum="247" Increment="1"
                                                    FormatString="0"
-                                                   Width="90" />
+                                                   Width="112" />
                                 </StackPanel>
                             </StackPanel>
 
