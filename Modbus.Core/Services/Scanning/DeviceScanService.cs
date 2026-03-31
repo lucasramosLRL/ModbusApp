@@ -40,7 +40,22 @@ public class DeviceScanService : IDeviceScanService
 
         await service.ConnectAsync(cancellationToken);
 
-        for (byte addr = startAddress; addr <= endAddress; addr++)
+        // Probe address 254 first — yield if a device responds
+        progress?.Report(new ScanProgress { Current = 0, Total = total, Found = found, CurrentLabel = "Address 254" });
+        DeviceScanResult? probeResult = null;
+        try
+        {
+            using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            probeCts.CancelAfter(TimeSpan.FromSeconds(2));
+            var probeData = await service.ReportSlaveIdAsync(254, probeCts.Token);
+            var probeSerial = await TryReadSerialNumberAsync(service, 254, cancellationToken);
+            probeResult = BuildResult(254, probeData.RawData, probeSerial, null, rtuConfig);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+        catch (Exception) { }
+        if (probeResult != null) { found++; yield return probeResult; }
+
+        for (byte addr = 1; addr <= 247; addr++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 

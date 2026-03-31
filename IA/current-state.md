@@ -290,6 +290,7 @@ UDP search command is now send to all network adapters
     
 Whats we need now next:
   X - Added device keep showing as disconnected and error on the device info card ** Tried to fix and failed need to try again...
+  - When a device from the list is added the page changes automatically to the main one, it shouldn't happen, the user may add another devices from the list
   - The pooling is working fine on TCP, now the RTU is having the same issue and still shows "connected" when a turn my device off
   - Move the COM port, baud rate, stopbits, parity to a new settings page ** Need to verify if the software is made to work with more than one COM port
   - Create a string dictionary to translate the software from english to brazillian portuguese and put it on settings page
