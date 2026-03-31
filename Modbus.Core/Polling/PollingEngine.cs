@@ -25,6 +25,9 @@ public class PollingEngine : IPollingEngine
 
     public void AddDevice(ModbusDevice device)
     {
+        if (_devices.ContainsKey(device.Id))
+            return; // Already tracked — keep the active connection.
+
         var ctx = new DeviceContext(device, _factory.Create(device));
         _devices[device.Id] = ctx;
     }
@@ -76,8 +79,20 @@ public class PollingEngine : IPollingEngine
                 foreach (var ctx in _devices.Values)
                 {
                     if (cancellationToken.IsCancellationRequested) return;
-                    if (ctx.Device.IsActive)
+                    if (!ctx.Device.IsActive) continue;
+
+                    try
+                    {
                         await PollDeviceAsync(ctx, cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        return; // Shutdown — exit.
+                    }
+                    catch
+                    {
+                        // Unexpected error for this device — continue polling others.
+                    }
                 }
             }
             while (await timer.WaitForNextTickAsync(cancellationToken));
@@ -88,18 +103,38 @@ public class PollingEngine : IPollingEngine
         }
     }
 
+    /// <summary>Maximum time allowed for a single device poll (connect + read).</summary>
+    private static readonly TimeSpan PollTimeout = TimeSpan.FromSeconds(4);
+
     private async Task PollDeviceAsync(DeviceContext ctx, CancellationToken cancellationToken)
     {
+        using var pollCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        pollCts.CancelAfter(PollTimeout);
+
         try
         {
-            if (!ctx.Service.IsConnected)
-                await ctx.Service.ConnectAsync(cancellationToken);
-
-            if (ctx.Device.DeviceModel is null)
-                return; // Register map not yet resolved — skip until model is detected.
+            // Always disconnect and reconnect to get a fresh connection state.
+            // TCP sockets don't reliably detect remote disconnection without I/O.
+            try { await ctx.Service.DisconnectAsync(); } catch { }
+            await ctx.Service.ConnectAsync(pollCts.Token);
 
             var timestamp = DateTime.UtcNow;
-            var values    = await ReadAllRegistersAsync(ctx.Service, ctx.Device, timestamp, cancellationToken);
+
+            if (ctx.Device.DeviceModel is null)
+            {
+                // No register map — heartbeat read to verify device is still alive.
+                await ctx.Service.ReadInputRegistersAsync(ctx.Device.SlaveId, 0, 1, pollCts.Token);
+
+                RegisterValuesUpdated?.Invoke(this, new RegisterValuesUpdatedEventArgs
+                {
+                    Device    = ctx.Device,
+                    Values    = Array.Empty<RegisterValue>(),
+                    Timestamp = timestamp
+                });
+                return;
+            }
+
+            var values = await ReadAllRegistersAsync(ctx.Service, ctx.Device, timestamp, pollCts.Token);
 
             RegisterValuesUpdated?.Invoke(this, new RegisterValuesUpdatedEventArgs
             {
@@ -108,13 +143,13 @@ public class PollingEngine : IPollingEngine
                 Timestamp = timestamp
             });
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            throw; // Propagate to stop the loop.
+            throw; // Shutdown requested — propagate.
         }
         catch (Exception ex)
         {
-            // Disconnect so the next poll attempt triggers a fresh reconnect.
+            // Disconnect so the next poll attempt starts clean.
             try { await ctx.Service.DisconnectAsync(); } catch { }
 
             DeviceConnectionFailed?.Invoke(this, new DeviceConnectionFailedEventArgs
