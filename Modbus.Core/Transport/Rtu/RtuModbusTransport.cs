@@ -69,7 +69,7 @@ public class RtuModbusTransport : IModbusTransport
             await port.BaseStream.WriteAsync(request, cancellationToken);
 
             return expectedResponseLength > 0
-                ? await ReadExactAsync(port.BaseStream, expectedResponseLength, cancellationToken)
+                ? await ReadExactAsync(port, expectedResponseLength, cancellationToken)
                 : await ReadUntilSilenceAsync(port, cancellationToken);
         }
         finally
@@ -78,17 +78,37 @@ public class RtuModbusTransport : IModbusTransport
         }
     }
 
-    private static async Task<byte[]> ReadExactAsync(Stream stream, int length, CancellationToken cancellationToken)
+    /// <summary>
+    /// Reads exactly <paramref name="length"/> bytes using <see cref="SerialPort.BytesToRead"/> polling.
+    /// SerialPort.BaseStream.ReadAsync on Windows ignores both ReadTimeout and CancellationToken,
+    /// so polling is the only reliable way to enforce a timeout and support cancellation.
+    /// </summary>
+    private static async Task<byte[]> ReadExactAsync(SerialPort port, int length, CancellationToken cancellationToken)
     {
         var buffer = new byte[length];
         int received = 0;
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+
         while (received < length)
         {
-            int read = await stream.ReadAsync(buffer.AsMemory(received), cancellationToken);
-            if (read == 0)
-                throw new EndOfStreamException("Serial port stream ended unexpectedly.");
-            received += read;
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (port.BytesToRead > 0)
+            {
+                int toRead = Math.Min(port.BytesToRead, length - received);
+                received += port.Read(buffer, received, toRead);
+            }
+            else if (timer.ElapsedMilliseconds > 1000)
+            {
+                throw new TimeoutException(
+                    $"RTU device did not respond (received {received}/{length} bytes).");
+            }
+            else
+            {
+                await Task.Delay(5, cancellationToken);
+            }
         }
+
         return buffer;
     }
 

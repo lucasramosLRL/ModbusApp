@@ -141,9 +141,9 @@ public class PollingEngine : IPollingEngine
 
             var timestamp = DateTime.UtcNow;
 
-            if (ctx.Device.DeviceModel is null)
+            if (ctx.Device.DeviceModel is null || ctx.Device.DeviceModel.Registers.Count == 0)
             {
-                // No register map — heartbeat read to verify device is still alive.
+                // No register map (or empty model) — heartbeat read to verify device is still alive.
                 await ctx.Service.ReadInputRegistersAsync(ctx.Device.SlaveId, 0, 1, pollCts.Token);
 
                 RegisterValuesUpdated?.Invoke(this, new RegisterValuesUpdatedEventArgs
