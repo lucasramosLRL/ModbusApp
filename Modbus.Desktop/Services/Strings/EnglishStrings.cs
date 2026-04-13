@@ -91,5 +91,6 @@ internal static class EnglishStrings
         ["Language"]             = "Language",
         ["ChangeInSettings"]     = "Change in Settings",
         ["NoPortConfigured"]     = "No COM port configured.",
+        ["PortUnavailable"]      = "Port not connected. Make sure the device is plugged in.",
     };
 }

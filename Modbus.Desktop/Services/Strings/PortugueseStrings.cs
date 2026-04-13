@@ -91,5 +91,6 @@ internal static class PortugueseStrings
         ["Language"]             = "Idioma",
         ["ChangeInSettings"]     = "Alterar nas Configurações",
         ["NoPortConfigured"]     = "Nenhuma porta COM configurada.",
+        ["PortUnavailable"]      = "Porta não conectada. Verifique se o dispositivo está plugado.",
     };
 }

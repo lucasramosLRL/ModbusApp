@@ -5,9 +5,11 @@ using Modbus.Core.Domain.Entities;
 using Modbus.Core.Domain.Repositories;
 using Modbus.Core.Domain.ValueObjects;
 using Modbus.Core.Services.Scanning;
+using Modbus.Desktop.Infrastructure;
+using Modbus.Desktop.Services;
 using System;
 using System.Collections.ObjectModel;
-using Modbus.Desktop.Services;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TransportType = Modbus.Core.Domain.Enums.TransportType;
@@ -43,6 +45,7 @@ public partial class AddDeviceViewModel : ObservableObject
     {
         if (value && SelectedTransport != TransportType.Rtu)
             SelectedTransport = TransportType.Rtu;
+        OnPropertyChanged(nameof(IsRtuPortUnavailable));
     }
 
     partial void OnIsTcpChanged(bool value)
@@ -58,6 +61,12 @@ public partial class AddDeviceViewModel : ObservableObject
 
     [ObservableProperty]
     private byte _endAddress = 247;
+
+    public bool IsRtuPortUnavailable =>
+        IsRtu &&
+        !string.IsNullOrEmpty(RtuSettingsService.Instance.PortName) &&
+        !SerialPortScanner.GetPortNames().Contains(RtuSettingsService.Instance.PortName,
+            StringComparer.OrdinalIgnoreCase);
 
     // ── TCP parameters ────────────────────────────────────────────────────────
 
@@ -296,5 +305,8 @@ public partial class AddDeviceViewModel : ObservableObject
         _deviceRepository      = deviceRepository;
         _deviceModelRepository = deviceModelRepository;
         _parent                = parent;
+
+        RtuSettingsService.Instance.PropertyChanged += (_, _) =>
+            OnPropertyChanged(nameof(IsRtuPortUnavailable));
     }
 }

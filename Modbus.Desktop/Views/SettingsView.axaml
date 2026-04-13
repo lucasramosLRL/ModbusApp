@@ -103,6 +103,11 @@
                               HorizontalAlignment="Stretch"
                               Margin="12,4,0,0" />
                 </Grid>
+                <TextBlock Text="{Binding [PortUnavailable], Source={x:Static svc:LocalizationService.Instance}}"
+                           FontSize="12"
+                           Foreground="#FFB300"
+                           IsVisible="{Binding IsPortUnavailable}"
+                           Margin="0,6,0,0" />
             </StackPanel>
         </Border>
 

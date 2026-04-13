@@ -82,6 +82,10 @@
                                            FontSize="13"
                                            Foreground="#E57373"
                                            IsVisible="{Binding Summary, Source={x:Static svc:RtuSettingsService.Instance}, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                                <TextBlock Text="{Binding [PortUnavailable], Source={x:Static svc:LocalizationService.Instance}}"
+                                           FontSize="13"
+                                           Foreground="#FFB300"
+                                           IsVisible="{Binding IsRtuPortUnavailable}" />
                             </StackPanel>
                             <Button Grid.Column="1"
                                     Content="{Binding [ChangeInSettings], Source={x:Static svc:LocalizationService.Instance}}"

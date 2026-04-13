@@ -31,6 +31,10 @@ public partial class SettingsViewModel : ObservableObject
     // ── RTU / COM port ────────────────────────────────────────────────────────
 
     public ObservableCollection<string> AvailablePorts { get; }
+    private HashSet<string> _connectedPorts = new(StringComparer.OrdinalIgnoreCase);
+
+    public bool IsPortUnavailable =>
+        !string.IsNullOrEmpty(_rtu.PortName) && !_connectedPorts.Contains(_rtu.PortName);
 
     public int[]      AvailableBaudRates { get; } = { 300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200 };
     public Parity[]   AvailableParities  { get; } = (Parity[])Enum.GetValues(typeof(Parity));
@@ -70,13 +74,16 @@ public partial class SettingsViewModel : ObservableObject
     private void RefreshPorts()
     {
         var current = SelectedPort;
+        var ports = SerialPortScanner.GetPortNames();
+        _connectedPorts = new HashSet<string>(ports, StringComparer.OrdinalIgnoreCase);
         AvailablePorts.Clear();
-        foreach (var p in SerialPortScanner.GetPortNames())
+        foreach (var p in ports)
             AvailablePorts.Add(p);
-        // Keep the saved port in the list even if it's not currently connected,
+        // Keep the saved port in the list even if not currently connected,
         // so the ComboBox binding doesn't reset it to null.
         if (!string.IsNullOrEmpty(current) && !AvailablePorts.Contains(current))
             AvailablePorts.Insert(0, current);
+        OnPropertyChanged(nameof(IsPortUnavailable));
     }
 
     // ── Constructor ───────────────────────────────────────────────────────────
@@ -89,6 +96,7 @@ public partial class SettingsViewModel : ObservableObject
         // Populate port list; always include the saved port even if not currently connected,
         // so the ComboBox binding doesn't reset it to null and overwrite the persisted value.
         var ports = SerialPortScanner.GetPortNames();
+        _connectedPorts = new HashSet<string>(ports, StringComparer.OrdinalIgnoreCase);
         AvailablePorts = new ObservableCollection<string>(ports);
         if (!string.IsNullOrEmpty(_rtu.PortName) && !AvailablePorts.Contains(_rtu.PortName))
             AvailablePorts.Insert(0, _rtu.PortName);
@@ -101,6 +109,7 @@ public partial class SettingsViewModel : ObservableObject
             OnPropertyChanged(nameof(DataBits));
             OnPropertyChanged(nameof(SelectedParity));
             OnPropertyChanged(nameof(SelectedStopBits));
+            OnPropertyChanged(nameof(IsPortUnavailable));
         };
     }
 }
