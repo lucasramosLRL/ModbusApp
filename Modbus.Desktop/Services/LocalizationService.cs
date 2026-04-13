@@ -10,11 +10,11 @@ public enum AppLanguage { English, Portuguese }
 
 public class LocalizationService : ObservableObject
 {
-    public static LocalizationService Instance { get; } = new();
-
     private static readonly string PreferencePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "ModbusApp", "lang.txt");
+
+    public static LocalizationService Instance { get; } = new();
 
     private Dictionary<string, string> _strings = EnglishStrings.All;
     private AppLanguage _currentLanguage = AppLanguage.Portuguese;

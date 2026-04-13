@@ -9,11 +9,11 @@ namespace Modbus.Desktop.Services;
 
 public partial class RtuSettingsService : ObservableObject
 {
-    public static RtuSettingsService Instance { get; } = new();
-
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "ModbusApp", "rtu-settings.json");
+
+    public static RtuSettingsService Instance { get; } = new();
 
     [ObservableProperty] private string _portName  = "";
     [ObservableProperty] private int    _baudRate  = 9600;
