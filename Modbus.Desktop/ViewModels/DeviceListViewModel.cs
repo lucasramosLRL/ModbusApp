@@ -17,6 +17,7 @@ public partial class DeviceListViewModel : ObservableObject
     private readonly IRegisterValueRepository _registerValueRepository;
     private readonly IPollingEngine _pollingEngine;
     private readonly IDeviceScanService _scanService;
+    private readonly SettingsViewModel _settingsViewModel;
     private bool _pollingStarted;
 
     public event EventHandler<object>? NavigationRequested;
@@ -31,13 +32,15 @@ public partial class DeviceListViewModel : ObservableObject
         IDeviceModelRepository deviceModelRepository,
         IRegisterValueRepository registerValueRepository,
         IPollingEngine pollingEngine,
-        IDeviceScanService scanService)
+        IDeviceScanService scanService,
+        SettingsViewModel settingsViewModel)
     {
-        _deviceRepository = deviceRepository;
+        _deviceRepository    = deviceRepository;
         _deviceModelRepository = deviceModelRepository;
         _registerValueRepository = registerValueRepository;
-        _pollingEngine = pollingEngine;
-        _scanService = scanService;
+        _pollingEngine       = pollingEngine;
+        _scanService         = scanService;
+        _settingsViewModel   = settingsViewModel;
 
         _pollingEngine.RegisterValuesUpdated += OnRegisterValuesUpdated;
         _pollingEngine.DeviceConnectionFailed += OnDeviceConnectionFailed;
@@ -97,7 +100,8 @@ public partial class DeviceListViewModel : ObservableObject
         NavigationRequested?.Invoke(this, vm);
     }
 
-    internal void NavigateBack() => NavigationRequested?.Invoke(this, this);
+    internal void NavigateBack()       => NavigationRequested?.Invoke(this, this);
+    internal void NavigateToSettings() => NavigationRequested?.Invoke(this, _settingsViewModel);
 
     internal Task SuspendRtuPollingAsync() => _pollingEngine.SuspendRtuPollingAsync();
     internal void ResumeRtuPolling()       => _pollingEngine.ResumeRtuPolling();

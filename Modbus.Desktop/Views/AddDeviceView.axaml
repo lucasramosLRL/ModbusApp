@@ -54,7 +54,7 @@
                     </StackPanel>
                 </Border>
 
-                <!-- RTU connection settings -->
+                <!-- RTU: current COM port summary + address range -->
                 <Border IsVisible="{Binding IsRtu}"
                         Padding="16"
                         CornerRadius="8"
@@ -62,78 +62,51 @@
                         BorderBrush="#1A1A2E"
                         Background="#1A1A2E">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="{Binding [SerialPortSettings], Source={x:Static svc:LocalizationService.Instance}}"
-                                   FontSize="13"
-                                   FontWeight="SemiBold"
-                                   Foreground="#FFFFFF" />
-                        <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto">
 
-                            <!-- Row 0 -->
-                            <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
-                                <TextBlock Text="{Binding [ComPort], Source={x:Static svc:LocalizationService.Instance}}"
-                                           FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <ComboBox Grid.Column="0"
-                                              ItemsSource="{Binding AvailablePorts}"
-                                              SelectedItem="{Binding SelectedPort}"
-                                              HorizontalAlignment="Stretch" />
-                                    <Button Grid.Column="1"
-                                            Content="↺"
-                                            Command="{Binding RefreshPortsCommand}"
-                                            Padding="8,4"
-                                            Margin="4,0,0,0"
-                                            ToolTip.Tip="{Binding [RefreshPortList], Source={x:Static svc:LocalizationService.Instance}}"
-                                            VerticalAlignment="Center" />
-                                </Grid>
+                        <!-- COM port summary row -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding [SerialPortSettings], Source={x:Static svc:LocalizationService.Instance}}"
+                                           FontSize="11" Opacity="0.55" Foreground="#FFFFFF" />
+                                <!-- Summary from RtuSettingsService (e.g. "COM5  9600  8N2") -->
+                                <TextBlock FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="#FFFFFF">
+                                    <TextBlock.Text>
+                                        <MultiBinding StringFormat="{}{0}">
+                                            <Binding Path="Summary" Source="{x:Static svc:RtuSettingsService.Instance}" />
+                                        </MultiBinding>
+                                    </TextBlock.Text>
+                                </TextBlock>
+                                <TextBlock Text="{Binding [NoPortConfigured], Source={x:Static svc:LocalizationService.Instance}}"
+                                           FontSize="13"
+                                           Foreground="#E57373"
+                                           IsVisible="{Binding Summary, Source={x:Static svc:RtuSettingsService.Instance}, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                             </StackPanel>
-                            <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" Margin="12,0,0,0">
-                                <TextBlock Text="{Binding [BaudRate], Source={x:Static svc:LocalizationService.Instance}}"
-                                           FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
-                                <ComboBox ItemsSource="{Binding AvailableBaudRates}"
-                                          SelectedItem="{Binding SelectedBaudRate}"
-                                          HorizontalAlignment="Stretch" />
-                            </StackPanel>
-                            <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4" Margin="12,0,0,0">
-                                <TextBlock Text="{Binding [DataBits], Source={x:Static svc:LocalizationService.Instance}}"
-                                           FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
-                                <NumericUpDown Value="{Binding DataBits}"
-                                               Minimum="7" Maximum="8" Increment="1"
-                                               FormatString="0"
-                                               HorizontalAlignment="Stretch" />
-                            </StackPanel>
-
-                            <!-- Row 1 -->
-                            <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,12,0,0">
-                                <TextBlock Text="{Binding [Parity], Source={x:Static svc:LocalizationService.Instance}}"
-                                           FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
-                                <ComboBox ItemsSource="{Binding AvailableParities}"
-                                          SelectedItem="{Binding SelectedParity}"
-                                          HorizontalAlignment="Stretch" />
-                            </StackPanel>
-                            <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4" Margin="12,12,0,0">
-                                <TextBlock Text="{Binding [StopBits], Source={x:Static svc:LocalizationService.Instance}}"
-                                           FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
-                                <ComboBox ItemsSource="{Binding AvailableStopBits}"
-                                          SelectedItem="{Binding SelectedStopBits}"
-                                          HorizontalAlignment="Stretch" />
-                            </StackPanel>
-                            <StackPanel Grid.Row="1" Grid.Column="2" Spacing="4" Margin="12,12,0,0">
-                                <TextBlock Text="{Binding [AddressRange], Source={x:Static svc:LocalizationService.Instance}}"
-                                           FontSize="11" Opacity="0.55" Foreground="#1F1F1F" />
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <NumericUpDown Value="{Binding StartAddress}"
-                                                   Minimum="1" Maximum="247" Increment="1"
-                                                   FormatString="0"
-                                                   Width="112" />
-                                    <TextBlock Text="—" VerticalAlignment="Center" Opacity="0.55" />
-                                    <NumericUpDown Value="{Binding EndAddress}"
-                                                   Minimum="1" Maximum="247" Increment="1"
-                                                   FormatString="0"
-                                                   Width="112" />
-                                </StackPanel>
-                            </StackPanel>
-
+                            <Button Grid.Column="1"
+                                    Content="{Binding [ChangeInSettings], Source={x:Static svc:LocalizationService.Instance}}"
+                                    Command="{Binding GoToSettingsCommand}"
+                                    Padding="12,8"
+                                    VerticalAlignment="Center" />
                         </Grid>
+
+                        <!-- Address range -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="{Binding [AddressRange], Source={x:Static svc:LocalizationService.Instance}}"
+                                       FontSize="11" Opacity="0.55" Foreground="#FFFFFF" />
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <NumericUpDown Value="{Binding StartAddress}"
+                                               Minimum="1" Maximum="247" Increment="1"
+                                               FormatString="0"
+                                               Width="112" />
+                                <TextBlock Text="—" VerticalAlignment="Center" Opacity="0.55" />
+                                <NumericUpDown Value="{Binding EndAddress}"
+                                               Minimum="1" Maximum="247" Increment="1"
+                                               FormatString="0"
+                                               Width="112" />
+                            </StackPanel>
+                        </StackPanel>
+
                     </StackPanel>
                 </Border>
 

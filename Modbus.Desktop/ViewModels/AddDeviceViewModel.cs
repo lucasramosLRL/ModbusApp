@@ -7,12 +7,9 @@ using Modbus.Core.Domain.ValueObjects;
 using Modbus.Core.Services.Scanning;
 using System;
 using System.Collections.ObjectModel;
-using Modbus.Desktop.Infrastructure;
 using Modbus.Desktop.Services;
 using System.Threading;
 using System.Threading.Tasks;
-using Parity = Modbus.Core.Domain.Enums.Parity;
-using StopBits = Modbus.Core.Domain.Enums.StopBits;
 using TransportType = Modbus.Core.Domain.Enums.TransportType;
 
 namespace Modbus.Desktop.ViewModels;
@@ -54,37 +51,7 @@ public partial class AddDeviceViewModel : ObservableObject
             SelectedTransport = TransportType.Tcp;
     }
 
-    // ── RTU parameters ────────────────────────────────────────────────────────
-
-    public ObservableCollection<string> AvailablePorts { get; } = new(SerialPortScanner.GetPortNames());
-
-    [RelayCommand]
-    private void RefreshPorts()
-    {
-        AvailablePorts.Clear();
-        foreach (var p in SerialPortScanner.GetPortNames())
-            AvailablePorts.Add(p);
-        if (SelectedPort is null && AvailablePorts.Count > 0)
-            SelectedPort = AvailablePorts[0];
-    }
-    public int[] AvailableBaudRates { get; } = { 300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200 };
-    public Parity[] AvailableParities { get; } = (Parity[])Enum.GetValues(typeof(Parity));
-    public StopBits[] AvailableStopBits { get; } = (StopBits[])Enum.GetValues(typeof(StopBits));
-
-    [ObservableProperty]
-    private string? _selectedPort;
-
-    [ObservableProperty]
-    private int _selectedBaudRate = 9600;
-
-    [ObservableProperty]
-    private Parity _selectedParity = Parity.None;
-
-    [ObservableProperty]
-    private StopBits _selectedStopBits = StopBits.One;
-
-    [ObservableProperty]
-    private int _dataBits = 8;
+    // ── RTU address range ─────────────────────────────────────────────────────
 
     [ObservableProperty]
     private byte _startAddress = 1;
@@ -136,7 +103,6 @@ public partial class AddDeviceViewModel : ObservableObject
     [ObservableProperty]
     private byte _slaveId = 1;
 
-    // For TCP manual/auto entry
     [ObservableProperty]
     private string _deviceIp = "";
 
@@ -157,15 +123,8 @@ public partial class AddDeviceViewModel : ObservableObject
         SaveCommand.NotifyCanExecuteChanged();
     }
 
-    partial void OnIsSavingChanged(bool value)
-    {
-        SaveCommand.NotifyCanExecuteChanged();
-    }
-
-    partial void OnDeviceNameChanged(string value)
-    {
-        SaveCommand.NotifyCanExecuteChanged();
-    }
+    partial void OnIsSavingChanged(bool value)   => SaveCommand.NotifyCanExecuteChanged();
+    partial void OnDeviceNameChanged(string value) => SaveCommand.NotifyCanExecuteChanged();
 
     [RelayCommand(CanExecute = nameof(CanScan))]
     private async Task ScanAsync()
@@ -192,20 +151,12 @@ public partial class AddDeviceViewModel : ObservableObject
         {
             if (IsRtu)
             {
-                if (string.IsNullOrEmpty(SelectedPort))
+                var config = RtuSettingsService.Instance.ToRtuConfig();
+                if (string.IsNullOrEmpty(config.PortName))
                 {
                     ScanStatus = LocalizationService.Instance["SelectComPortFirst"];
                     return;
                 }
-
-                var config = new RtuConfig
-                {
-                    PortName = SelectedPort,
-                    BaudRate = SelectedBaudRate,
-                    DataBits = DataBits,
-                    Parity = SelectedParity,
-                    StopBits = SelectedStopBits
-                };
 
                 await _parent.SuspendRtuPollingAsync();
                 try
@@ -224,8 +175,7 @@ public partial class AddDeviceViewModel : ObservableObject
             }
             else
             {
-                await foreach (var result in _scanService.ScanTcpAsync(
-                    progress, token))
+                await foreach (var result in _scanService.ScanTcpAsync(progress, token))
                 {
                     var vm = new ScanResultViewModel(result);
                     await Dispatcher.UIThread.InvokeAsync(() => ScanResults.Add(vm));
@@ -270,7 +220,6 @@ public partial class AddDeviceViewModel : ObservableObject
         {
             var serialNumber = SelectedResult?.Result.SerialNumber;
 
-            // Prevent duplicate devices with the same serial number
             if (serialNumber.HasValue &&
                 await _deviceRepository.ExistsBySerialNumberAsync(serialNumber.Value))
             {
@@ -287,25 +236,17 @@ public partial class AddDeviceViewModel : ObservableObject
 
             var device = new ModbusDevice
             {
-                Name = DeviceName,
-                SlaveId = SlaveId,
+                Name          = DeviceName,
+                SlaveId       = SlaveId,
                 TransportType = SelectedTransport,
-                SerialNumber = serialNumber,
-                IsActive = true,
+                SerialNumber  = serialNumber,
+                IsActive      = true,
                 DeviceModelId = deviceModelId
             };
 
             if (SelectedTransport == TransportType.Rtu)
             {
-                var src = SelectedResult?.Result.Rtu;
-                device.Rtu = new RtuConfig
-                {
-                    PortName = src?.PortName ?? SelectedPort ?? "",
-                    BaudRate = src?.BaudRate ?? SelectedBaudRate,
-                    DataBits = src?.DataBits ?? DataBits,
-                    Parity = src?.Parity ?? SelectedParity,
-                    StopBits = src?.StopBits ?? SelectedStopBits
-                };
+                device.Rtu = RtuSettingsService.Instance.ToRtuConfig();
             }
             else
             {
@@ -313,18 +254,17 @@ public partial class AddDeviceViewModel : ObservableObject
                 device.Tcp = new TcpConfig
                 {
                     IpAddress = src?.IpAddress ?? DeviceIp,
-                    Port = src?.Port ?? TcpPort
+                    Port      = src?.Port ?? TcpPort
                 };
             }
 
             await _deviceRepository.AddAsync(device);
             await _parent.LoadDevicesAsync();
 
-            // Stay on this screen so the user can add more devices from the list
-            DeviceName = "";
+            DeviceName    = "";
             SelectedResult = null;
-            SaveError = null;
-            ScanStatus = LocalizationService.Instance["DeviceSaved"];
+            SaveError     = null;
+            ScanStatus    = LocalizationService.Instance["DeviceSaved"];
         }
         catch (Exception ex)
         {
@@ -341,6 +281,9 @@ public partial class AddDeviceViewModel : ObservableObject
     [RelayCommand]
     private void GoBack() => _parent.NavigateBack();
 
+    [RelayCommand]
+    private void GoToSettings() => _parent.NavigateToSettings();
+
     // ── Constructor ───────────────────────────────────────────────────────────
 
     public AddDeviceViewModel(
@@ -349,13 +292,9 @@ public partial class AddDeviceViewModel : ObservableObject
         IDeviceModelRepository deviceModelRepository,
         DeviceListViewModel parent)
     {
-        _scanService = scanService;
-        _deviceRepository = deviceRepository;
+        _scanService           = scanService;
+        _deviceRepository      = deviceRepository;
         _deviceModelRepository = deviceModelRepository;
-        _parent = parent;
-
-        // Pre-select first available port
-        if (AvailablePorts.Count > 0)
-            SelectedPort = AvailablePorts[0];
+        _parent                = parent;
     }
 }

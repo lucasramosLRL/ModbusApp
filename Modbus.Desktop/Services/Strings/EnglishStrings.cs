@@ -89,5 +89,7 @@ internal static class EnglishStrings
         // SettingsView
         ["SettingsTitle"]        = "Settings",
         ["Language"]             = "Language",
+        ["ChangeInSettings"]     = "Change in Settings",
+        ["NoPortConfigured"]     = "No COM port configured.",
     };
 }

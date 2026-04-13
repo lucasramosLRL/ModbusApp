@@ -89,5 +89,7 @@ internal static class PortugueseStrings
         // SettingsView
         ["SettingsTitle"]        = "Configurações",
         ["Language"]             = "Idioma",
+        ["ChangeInSettings"]     = "Alterar nas Configurações",
+        ["NoPortConfigured"]     = "Nenhuma porta COM configurada.",
     };
 }

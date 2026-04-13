@@ -75,6 +75,7 @@ public partial class App : Application
                 TimeSpan.FromSeconds(5)));
 
         services.AddSingleton(_ => LocalizationService.Instance);
+        services.AddSingleton(_ => RtuSettingsService.Instance);
         services.AddSingleton<DeviceListViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainViewModel>();

@@ -32,7 +32,14 @@ public partial class MainViewModel : ObservableObject
         UpdateNavTitles();
         LocalizationService.Instance.PropertyChanged += OnLocalizationChanged;
 
-        deviceList.NavigationRequested += (_, page) => CurrentPage = page;
+        deviceList.NavigationRequested += (_, page) =>
+        {
+            CurrentPage = page;
+            if (page == _settings)
+                SelectedNavItem = NavItems.FirstOrDefault(n => n.Key == "NavSettings");
+            else
+                SelectedNavItem = NavItems.FirstOrDefault(n => n.Key == "NavDevices");
+        };
 
         SelectedNavItem = NavItems[0];
         CurrentPage = _deviceList;
