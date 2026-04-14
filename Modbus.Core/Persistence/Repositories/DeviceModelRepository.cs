@@ -30,4 +30,10 @@ public class DeviceModelRepository : IDeviceModelRepository
         _db.DeviceModels.Add(model);
         await _db.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task UpdateAsync(DeviceModel model, CancellationToken cancellationToken = default)
+    {
+        _db.DeviceModels.Update(model);
+        await _db.SaveChangesAsync(cancellationToken);
+    }
 }

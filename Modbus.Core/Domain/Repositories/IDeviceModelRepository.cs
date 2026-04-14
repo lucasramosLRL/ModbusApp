@@ -8,4 +8,5 @@ public interface IDeviceModelRepository
     Task<DeviceModel?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<DeviceModel?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
     Task AddAsync(DeviceModel model, CancellationToken cancellationToken = default);
+    Task UpdateAsync(DeviceModel model, CancellationToken cancellationToken = default);
 }

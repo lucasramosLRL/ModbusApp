@@ -67,54 +67,139 @@
             </Grid>
         </Border>
 
-        <!-- Register section header -->
-        <TextBlock DockPanel.Dock="Top"
-                   Text="{Binding [RegisterValues], Source={x:Static svc:LocalizationService.Instance}}"
-                   FontSize="16"
-                   FontWeight="SemiBold"
-                   Margin="0,0,0,8" />
+        <!-- Tab Control -->
+        <TabControl SelectedIndex="{Binding SelectedTabIndex}">
 
-        <!-- Empty state -->
-        <TextBlock DockPanel.Dock="Top"
-                   Text="{Binding [NoRegisterValues], Source={x:Static svc:LocalizationService.Instance}}"
-                   IsVisible="{Binding !RegisterValues.Count}"
-                   Opacity="0.5"
-                   Margin="0,12" />
+            <!-- Tab 1: Real-time Readings -->
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="{Binding [TabRealTime], Source={x:Static svc:LocalizationService.Instance}}" />
+                </TabItem.Header>
 
-        <!-- Register values DataGrid -->
-        <DataGrid ItemsSource="{Binding RegisterValues}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  GridLinesVisibility="Horizontal"
-                  CanUserResizeColumns="True">
-            <DataGrid.Columns>
-                <DataGridTextColumn Binding="{Binding Name}" Width="*">
-                    <DataGridTextColumn.Header>
-                        <TextBlock Text="{Binding [ColName], Source={x:Static svc:LocalizationService.Instance}}" />
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
-                <DataGridTextColumn Binding="{Binding Address}" Width="80">
-                    <DataGridTextColumn.Header>
-                        <TextBlock Text="{Binding [ColAddress], Source={x:Static svc:LocalizationService.Instance}}" />
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
-                <DataGridTextColumn Binding="{Binding RegisterType}" Width="80">
-                    <DataGridTextColumn.Header>
-                        <TextBlock Text="{Binding [ColType], Source={x:Static svc:LocalizationService.Instance}}" />
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
-                <DataGridTextColumn Binding="{Binding DisplayValue}" Width="140">
-                    <DataGridTextColumn.Header>
-                        <TextBlock Text="{Binding [ColValue], Source={x:Static svc:LocalizationService.Instance}}" />
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
-                <DataGridTextColumn Binding="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}" Width="110">
-                    <DataGridTextColumn.Header>
-                        <TextBlock Text="{Binding [ColLastUpdated], Source={x:Static svc:LocalizationService.Instance}}" />
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
-            </DataGrid.Columns>
-        </DataGrid>
+                <ScrollViewer Padding="0,12,0,0">
+                    <StackPanel Spacing="12">
+
+                        <!-- Empty state -->
+                        <TextBlock Text="{Binding [NoLiveData], Source={x:Static svc:LocalizationService.Instance}}"
+                                   IsVisible="{Binding !ReadingGroups.Count}"
+                                   Opacity="0.5"
+                                   Margin="0,12" />
+
+                        <!-- Reading groups -->
+                        <ItemsControl ItemsSource="{Binding ReadingGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ReadingGroupViewModel">
+                                    <Border Background="#252540"
+                                            CornerRadius="8"
+                                            Padding="16"
+                                            Margin="0,0,0,4">
+                                        <StackPanel Spacing="12">
+
+                                            <!-- Group header -->
+                                            <TextBlock Text="{Binding GroupName}"
+                                                       FontSize="15"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#FFFFFF"
+                                                       Opacity="0.85" />
+
+                                            <!-- Readings grid -->
+                                            <ItemsControl ItemsSource="{Binding Readings}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel Orientation="Horizontal" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:ElectricalReadingViewModel">
+                                                        <Border Background="#1A1A2E"
+                                                                CornerRadius="6"
+                                                                Padding="14,10"
+                                                                Margin="0,0,8,8"
+                                                                MinWidth="170">
+                                                            <StackPanel Spacing="4">
+                                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                    <TextBlock Text="{Binding Name}"
+                                                                               FontSize="12"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="#7070A0" />
+                                                                    <TextBlock Text="{Binding Description}"
+                                                                               FontSize="11"
+                                                                               Opacity="0.45"
+                                                                               Foreground="#FFFFFF"
+                                                                               VerticalAlignment="Center" />
+                                                                </StackPanel>
+                                                                <TextBlock Text="{Binding DisplayValue}"
+                                                                           FontSize="20"
+                                                                           FontWeight="Medium"
+                                                                           Foreground="#FFFFFF" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Tab 2: Raw Registers -->
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="{Binding [TabRawRegisters], Source={x:Static svc:LocalizationService.Instance}}" />
+                </TabItem.Header>
+
+                <DockPanel Margin="0,12,0,0">
+                    <!-- Empty state -->
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="{Binding [NoRegisterValues], Source={x:Static svc:LocalizationService.Instance}}"
+                               IsVisible="{Binding !RegisterValues.Count}"
+                               Opacity="0.5"
+                               Margin="0,12" />
+
+                    <!-- Register values DataGrid -->
+                    <DataGrid ItemsSource="{Binding RegisterValues}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              GridLinesVisibility="Horizontal"
+                              CanUserResizeColumns="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Binding="{Binding Name}" Width="*">
+                                <DataGridTextColumn.Header>
+                                    <TextBlock Text="{Binding [ColName], Source={x:Static svc:LocalizationService.Instance}}" />
+                                </DataGridTextColumn.Header>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Binding="{Binding Address}" Width="80">
+                                <DataGridTextColumn.Header>
+                                    <TextBlock Text="{Binding [ColAddress], Source={x:Static svc:LocalizationService.Instance}}" />
+                                </DataGridTextColumn.Header>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Binding="{Binding RegisterType}" Width="80">
+                                <DataGridTextColumn.Header>
+                                    <TextBlock Text="{Binding [ColType], Source={x:Static svc:LocalizationService.Instance}}" />
+                                </DataGridTextColumn.Header>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Binding="{Binding DisplayValue}" Width="140">
+                                <DataGridTextColumn.Header>
+                                    <TextBlock Text="{Binding [ColValue], Source={x:Static svc:LocalizationService.Instance}}" />
+                                </DataGridTextColumn.Header>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Binding="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}" Width="110">
+                                <DataGridTextColumn.Header>
+                                    <TextBlock Text="{Binding [ColLastUpdated], Source={x:Static svc:LocalizationService.Instance}}" />
+                                </DataGridTextColumn.Header>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+
+        </TabControl>
 
     </DockPanel>
 </UserControl>
