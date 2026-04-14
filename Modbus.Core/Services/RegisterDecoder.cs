@@ -27,12 +27,18 @@ public static class RegisterDecoder
 
     /// <summary>
     /// Combines two 16-bit words into a 32-bit unsigned integer respecting word order.
-    /// BigEndian = words[0] is the high word (most common in energy meters).
+    /// BigEndian    = ABCD — words[0] is the high word.
+    /// LittleEndian = CDAB — words[1] is the high word.
+    /// ByteSwapped  = DCBA — bytes within each word are swapped, then words[1] is high.
     /// </summary>
     private static uint Combine32(ushort[] words, WordOrder wordOrder) => wordOrder switch
     {
         WordOrder.BigEndian    => ((uint)words[0] << 16) | words[1],
         WordOrder.LittleEndian => ((uint)words[1] << 16) | words[0],
+        WordOrder.ByteSwapped  => ((uint)SwapBytes(words[1]) << 16) | SwapBytes(words[0]),
         _                      => throw new ArgumentOutOfRangeException(nameof(wordOrder), wordOrder, null)
     };
+
+    private static ushort SwapBytes(ushort value) =>
+        (ushort)((value >> 8) | (value << 8));
 }

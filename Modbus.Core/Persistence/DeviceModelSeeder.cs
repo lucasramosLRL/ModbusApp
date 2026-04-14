@@ -83,7 +83,7 @@ public class DeviceModelSeeder
             Description   = description,
             DataType      = dataType,
             RegisterType  = RegisterType.Input,
-            WordOrder     = WordOrder.LittleEndian,
+            WordOrder     = WordOrder.ByteSwapped,
             ScaleFactor   = 1.0,
             Unit          = unit,
             IsWritable    = false,
