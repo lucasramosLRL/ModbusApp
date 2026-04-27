@@ -6,6 +6,7 @@ public class DeviceModel
     public required string Name { get; set; }
     public string? Manufacturer { get; set; }
     public byte? DeviceCode { get; set; }
+    public ushort? SqpfRegisterAddress { get; set; }
 
     public ICollection<RegisterDefinition> Registers { get; set; } = [];
     public ICollection<ModbusDevice> Devices { get; set; } = [];

@@ -195,6 +195,20 @@ public class PollingEngine : IPollingEngine
         DateTime timestamp,
         CancellationToken cancellationToken)
     {
+        // Read SQPF once per poll cycle; applies only to Float32 input registers marked UseSqpf.
+        // Falls back to 0x3210 (Padrão KRON) if the register is unavailable.
+        ushort sqpfValue = 0x3210;
+        if (device.DeviceModel?.SqpfRegisterAddress is { } sqpfAddr)
+        {
+            try
+            {
+                var sqpfWords = await service.ReadHoldingRegistersAsync(device.SlaveId, sqpfAddr, 1, cancellationToken);
+                sqpfValue = sqpfWords[0];
+            }
+            catch (OperationCanceledException) { throw; }
+            catch { /* device does not support SQPF register — keep default */ }
+        }
+
         var results = new List<RegisterValue>();
         var registers = device.DeviceModel!.Registers;
 
@@ -211,12 +225,20 @@ public class PollingEngine : IPollingEngine
                     int offset   = reg.Address - block.Start;
                     var regWords = words[offset..(offset + reg.RegisterCount)];
 
+                    bool useSqpf = reg.WordOrder == WordOrder.UseSqpf &&
+                                   reg.RegisterType == RegisterType.Input &&
+                                   reg.DataType == DataType.Float32;
+
+                    double value = useSqpf
+                        ? RegisterDecoder.DecodeFloat32WithSqpf(regWords, sqpfValue, reg.ScaleFactor)
+                        : RegisterDecoder.Decode(regWords, reg.DataType, reg.WordOrder, reg.ScaleFactor);
+
                     results.Add(new RegisterValue
                     {
                         DeviceId     = device.Id,
                         Address      = reg.Address,
                         RegisterType = reg.RegisterType,
-                        Value        = RegisterDecoder.Decode(regWords, reg.DataType, reg.WordOrder, reg.ScaleFactor),
+                        Value        = value,
                         RawWords     = regWords,
                         Timestamp    = timestamp
                     });

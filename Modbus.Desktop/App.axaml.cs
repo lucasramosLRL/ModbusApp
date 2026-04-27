@@ -31,6 +31,7 @@ public partial class App : Application
 
         using var db = Services.GetRequiredService<ModbusDbContext>();
         db.Database.EnsureCreated();
+        try { db.Database.ExecuteSqlRaw("ALTER TABLE DeviceModels ADD COLUMN SqpfRegisterAddress INTEGER"); } catch { }
 
         var seeder = new DeviceModelSeeder(Services.GetRequiredService<IDeviceModelRepository>());
         seeder.SeedAsync().GetAwaiter().GetResult();

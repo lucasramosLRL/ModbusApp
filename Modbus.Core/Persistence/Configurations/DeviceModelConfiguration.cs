@@ -12,6 +12,7 @@ public class DeviceModelConfiguration : IEntityTypeConfiguration<DeviceModel>
         builder.Property(m => m.Name).IsRequired().HasMaxLength(100);
         builder.Property(m => m.Manufacturer).HasMaxLength(100);
         builder.Property(m => m.DeviceCode).IsRequired(false);
+        builder.Property(m => m.SqpfRegisterAddress).IsRequired(false);
 
         builder.HasMany(m => m.Registers)
                .WithOne(r => r.DeviceModel)

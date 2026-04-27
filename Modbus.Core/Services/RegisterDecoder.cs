@@ -26,6 +26,26 @@ public static class RegisterDecoder
     }
 
     /// <summary>
+    /// Decodes a Float32 using the raw SQPF register value as a byte-permutation table.
+    /// Each nibble i of sqpfValue is the index into the transmitted byte stream for float byte i.
+    /// </summary>
+    public static double DecodeFloat32WithSqpf(ushort[] words, ushort sqpfValue, double scaleFactor = 1.0)
+    {
+        // Transmitted bytes in Modbus order: words[0] high, words[0] low, words[1] high, words[1] low
+        Span<byte> t = [(byte)(words[0] >> 8), (byte)(words[0] & 0xFF), (byte)(words[1] >> 8), (byte)(words[1] & 0xFF)];
+
+        // Reassemble float bytes: nibble i of sqpfValue = IEEE 754 float byte index at transmitted position i
+        uint raw = 0;
+        for (int i = 0; i < 4; i++)
+        {
+            int floatByteIdx = (sqpfValue >> (i * 4)) & 0xF;
+            raw |= (uint)t[i] << (floatByteIdx * 8);
+        }
+
+        return BitConverter.Int32BitsToSingle((int)raw) * scaleFactor;
+    }
+
+    /// <summary>
     /// Combines two 16-bit words into a 32-bit unsigned integer respecting word order.
     /// BigEndian    = ABCD — words[0] is the high word.
     /// LittleEndian = CDAB — words[1] is the high word.
