@@ -7,6 +7,7 @@ Desktop-first, with mobile (MAUI) coming later. Both share `Modbus.Core`.
 **Solutions:**
 - `Modbus.Core` — shared logic (domain, protocol, transport, services, polling, persistence)
 - `Modbus.Desktop` — Avalonia UI (Windows/Linux/macOS)
+- `Modbus.Core.Tests` — xUnit test project covering Core logic
 - `Modbus.Mobile` — MAUI (future)
 
 **Target devices:** KRON KS-3000, KRON Konect 120 (same register map). More models coming.
@@ -40,6 +41,12 @@ that bubble up through `DeviceListViewModel` to `MainViewModel`.
 - Register write / configure screen
 - Mobile app (MAUI)
 - SQPF configuration UI (reading is implemented, writing is not)
+
+### Test coverage (Phases 1-2 complete)
+- `Modbus.Core.Tests` project — xUnit + FluentAssertions + NSubstitute
+- 97 tests passing — covers RegisterDecoder, Crc16, RTU/TCP frame builders and parsers
+- `InternalsVisibleTo("Modbus.Core.Tests")` configured in `Modbus.Core.csproj`
+- Phase 3 (PollingEngine + DeviceModelSeeder with mocks) and Phase 4 (EF Core repos with in-memory SQLite) — not yet implemented
 
 ---
 
@@ -186,3 +193,69 @@ SQPF config: Holding register 42.901 → FC03, 0-based address **2900**
 `LocalizationService` — singleton, dictionary-based.
 String files: `Modbus.Desktop/Services/Strings/PortugueseStrings.cs` and `EnglishStrings.cs`.
 Usage in XAML: `{Binding [KeyName], Source={x:Static svc:LocalizationService.Instance}}`
+
+---
+
+## Testing
+
+### Project setup
+- **Project:** `Modbus.Core.Tests/Modbus.Core.Tests.csproj` (net8.0)
+- **Frameworks:** xUnit + FluentAssertions + NSubstitute (mocking) + coverlet.collector
+- **Run all tests:** `dotnet test Modbus.Core.Tests/Modbus.Core.Tests.csproj`
+- **InternalsVisibleTo:** `Modbus.Core.csproj` exposes internals to `Modbus.Core.Tests` (needed for `Crc16` and future `internal` test targets)
+
+### Folder structure (mirrors source project)
+```
+Modbus.Core.Tests/
+  Services/
+    RegisterDecoderTests.cs       — 37 tests: all DataType × WordOrder combos, SQPF permutations, scale factors
+  Protocol/
+    Rtu/
+      Crc16Tests.cs                       — 8 tests: Compute/Append/Validate with known Modbus CRC vectors
+      ModbusRtuFrameBuilderTests.cs       — 12 tests: FC03/04/06/16/17, address ranges, CRC validation
+      ModbusRtuFrameParserTests.cs        — 12 tests: parse, error responses, ReportSlaveId
+    Tcp/
+      ModbusTcpFrameBuilderTests.cs       — 11 tests: MBAP header, Transaction ID increment, all FCs
+      ModbusTcpFrameParserTests.cs        — 11 tests: parse, error responses, frame too short
+```
+
+### What is covered (Phases 1 + 2 complete — 97 tests passing)
+- **RegisterDecoder** — all DataType × WordOrder combinations, SQPF byte-permutation with 3 known SQPF values, scale factors, edge cases (invalid enum values)
+- **Crc16** — Modbus polynomial 0xA001 with known test vectors, Append (LSB-first), Validate (round-trip + corruption + length checks)
+- **RTU Frame Builder** — FC03/04 (read), FC06 (write single), FC16 (write multiple), FC17 (report slave ID); CRC always validated
+- **RTU Frame Parser** — parse read responses, error responses (FC | 0x80 → ModbusProtocolException), ReportSlaveId, CRC failure, too-short frames
+- **TCP Frame Builder** — 12-byte fixed frames, MBAP header (TxId / ProtocolId=0 / Length / UnitId), variable-length write, transaction ID auto-increment
+- **TCP Frame Parser** — same coverage as RTU parser, no CRC (TCP uses MBAP length field)
+
+### Phases not yet implemented
+- **Phase 3 — Mocked service tests:** `PollingEngine` (lifecycle, RTU semaphore, SQPF fallback, RegisterValuesUpdated/DeviceConnectionFailed events), `DeviceModelSeeder` (idempotent seeding, Float32 → UseSqpf mapping). Will require making `GroupRegisters` `internal` instead of `private`.
+- **Phase 4 — EF Core integration tests:** `TestDbContextFactory` with `DataSource=:memory:` SQLite, repository CRUD, RegisterValue upsert behavior.
+
+### Conventions and directives for future sessions
+
+**TDD posture going forward:**
+- New features in `Modbus.Core` → write a failing test first, then implement. The interface-based architecture makes mocking trivial with NSubstitute.
+- Bug fixes in `Modbus.Core` → reproduce with a failing test, then fix. Especially relevant for RegisterDecoder/SQPF edge cases.
+- UI / ViewModels in `Modbus.Desktop` → no automated tests yet; verify by running the app.
+
+**Test naming convention:**
+`MethodName_Scenario_ExpectedResult` — e.g. `Decode_UInt16_MaxValue_Returns65535`, `ParseReadRegisters_BadCrc_ThrowsInvalidDataException`.
+
+**Test structure:**
+- `[Theory]` + `[MemberData]` for parameterized cases (xUnit's `[InlineData]` does not support `ushort[]` — must use `MemberData` returning `IEnumerable<object[]>`).
+- `[Fact]` for single-scenario tests.
+- One test class per production class; folder structure mirrors source.
+
+**FluentAssertions patterns used:**
+- Numeric: `.Should().Be(expected)` for exact, `.Should().BeApproximately(expected, precision)` for floats (precision `1e-6` for direct float ops, `1e-2` for SQPF/scale).
+- Collections: `.Should().HaveCount(n)`, `.Should().Equal(expected)`.
+- Exceptions: `.Should().Throw<T>().Where(e => e.Property == ...)` — pattern works because production exceptions have public properties (`ModbusProtocolException.FunctionCode`, etc.).
+
+**Visibility rule:** if a private method is a pure function worth testing in isolation (e.g. `PollingEngine.GroupRegisters`), make it `internal` and rely on `InternalsVisibleTo`. Don't expose via `public` solely for tests.
+
+**SQPF test vector derivation:** the algorithm in `RegisterDecoder.DecodeFloat32WithSqpf` is `raw |= t[i] << (floatByteIdx * 8)` where `floatByteIdx = (sqpfValue >> (i*4)) & 0xF` and `t[i]` is the i-th transmitted byte (`t[0]=words[0]Hi, t[1]=words[0]Lo, t[2]=words[1]Hi, t[3]=words[1]Lo`). To build a test vector for value V with SQPF S: write V's IEEE 754 bytes (byte0=LSB ... byte3=MSB), then for each i set `t[i] = byte_at_position((S>>(i*4))&0xF)`, finally pack `words[0] = (t[0]<<8) | t[1]`, `words[1] = (t[2]<<8) | t[3]`.
+
+**Avoid in test data:** values where `uint → double` rounding produces off-by-one (e.g. `0xFFFFFFFF`, `0x7FFFFFFF`). Removed from current test cases; if needed in future, use larger `BeApproximately` tolerance or convert through `int.MaxValue`/`uint.MaxValue` constants.
+
+### Bugs caught by the test suite
+- **`ModbusProtocolException` format string** — `$"...0x{functionCode:X2}..."` raised `FormatException` because `:X2` is invalid for enum types (only `G/g/X/x/F/f/D/d` accepted, no width specifier). Fixed by casting to `byte` before formatting: `0x{(byte)functionCode:X2}`. Production code path was never exercised because real devices hadn't returned error responses in this code path until tests forced it.
