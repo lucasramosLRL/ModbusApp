@@ -181,7 +181,11 @@ public partial class AddDeviceViewModel : ObservableObject
                         config, StartAddress, EndAddress, progress, token))
                     {
                         var vm = new ScanResultViewModel(result);
-                        await Dispatcher.UIThread.InvokeAsync(() => ScanResults.Add(vm));
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            if (!token.IsCancellationRequested)
+                                ScanResults.Add(vm);
+                        });
                     }
                 }
                 finally
@@ -194,7 +198,11 @@ public partial class AddDeviceViewModel : ObservableObject
                 await foreach (var result in _scanService.ScanTcpAsync(progress, token))
                 {
                     var vm = new ScanResultViewModel(result);
-                    await Dispatcher.UIThread.InvokeAsync(() => ScanResults.Add(vm));
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        if (!token.IsCancellationRequested)
+                            ScanResults.Add(vm);
+                    });
                 }
             }
 
