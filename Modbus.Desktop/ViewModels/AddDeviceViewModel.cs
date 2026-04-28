@@ -36,6 +36,13 @@ public partial class AddDeviceViewModel : ObservableObject
     {
         IsRtu = value == TransportType.Rtu;
         IsTcp = value == TransportType.Tcp;
+
+        if (IsScanning)
+            _scanCts?.Cancel();
+
+        ScanResults.Clear();
+        SelectedResult = null;
+        FoundCount = 0;
     }
 
     partial void OnIsRtuChanged(bool value)
