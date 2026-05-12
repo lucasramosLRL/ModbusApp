@@ -186,9 +186,11 @@ internal static class PortugueseStrings
         ["CfgBtPassword"]        = "Senha",
 
         // DeviceConfigureView — SNTP
-        ["CfgNtpServer"]         = "Servidor NTP",
-        ["CfgTimezone"]          = "Fuso horário (UTC ± h)",
-        ["CfgSyncInterval"]      = "Intervalo de sincronização (min)",
+        ["CfgNtpServer"]         = "Servidor SNTP",
+        ["CfgTimezone"]          = "Fuso horário",
+        ["CfgSyncInterval"]      = "Int. de sincronismo",
+        ["CfgUnitHours"]         = "hora(s)",
+        ["CfgUnitMinutes"]       = "minuto(s)",
 
         // DeviceConfigureView — IoT / MQTT
         ["CfgSendInterval"]      = "Intervalo de envio (min)",

@@ -186,9 +186,11 @@ internal static class EnglishStrings
         ["CfgBtPassword"]        = "Password",
 
         // DeviceConfigureView — SNTP
-        ["CfgNtpServer"]         = "NTP Server",
-        ["CfgTimezone"]          = "Timezone (UTC ± h)",
-        ["CfgSyncInterval"]      = "Sync interval (min)",
+        ["CfgNtpServer"]         = "SNTP Server",
+        ["CfgTimezone"]          = "Timezone",
+        ["CfgSyncInterval"]      = "Sync interval",
+        ["CfgUnitHours"]         = "hour(s)",
+        ["CfgUnitMinutes"]       = "minute(s)",
 
         // DeviceConfigureView — IoT / MQTT
         ["CfgSendInterval"]      = "Send interval (min)",

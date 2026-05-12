@@ -437,29 +437,60 @@
 
                     <!-- ── SNTP ──────────────────────────────────────────── -->
                     <Border Classes="card" IsVisible="{Binding IsSntp}">
-                        <StackPanel Spacing="16">
+                        <StackPanel Spacing="20" MaxWidth="480" HorizontalAlignment="Left">
                             <TextBlock Text="{Binding [CfgSntp], Source={x:Static svc:LocalizationService.Instance}}"
                                        Classes="section-title" />
-                            <CheckBox Content="{Binding [CfgEnabled], Source={x:Static svc:LocalizationService.Instance}}"
-                                      Foreground="{StaticResource BrushTextPrimary}" />
-                            <Grid ColumnDefinitions="*,140,140" RowDefinitions="Auto">
-                                <StackPanel Grid.Column="0" Spacing="4">
-                                    <TextBlock Classes="label-small"
-                                               Text="{Binding [CfgNtpServer], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <TextBox />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
-                                    <TextBlock Classes="label-small"
-                                               Text="{Binding [CfgTimezone], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <NumericUpDown Minimum="-12" Maximum="14" Increment="1"
-                                                   FormatString="0" HorizontalAlignment="Stretch" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2" Spacing="4" Margin="12,0,0,0">
-                                    <TextBlock Classes="label-small"
-                                               Text="{Binding [CfgSyncInterval], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <NumericUpDown Minimum="1" Maximum="1440" Increment="1"
-                                                   FormatString="0" HorizontalAlignment="Stretch" />
-                                </StackPanel>
+
+                            <!-- Form grid: label | control | unit -->
+                            <Grid ColumnDefinitions="180,160,*" RowDefinitions="Auto,14,Auto,14,Auto,14,Auto">
+
+                                <!-- SNTP enabled -->
+                                <TextBlock Grid.Row="0" Grid.Column="0"
+                                           Classes="label-small"
+                                           Text="{Binding [CfgSntp], Source={x:Static svc:LocalizationService.Instance}}"
+                                           VerticalAlignment="Center" />
+                                <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="{Binding [CfgEnabled],  Source={x:Static svc:LocalizationService.Instance}}" />
+                                    <ComboBoxItem Content="{Binding [CfgDisabled], Source={x:Static svc:LocalizationService.Instance}}" />
+                                </ComboBox>
+
+                                <!-- Timezone -->
+                                <TextBlock Grid.Row="2" Grid.Column="0"
+                                           Classes="label-small"
+                                           Text="{Binding [CfgTimezone], Source={x:Static svc:LocalizationService.Instance}}"
+                                           VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Row="2" Grid.Column="1"
+                                               Minimum="-12" Maximum="14" Increment="1"
+                                               FormatString="0" HorizontalAlignment="Stretch" />
+                                <TextBlock Grid.Row="2" Grid.Column="2"
+                                           Classes="label-small"
+                                           Text="{Binding [CfgUnitHours], Source={x:Static svc:LocalizationService.Instance}}"
+                                           VerticalAlignment="Center"
+                                           Margin="8,0,0,0" />
+
+                                <!-- Sync interval -->
+                                <TextBlock Grid.Row="4" Grid.Column="0"
+                                           Classes="label-small"
+                                           Text="{Binding [CfgSyncInterval], Source={x:Static svc:LocalizationService.Instance}}"
+                                           VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Row="4" Grid.Column="1"
+                                               Minimum="1" Maximum="1440" Increment="1"
+                                               FormatString="0" HorizontalAlignment="Stretch" />
+                                <TextBlock Grid.Row="4" Grid.Column="2"
+                                           Classes="label-small"
+                                           Text="{Binding [CfgUnitMinutes], Source={x:Static svc:LocalizationService.Instance}}"
+                                           VerticalAlignment="Center"
+                                           Margin="8,0,0,0" />
+
+                                <!-- NTP Server -->
+                                <TextBlock Grid.Row="6" Grid.Column="0"
+                                           Classes="label-small"
+                                           Text="{Binding [CfgNtpServer], Source={x:Static svc:LocalizationService.Instance}}"
+                                           VerticalAlignment="Center" />
+                                <TextBox Grid.Row="6" Grid.Column="1"
+                                         Grid.ColumnSpan="2"
+                                         Watermark="a.st1.ntp.br" />
+
                             </Grid>
                         </StackPanel>
                     </Border>
