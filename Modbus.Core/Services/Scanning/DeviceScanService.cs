@@ -187,7 +187,7 @@ public class DeviceScanService : IDeviceScanService
             try
             {
                 using var perIpCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                perIpCts.CancelAfter(TimeSpan.FromMilliseconds(1500));
+                perIpCts.CancelAfter(TimeSpan.FromMilliseconds(2000));
 
                 await service.ConnectAsync(perIpCts.Token);
                 var slaveIdData = await service.ReportSlaveIdAsync(tcpUnitId, perIpCts.Token);
