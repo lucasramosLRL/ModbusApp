@@ -22,7 +22,7 @@ Desktop-first, with mobile (MAUI) coming later. Both share `Modbus.Core`.
 - Device list with connection status (Connected / Disconnected + last seen)
 - Add device flow: scan (RTU broadcast or TCP broadcast) → select result → save
 - Real-time electrical readings screen (voltages, currents, power, frequency, power factor)
-- SQLite persistence via EF Core (no migrations — uses `EnsureCreated` + manual ALTER TABLE patches)
+- SQLite persistence via EF Core Migrations (`db.Database.Migrate()` on startup, with legacy-DB baselining for clients upgrading from pre-migration builds)
 - Device model seeding (`DeviceModelSeeder`) — idempotent, runs on every startup
 - SQPF (float byte order) read dynamically from device register 42.901 (holding reg, FC03, 0-based address 2900) every poll cycle
 - Hub navigation: device list → device hub → real-time readings (back chain works)
@@ -69,7 +69,10 @@ Polling/
   Events: RegisterValuesUpdated, DeviceConnectionFailed
 
 Persistence/
-  ModbusDbContext (SQLite, EF Core, EnsureCreated)
+  ModbusDbContext (SQLite, EF Core Migrations)
+  DatabaseInitializer — startup entry: baselines legacy DBs then runs Migrate()
+  DesignTimeDbContextFactory — lets `dotnet ef` instantiate the context without the UI host
+  Migrations/ — EF-generated migration files (InitialSchema is the baseline)
   Repositories/ — EF implementations
   DeviceModelSeeder — seeds register maps for known models on every startup
   Configurations/ — EF fluent configs; WordOrder stored as string
@@ -144,10 +147,11 @@ For TCP, it also reconnects each poll (simpler; avoids stale connection detectio
 
 ### EF / Database
 - SQLite at `%LocalAppData%\ModbusApp\modbusapp.db`
-- `EnsureCreated()` — no migrations; schema changes require manual `ALTER TABLE` patches in `App.axaml.cs`
+- **EF Core Migrations** — `DatabaseInitializer.Initialize(db)` runs at startup and calls `db.Database.Migrate()`. Schema changes: add/modify entity, then `dotnet ef migrations add <Name> --project Modbus.Core --startup-project Modbus.Core --output-dir Persistence/Migrations`. Migrations live in `Modbus.Core/Persistence/Migrations/`.
+- **Legacy DB baselining**: `DatabaseInitializer` detects pre-migration databases (no `__EFMigrationsHistory` but `Devices` table exists) and idempotently patches missing columns (`SqpfRegisterAddress`, `FirmwareVersion`) before inserting the `InitialSchema` migration as already applied. After baselining, normal `Migrate()` applies any newer migrations.
+- **EF design-time**: `DesignTimeDbContextFactory` in `Modbus.Core` lets `dotnet ef` build the context without spinning up the Avalonia host. Use `--startup-project Modbus.Core` for EF CLI commands. `dotnet-ef` is a local tool (see `.config/dotnet-tools.json`); run `dotnet tool restore` after cloning.
 - `WordOrder` stored as **string** (HasConversion<string>()) — "UseSqpf", "ByteSwapped", etc.
 - `TcpConfig` and `RtuConfig` are owned entities (EF `OwnsOne`) — loaded automatically, no Include needed
-- `DeviceModel.SqpfRegisterAddress` added via patch: `ALTER TABLE DeviceModels ADD COLUMN SqpfRegisterAddress INTEGER`
 
 ### DeviceModelSeeder
 Runs on every startup. For each known model:

@@ -30,8 +30,7 @@ public partial class App : Application
         Services = serviceCollection.BuildServiceProvider();
 
         using var db = Services.GetRequiredService<ModbusDbContext>();
-        db.Database.EnsureCreated();
-        try { db.Database.ExecuteSqlRaw("ALTER TABLE DeviceModels ADD COLUMN SqpfRegisterAddress INTEGER"); } catch { }
+        DatabaseInitializer.Initialize(db);
 
         var seeder = new DeviceModelSeeder(Services.GetRequiredService<IDeviceModelRepository>());
         seeder.SeedAsync().GetAwaiter().GetResult();
@@ -61,7 +60,9 @@ public partial class App : Application
         Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 
         services.AddDbContext<ModbusDbContext>(
-            options => options.UseSqlite($"Data Source={dbPath}"),
+            options => options.UseSqlite(
+                $"Data Source={dbPath}",
+                b => b.MigrationsAssembly("Modbus.Core")),
             ServiceLifetime.Transient);
 
         services.AddTransient<IDeviceRepository, DeviceRepository>();
