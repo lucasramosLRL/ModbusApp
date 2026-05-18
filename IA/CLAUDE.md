@@ -259,6 +259,70 @@ Modbus.Core.Tests/
 - **`ModbusProtocolException` format string** — `$"...0x{functionCode:X2}..."` raised `FormatException` because `:X2` is invalid for enum types (only `G/g/X/x/F/f/D/d` accepted, no width specifier). Fixed by casting to `byte` before formatting: `0x{(byte)functionCode:X2}`. Production code path was never exercised because real devices hadn't returned error responses in this code path until tests forced it.
 
 
+---
+
+## Configure Screen Architecture
+
+### Overview
+```
+DeviceCapabilityRegistry  →  which sections/fields each model has (flags enum)
+DeviceConfigProfile       →  which register addresses each model exposes
+IDeviceConfigService      →  stateless FC03/FC04 block reader + FC06 writer
+DeviceConfigureViewModel  →  consumes both; exposes Has* props and loaded field values
+```
+
+### DeviceCapabilities (flags enum)
+`Modbus.Core/Domain/Enums/DeviceCapabilities.cs` — controls sidebar visibility in the configure view.
+Flags: `Ethernet`, `Wireless`, `Sntp`, `Iot`, `Clock`, `InputsOutputs`, `FieldKe`, `FieldCurrentInvert`.
+`DeviceCapabilityRegistry.Get(deviceCode)` maps device code → flags. Models not in the map return `None`.
+
+### RegisterField struct
+`Modbus.Core/Services/RegisterField.cs` — describes one configuration field.
+
+Three usage patterns when filling `DeviceConfigProfileRegistry.cs`:
+
+```csharp
+// Whole register (16-bit)
+AddrKe = 40005
+
+// Multi-word (Float32, IP = 2 words, MAC = 3 words, string = N words)
+AddrTp          = new RegisterField(40001, WordCount: 2)
+AddrIpAddress   = new RegisterField(40010, WordCount: 2)
+AddrMacAddress  = new RegisterField(30100, WordCount: 3)   // FC04 → 3xxxx
+
+// Bit-field (multiple fields sharing one register)
+AddrCurrentInvert = new RegisterField(40007, BitOffset: 15, BitWidth: 1)
+AddrSntpEnabled   = new RegisterField(40007, BitOffset: 12, BitWidth: 1)
+AddrTl            = new RegisterField(40006, BitOffset: 0,  BitWidth: 8)  // LSB byte
+AddrTi            = new RegisterField(40006, BitOffset: 8,  BitWidth: 8)  // MSB byte
+```
+
+Modicon convention: `4xxxx` = FC03 holding register (read/write); `3xxxx` = FC04 input register (read-only).
+Plain integer assignment (`AddrKe = 40005`) is valid — implicit conversion creates `RegisterField(addr)`.
+
+Key methods on `RegisterField`:
+- `ExtractValue(regs)` — returns the field value from the register dictionary (handles multi-word and bit-fields)
+- `ApplyBits(currentReg, fieldValue)` — read-modify-write helper for bit-field writes
+
+### DeviceConfigService
+`Modbus.Core/Services/DeviceConfigService.cs` — stateless, opens/closes connection per call.
+- `ReadAsync(device, addresses)` — accepts Modicon numbers, splits FC03/FC04, coalesces contiguous blocks (gap ≤ 5), returns `Dictionary<modiconAddr, ushort>`
+- `WriteAsync(device, address, value)` — FC06, address must be `4xxxx`
+- Registered as `AddTransient<IDeviceConfigService, DeviceConfigService>()` in `App.axaml.cs`
+
+### DeviceConfigureViewModel
+Constructor: `(DeviceItemViewModel device, IDeviceConfigService, Func<Task> suspendRtuPolling, Action resumeRtuPolling, Action onGoBack)`
+- `HasEthernet`, `HasWireless`, `HasSntp`, `HasIot`, `HasClock`, `HasInputsOutputs`, `HasFieldKe`, `HasCurrentInvert` — computed from `DeviceCapabilityRegistry`
+- `LoadAsync()` — suspends RTU polling if needed, reads all profile addresses, calls `ApplyRegisters()`
+- `ApplyRegisters()` — maps register values to observable properties (to be filled once addresses are in the profile)
+
+### Filling in register addresses
+Edit `Modbus.Core/Services/DeviceConfigProfileRegistry.cs`.
+The file has a usage guide at the top. Each model (Ks3000, Konect120) has one property per field — replace `null` with the appropriate `RegisterField`.
+Multi-word and bit-field addresses pointing to the same register are deduplicated automatically by `AllAddresses`.
+
+---
+
 ### Pending / future features - Attention! Keep it in the end of the file
 - Investigate if its necessary to prompt the user to reset the software when the language is changed, it seens like some texts won't change until a complete restart
 - Register write / configure screen / SQPF configuration UI (reading is implemented, writing is not)

@@ -70,6 +70,7 @@ public partial class App : Application
         services.AddTransient<IRegisterValueRepository, RegisterValueRepository>();
 
         services.AddTransient<IDeviceScanService, DeviceScanService>();
+        services.AddTransient<IDeviceConfigService, DeviceConfigService>();
         services.AddSingleton<IModbusServiceFactory, ModbusServiceFactory>();
         services.AddSingleton<IPollingEngine>(sp =>
             new PollingEngine(

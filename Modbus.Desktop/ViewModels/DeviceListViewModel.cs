@@ -17,6 +17,7 @@ public partial class DeviceListViewModel : ObservableObject
     private readonly IDeviceModelRepository _deviceModelRepository;
     private readonly IRegisterValueRepository _registerValueRepository;
     private readonly IPollingEngine _pollingEngine;
+    private readonly IDeviceConfigService _configService;
     private readonly IDeviceScanService _scanService;
     private readonly IModbusServiceFactory _serviceFactory;
     private readonly SettingsViewModel _settingsViewModel;
@@ -34,6 +35,7 @@ public partial class DeviceListViewModel : ObservableObject
         IDeviceModelRepository deviceModelRepository,
         IRegisterValueRepository registerValueRepository,
         IPollingEngine pollingEngine,
+        IDeviceConfigService configService,
         IDeviceScanService scanService,
         IModbusServiceFactory serviceFactory,
         SettingsViewModel settingsViewModel)
@@ -42,6 +44,7 @@ public partial class DeviceListViewModel : ObservableObject
         _deviceModelRepository   = deviceModelRepository;
         _registerValueRepository = registerValueRepository;
         _pollingEngine           = pollingEngine;
+        _configService           = configService;
         _scanService             = scanService;
         _serviceFactory          = serviceFactory;
         _settingsViewModel       = settingsViewModel;
@@ -92,7 +95,7 @@ public partial class DeviceListViewModel : ObservableObject
     [RelayCommand]
     private void OpenDeviceDetail(DeviceItemViewModel device)
     {
-        var hub = new DeviceHubViewModel(device, _registerValueRepository, _pollingEngine, this);
+        var hub = new DeviceHubViewModel(device, _registerValueRepository, _pollingEngine, _configService, this);
         hub.NavigationRequested += (_, vm) => NavigationRequested?.Invoke(this, vm);
         NavigationRequested?.Invoke(this, hub);
     }

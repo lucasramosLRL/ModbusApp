@@ -1,13 +1,20 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Modbus.Core.Domain.Enums;
+using Modbus.Core.Services;
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Modbus.Desktop.ViewModels;
 
 public partial class DeviceConfigureViewModel : ObservableObject
 {
     private readonly Action _onGoBack;
+    private readonly IDeviceConfigService _configService;
+    private readonly Func<Task> _suspendRtuPolling;
+    private readonly Action _resumeRtuPolling;
 
     public DeviceItemViewModel Device { get; }
 
@@ -32,6 +39,23 @@ public partial class DeviceConfigureViewModel : ObservableObject
         OnPropertyChanged(nameof(IsClock));
         OnPropertyChanged(nameof(IsInputsOutputs));
     }
+
+    // ── Capabilities ─────────────────────────────────────────────────────────
+    private DeviceCapabilities Capabilities =>
+        DeviceCapabilityRegistry.Get(Device.Device.DeviceModel?.DeviceCode);
+
+    public bool HasEthernet      => Capabilities.HasFlag(DeviceCapabilities.Ethernet);
+    public bool HasWireless      => Capabilities.HasFlag(DeviceCapabilities.Wireless);
+    public bool HasSntp          => Capabilities.HasFlag(DeviceCapabilities.Sntp);
+    public bool HasIot           => Capabilities.HasFlag(DeviceCapabilities.Iot);
+    public bool HasClock         => Capabilities.HasFlag(DeviceCapabilities.Clock);
+    public bool HasInputsOutputs => Capabilities.HasFlag(DeviceCapabilities.InputsOutputs);
+    public bool HasFieldKe       => Capabilities.HasFlag(DeviceCapabilities.FieldKe);
+    public bool HasCurrentInvert => Capabilities.HasFlag(DeviceCapabilities.FieldCurrentInvert);
+
+    // ── Load state ───────────────────────────────────────────────────────────
+    [ObservableProperty] private bool _isLoading;
+    [ObservableProperty] private string? _loadError;
 
     // ── Device info strip (always visible) ──────────────────────────────────
     public string SerialNumberText =>
@@ -66,7 +90,6 @@ public partial class DeviceConfigureViewModel : ObservableObject
     {
         if (newValue == _pfPos[index]) return;
 
-        // Find which other position holds newValue and swap it with the displaced one
         int conflictIndex = Array.IndexOf(_pfPos, newValue);
         if (conflictIndex >= 0 && conflictIndex != index)
         {
@@ -79,12 +102,60 @@ public partial class DeviceConfigureViewModel : ObservableObject
     }
 
     // ── Constructor / Commands ───────────────────────────────────────────────
-    public DeviceConfigureViewModel(DeviceItemViewModel device, Action onGoBack)
+    public DeviceConfigureViewModel(
+        DeviceItemViewModel device,
+        IDeviceConfigService configService,
+        Func<Task> suspendRtuPolling,
+        Action resumeRtuPolling,
+        Action onGoBack)
     {
-        Device = device;
-        _onGoBack = onGoBack;
-        _editableSlaveId = device.SlaveId;
-        _description = device.Name;
+        Device              = device;
+        _configService      = configService;
+        _suspendRtuPolling  = suspendRtuPolling;
+        _resumeRtuPolling   = resumeRtuPolling;
+        _onGoBack           = onGoBack;
+        _editableSlaveId    = device.SlaveId;
+        _description        = device.Name;
+    }
+
+    public async Task LoadAsync()
+    {
+        var profile = DeviceConfigProfileRegistry.Get(Device.Device.DeviceModel?.DeviceCode);
+        if (profile is null || profile.AllAddresses.Count == 0) return;
+
+        IsLoading = true;
+        LoadError = null;
+        try
+        {
+            bool isRtu = Device.Device.TransportType == TransportType.Rtu;
+            if (isRtu) await _suspendRtuPolling();
+            try
+            {
+                var regs = await _configService.ReadAsync(
+                    Device.Device, profile.AllAddresses, CancellationToken.None);
+                ApplyRegisters(regs, profile);
+            }
+            finally
+            {
+                if (isRtu) _resumeRtuPolling();
+            }
+        }
+        catch (Exception ex)
+        {
+            LoadError = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void ApplyRegisters(IReadOnlyDictionary<ushort, ushort> regs, DeviceConfigProfile p)
+    {
+        // TODO: map registers to observable properties once addresses are filled in DeviceConfigProfileRegistry.
+        // Example:
+        //   if (p.AddrSlaveId is ushort sid && regs.TryGetValue(sid, out var slaveId))
+        //       EditableSlaveId = slaveId;
     }
 
     [RelayCommand]
