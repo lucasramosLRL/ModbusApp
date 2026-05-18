@@ -193,7 +193,7 @@ internal static class EnglishStrings
         ["CfgUnitMinutes"]       = "minute(s)",
 
         // DeviceConfigureView — IoT / MQTT
-        ["CfgSendInterval"]      = "Send interval (min)",
+        ["CfgSendInterval"]      = "Send interval",
         ["CfgSendOnHour"]        = "Send on full hour",
         ["CfgMqttBroker"]        = "Broker",
         ["CfgMqttDescId"]        = "Description / ID",
@@ -204,10 +204,18 @@ internal static class EnglishStrings
         ["CfgKeepAlive"]         = "Keep connection alive",
         ["CfgKronCloud"]         = "KronCloud",
         ["CfgTls"]               = "TLS",
+        ["CfgClearBuffer"]       = "Clear Buffer",
+        ["CfgAvailableRegisters"]= "Available registers",
+        ["CfgSelectedRegisters"] = "Selected",
+        ["CfgIotTabCerts"]       = "Certificates",
+        ["CfgIotTabRetransmit"]  = "Retransmit blocks",
 
         // DeviceConfigureView — Clock
-        ["CfgCurrentTime"]       = "Current date and time",
-        ["CfgSyncSource"]        = "Sync source",
+        ["CfgDate"]              = "Date",
+        ["CfgTime"]              = "Time",
+
+        // DeviceConfigureView — Inputs & Outputs
+        ["CfgDebounceEdp"]       = "Debounce EDPs",
 
         // SettingsView
         ["SettingsTitle"]        = "Settings",

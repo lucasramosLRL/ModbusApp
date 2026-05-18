@@ -501,137 +501,232 @@
                             <TextBlock Text="{Binding [CfgIot], Source={x:Static svc:LocalizationService.Instance}}"
                                        Classes="section-title" />
 
-                            <!-- IoT global controls -->
-                            <StackPanel Orientation="Horizontal" Spacing="24" Margin="0,0,0,4">
-                                <StackPanel Spacing="4">
+                            <!-- Top bar: IoT status | interval | send on hour | clear buffer -->
+                            <Grid ColumnDefinitions="Auto,24,Auto,*">
+                                <!-- IoT status -->
+                                <StackPanel Grid.Column="0" Spacing="4">
                                     <TextBlock Classes="label-small" Text="IoT" />
                                     <ComboBox Width="160">
                                         <ComboBoxItem Content="{Binding [CfgEnabled],  Source={x:Static svc:LocalizationService.Instance}}" />
                                         <ComboBoxItem Content="{Binding [CfgDisabled], Source={x:Static svc:LocalizationService.Instance}}" />
                                     </ComboBox>
                                 </StackPanel>
-                                <StackPanel Spacing="4">
+                                <!-- Send interval -->
+                                <StackPanel Grid.Column="2" Spacing="4">
                                     <TextBlock Classes="label-small"
                                                Text="{Binding [CfgSendInterval], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <NumericUpDown Minimum="1" Maximum="1440" Increment="1"
-                                                   FormatString="0" Width="120" />
-                                </StackPanel>
-                                <CheckBox Content="{Binding [CfgSendOnHour], Source={x:Static svc:LocalizationService.Instance}}"
-                                          VerticalAlignment="Bottom"
-                                          Foreground="{StaticResource BrushTextPrimary}" />
-                            </StackPanel>
-
-                            <!-- MQTT subsection -->
-                            <Border Background="{StaticResource BrushBgElevated}"
-                                    CornerRadius="{StaticResource RadiusCardSmall}"
-                                    Padding="16">
-                                <StackPanel Spacing="16">
-                                    <TextBlock Text="MQTT"
-                                               FontSize="{StaticResource FontSizeSectionTitle}"
-                                               FontWeight="SemiBold"
-                                               Foreground="{StaticResource BrushTextPrimary}"
-                                               Opacity="0.7" />
-
-                                    <!-- Broker + URL -->
-                                    <Grid ColumnDefinitions="200,*" RowDefinitions="Auto">
-                                        <StackPanel Grid.Column="0" Spacing="4">
-                                            <TextBlock Classes="label-small"
-                                                       Text="{Binding [CfgMqttBroker], Source={x:Static svc:LocalizationService.Instance}}" />
-                                            <ComboBox HorizontalAlignment="Stretch">
-                                                <ComboBoxItem Content="{Binding [CfgBrokerDefault], Source={x:Static svc:LocalizationService.Instance}}" />
-                                                <ComboBoxItem Content="AWS" />
-                                            </ComboBox>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
-                                            <TextBlock Classes="label-small" Text="URL" />
-                                            <TextBox />
-                                        </StackPanel>
-                                    </Grid>
-
-                                    <!-- Desc/ID + Port + Topic -->
-                                    <Grid ColumnDefinitions="*,120,*" RowDefinitions="Auto">
-                                        <StackPanel Grid.Column="0" Spacing="4">
-                                            <TextBlock Classes="label-small"
-                                                       Text="{Binding [CfgMqttDescId], Source={x:Static svc:LocalizationService.Instance}}" />
-                                            <TextBox />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
-                                            <TextBlock Classes="label-small"
-                                                       Text="{Binding [CfgMqttPort], Source={x:Static svc:LocalizationService.Instance}}" />
-                                            <NumericUpDown Minimum="1" Maximum="65535" Increment="1"
-                                                           FormatString="0" HorizontalAlignment="Stretch" />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="2" Spacing="4" Margin="12,0,0,0">
-                                            <TextBlock Classes="label-small"
-                                                       Text="{Binding [CfgMqttTopic], Source={x:Static svc:LocalizationService.Instance}}" />
-                                            <TextBox />
-                                        </StackPanel>
-                                    </Grid>
-
-                                    <!-- Username + Token/Password -->
-                                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto">
-                                        <StackPanel Grid.Column="0" Spacing="4">
-                                            <TextBlock Classes="label-small"
-                                                       Text="{Binding [CfgMqttUser], Source={x:Static svc:LocalizationService.Instance}}" />
-                                            <TextBox />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
-                                            <TextBlock Classes="label-small"
-                                                       Text="{Binding [CfgMqttToken], Source={x:Static svc:LocalizationService.Instance}}" />
-                                            <TextBox PasswordChar="•" />
-                                        </StackPanel>
-                                    </Grid>
-
-                                    <!-- Options -->
-                                    <StackPanel Orientation="Horizontal" Spacing="24">
-                                        <CheckBox Content="{Binding [CfgKeepAlive],  Source={x:Static svc:LocalizationService.Instance}}"
-                                                  Foreground="{StaticResource BrushTextPrimary}" />
-                                        <CheckBox Content="{Binding [CfgKronCloud], Source={x:Static svc:LocalizationService.Instance}}"
-                                                  Foreground="{StaticResource BrushTextPrimary}" />
-                                        <CheckBox Content="{Binding [CfgTls],       Source={x:Static svc:LocalizationService.Instance}}"
-                                                  Foreground="{StaticResource BrushTextPrimary}" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <NumericUpDown Minimum="1" Maximum="1440" Increment="1"
+                                                       FormatString="0" Width="100" />
+                                        <TextBlock Classes="label-small"
+                                                   Text="{Binding [CfgUnitMinutes], Source={x:Static svc:LocalizationService.Instance}}"
+                                                   VerticalAlignment="Center" />
                                     </StackPanel>
-
                                 </StackPanel>
-                            </Border>
+                                <!-- Send on hour + Clear Buffer -->
+                                <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Right"
+                                            Spacing="20" VerticalAlignment="Bottom">
+                                    <CheckBox Content="{Binding [CfgSendOnHour], Source={x:Static svc:LocalizationService.Instance}}"
+                                              Foreground="{StaticResource BrushTextPrimary}" />
+                                    <Button Content="{Binding [CfgClearBuffer], Source={x:Static svc:LocalizationService.Instance}}"
+                                            Padding="{StaticResource PaddingButtonSmall}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Sub-tabs: MQTT | Certificados | Retransmitir blocos -->
+                            <TabControl MinHeight="320">
+
+                                <!-- MQTT tab -->
+                                <TabItem Header="MQTT">
+                                    <StackPanel Spacing="16" Margin="0,12,0,0">
+
+                                        <!-- Form: label | control, with checkboxes on the right -->
+                                        <Grid ColumnDefinitions="*,Auto">
+
+                                            <!-- Left: form fields -->
+                                            <Grid Grid.Column="0"
+                                                  ColumnDefinitions="140,*"
+                                                  RowDefinitions="Auto,10,Auto,10,Auto,10,Auto,10,Auto,10,Auto,10,Auto">
+
+                                                <!-- Broker -->
+                                                <TextBlock Grid.Row="0" Grid.Column="0" Classes="label-small"
+                                                           Text="{Binding [CfgMqttBroker], Source={x:Static svc:LocalizationService.Instance}}"
+                                                           VerticalAlignment="Center" />
+                                                <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch">
+                                                    <ComboBoxItem Content="{Binding [CfgBrokerDefault], Source={x:Static svc:LocalizationService.Instance}}" />
+                                                    <ComboBoxItem Content="AWS" />
+                                                </ComboBox>
+
+                                                <!-- URL -->
+                                                <TextBlock Grid.Row="2" Grid.Column="0" Classes="label-small"
+                                                           Text="URL"
+                                                           VerticalAlignment="Center" />
+                                                <TextBox Grid.Row="2" Grid.Column="1" Watermark="broker.emqx.io" />
+
+                                                <!-- Descrição / ID -->
+                                                <TextBlock Grid.Row="4" Grid.Column="0" Classes="label-small"
+                                                           Text="{Binding [CfgMqttDescId], Source={x:Static svc:LocalizationService.Instance}}"
+                                                           VerticalAlignment="Center" />
+                                                <TextBox Grid.Row="4" Grid.Column="1" />
+
+                                                <!-- Porta -->
+                                                <TextBlock Grid.Row="6" Grid.Column="0" Classes="label-small"
+                                                           Text="{Binding [CfgMqttPort], Source={x:Static svc:LocalizationService.Instance}}"
+                                                           VerticalAlignment="Center" />
+                                                <NumericUpDown Grid.Row="6" Grid.Column="1"
+                                                               Minimum="1" Maximum="65535" Increment="1"
+                                                               FormatString="0" HorizontalAlignment="Left" Width="120" />
+
+                                                <!-- Tópico -->
+                                                <TextBlock Grid.Row="8" Grid.Column="0" Classes="label-small"
+                                                           Text="{Binding [CfgMqttTopic], Source={x:Static svc:LocalizationService.Instance}}"
+                                                           VerticalAlignment="Center" />
+                                                <TextBox Grid.Row="8" Grid.Column="1" />
+
+                                                <!-- Nome de usuário -->
+                                                <TextBlock Grid.Row="10" Grid.Column="0" Classes="label-small"
+                                                           Text="{Binding [CfgMqttUser], Source={x:Static svc:LocalizationService.Instance}}"
+                                                           VerticalAlignment="Center" />
+                                                <TextBox Grid.Row="10" Grid.Column="1" />
+
+                                                <!-- Token / Senha -->
+                                                <TextBlock Grid.Row="12" Grid.Column="0" Classes="label-small"
+                                                           Text="{Binding [CfgMqttToken], Source={x:Static svc:LocalizationService.Instance}}"
+                                                           VerticalAlignment="Center" />
+                                                <TextBox Grid.Row="12" Grid.Column="1" PasswordChar="•" />
+
+                                            </Grid>
+
+                                            <!-- Right: option checkboxes -->
+                                            <StackPanel Grid.Column="1" Spacing="10" Margin="32,0,0,0"
+                                                        VerticalAlignment="Top">
+                                                <CheckBox Content="{Binding [CfgKeepAlive], Source={x:Static svc:LocalizationService.Instance}}"
+                                                          Foreground="{StaticResource BrushTextPrimary}" />
+                                                <CheckBox Content="{Binding [CfgKronCloud], Source={x:Static svc:LocalizationService.Instance}}"
+                                                          Foreground="{StaticResource BrushTextPrimary}" />
+                                                <CheckBox Content="{Binding [CfgTls], Source={x:Static svc:LocalizationService.Instance}}"
+                                                          Foreground="{StaticResource BrushTextPrimary}" />
+                                            </StackPanel>
+
+                                        </Grid>
+                                    </StackPanel>
+                                </TabItem>
+
+                                <!-- Certificados tab -->
+                                <TabItem Header="{Binding [CfgIotTabCerts], Source={x:Static svc:LocalizationService.Instance}}">
+                                    <TextBlock Text="{Binding [TabComingSoon], Source={x:Static svc:LocalizationService.Instance}}"
+                                               Opacity="0.45"
+                                               FontSize="{StaticResource FontSizeSectionTitle}"
+                                               Margin="0,16,0,0" />
+                                </TabItem>
+
+                                <!-- Retransmitir blocos tab -->
+                                <TabItem Header="{Binding [CfgIotTabRetransmit], Source={x:Static svc:LocalizationService.Instance}}">
+                                    <TextBlock Text="{Binding [TabComingSoon], Source={x:Static svc:LocalizationService.Instance}}"
+                                               Opacity="0.45"
+                                               FontSize="{StaticResource FontSizeSectionTitle}"
+                                               Margin="0,16,0,0" />
+                                </TabItem>
+
+                            </TabControl>
+
+                            <Border Height="1" Background="{StaticResource BrushBgSeparator}" Margin="-16,0" />
+
+                            <!-- Variable selection panel -->
+                            <Grid ColumnDefinitions="*,48,*" MinHeight="180">
+
+                                <!-- Available registers -->
+                                <StackPanel Grid.Column="0" Spacing="6">
+                                    <TextBlock Classes="label-small"
+                                               Text="{Binding [CfgAvailableRegisters], Source={x:Static svc:LocalizationService.Instance}}" />
+                                    <ListBox Background="{StaticResource BrushBgElevated}"
+                                             CornerRadius="{StaticResource RadiusCardSmall}"
+                                             Padding="4" />
+                                </StackPanel>
+
+                                <!-- Transfer buttons -->
+                                <StackPanel Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Center"
+                                            Spacing="6">
+                                    <Button Content="→" Width="36" HorizontalContentAlignment="Center" />
+                                    <Button Content="←" Width="36" HorizontalContentAlignment="Center" />
+                                    <Button Content="✕" Width="36" HorizontalContentAlignment="Center" Opacity="0.7" />
+                                </StackPanel>
+
+                                <!-- Selected registers -->
+                                <StackPanel Grid.Column="2" Spacing="6">
+                                    <TextBlock Classes="label-small"
+                                               Text="{Binding [CfgSelectedRegisters], Source={x:Static svc:LocalizationService.Instance}}" />
+                                    <ListBox Background="{StaticResource BrushBgElevated}"
+                                             CornerRadius="{StaticResource RadiusCardSmall}"
+                                             Padding="4" />
+                                </StackPanel>
+
+                            </Grid>
+
                         </StackPanel>
                     </Border>
 
                     <!-- ── Relógio ────────────────────────────────────────── -->
                     <Border Classes="card" IsVisible="{Binding IsClock}">
-                        <StackPanel Spacing="16">
+                        <StackPanel Spacing="20" MaxWidth="400" HorizontalAlignment="Left">
                             <TextBlock Text="{Binding [CfgClock], Source={x:Static svc:LocalizationService.Instance}}"
                                        Classes="section-title" />
-                            <Grid ColumnDefinitions="*,200" RowDefinitions="Auto">
-                                <StackPanel Grid.Column="0" Spacing="4">
-                                    <TextBlock Classes="label-small"
-                                               Text="{Binding [CfgCurrentTime], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <TextBlock Text="—"
-                                               FontSize="{StaticResource FontSizeCardTitle}"
-                                               FontWeight="Medium"
-                                               Foreground="{StaticResource BrushTextPrimary}"
-                                               Opacity="0.4" />
+
+                            <!-- Form grid: label | control -->
+                            <Grid ColumnDefinitions="80,200"
+                                  RowDefinitions="Auto,12,Auto,16,Auto">
+
+                                <!-- Data -->
+                                <TextBlock Grid.Row="0" Grid.Column="0" Classes="label-small"
+                                           Text="{Binding [CfgDate], Source={x:Static svc:LocalizationService.Instance}}"
+                                           VerticalAlignment="Center" />
+                                <DatePicker Grid.Row="0" Grid.Column="1"
+                                            HorizontalAlignment="Stretch" />
+
+                                <!-- Hora -->
+                                <TextBlock Grid.Row="2" Grid.Column="0" Classes="label-small"
+                                           Text="{Binding [CfgTime], Source={x:Static svc:LocalizationService.Instance}}"
+                                           VerticalAlignment="Center" />
+                                <TimePicker Grid.Row="2" Grid.Column="1"
+                                            HorizontalAlignment="Stretch" />
+
+                                <!-- Sync source radio buttons -->
+                                <StackPanel Grid.Row="4" Grid.Column="1"
+                                            Orientation="Horizontal" Spacing="20">
+                                    <RadioButton Content="{Binding [CfgManual], Source={x:Static svc:LocalizationService.Instance}}"
+                                                 GroupName="ClockSync"
+                                                 Foreground="{StaticResource BrushTextPrimary}" />
+                                    <RadioButton Content="PC"
+                                                 GroupName="ClockSync"
+                                                 IsChecked="True"
+                                                 Foreground="{StaticResource BrushTextPrimary}" />
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
-                                    <TextBlock Classes="label-small"
-                                               Text="{Binding [CfgSyncSource], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <ComboBox HorizontalAlignment="Stretch">
-                                        <ComboBoxItem Content="NTP" />
-                                        <ComboBoxItem Content="{Binding [CfgManual], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    </ComboBox>
-                                </StackPanel>
+
                             </Grid>
                         </StackPanel>
                     </Border>
 
                     <!-- ── Entradas e Saídas ──────────────────────────────── -->
                     <Border Classes="card" IsVisible="{Binding IsInputsOutputs}">
-                        <StackPanel Spacing="8">
+                        <StackPanel Spacing="20" MaxWidth="400" HorizontalAlignment="Left">
                             <TextBlock Text="{Binding [CfgInputsOutputs], Source={x:Static svc:LocalizationService.Instance}}"
                                        Classes="section-title" />
-                            <TextBlock Text="{Binding [TabComingSoon], Source={x:Static svc:LocalizationService.Instance}}"
-                                       Opacity="0.45"
-                                       FontSize="{StaticResource FontSizeSectionTitle}" />
+
+                            <Grid ColumnDefinitions="160,120,*" RowDefinitions="Auto">
+                                <TextBlock Grid.Column="0" Classes="label-small"
+                                           Text="{Binding [CfgDebounceEdp], Source={x:Static svc:LocalizationService.Instance}}"
+                                           VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Column="1"
+                                               Minimum="0" Maximum="9999" Increment="1"
+                                               FormatString="0" HorizontalAlignment="Stretch" />
+                                <TextBlock Grid.Column="2" Classes="label-small"
+                                           Text="ms"
+                                           VerticalAlignment="Center"
+                                           Margin="8,0,0,0" />
+                            </Grid>
+
                         </StackPanel>
                     </Border>
 
