@@ -303,9 +303,11 @@ AddrMacAddress  = new RegisterField(30100, WordCount: 3)   // FC04 → 3xxxx
 // Bit-field (multiple fields sharing one register)
 AddrCurrentInvert = new RegisterField(40007, BitOffset: 15, BitWidth: 1)
 AddrSntpEnabled   = new RegisterField(40007, BitOffset: 12, BitWidth: 1)
-AddrTl            = new RegisterField(40006, BitOffset: 0,  BitWidth: 8)  // LSB byte
-AddrTi            = new RegisterField(40006, BitOffset: 8,  BitWidth: 8)  // MSB byte
+AddrTl            = new RegisterField(40006, BitOffset: 8, BitWidth: 8)  // KS-3000: high byte
+AddrTi            = new RegisterField(40006, BitOffset: 0, BitWidth: 8)  // KS-3000: low byte
 ```
+
+**KS-3000 byte order quirk**: in register 40006, TL is stored in the **high** byte and TI in the **low** byte — opposite of what the natural "first field at LSB" intuition suggests. Verify by reading register against the old KRON software before assuming layout.
 
 Modicon convention: `4xxxx` = FC03 holding register (read/write); `3xxxx` = FC04 input register (read-only).
 Plain integer assignment (`AddrKe = 40005`) is valid — implicit conversion creates `RegisterField(addr)`.
@@ -316,15 +318,22 @@ Key methods on `RegisterField`:
 
 ### DeviceConfigService
 `Modbus.Core/Services/DeviceConfigService.cs` — stateless, opens/closes connection per call.
-- `ReadAsync(device, addresses)` — accepts Modicon numbers, splits FC03/FC04, coalesces contiguous blocks (gap ≤ 5), returns `Dictionary<modiconAddr, ushort>`
+- `ReadAsync(device, addresses)` — accepts Modicon numbers, splits FC03/FC04, coalesces **only adjacent addresses (`MaxGap = 1`)**, returns `Dictionary<modiconAddr, ushort>`
+- Per-block resilience: if any block throws (TimeoutException / ModbusProtocolException), the failure is logged to `Debug.WriteLine` (`[DeviceConfigService] FC03 <range> failed: ...`) and other blocks continue. The returned dict simply has those addresses missing; consumers must guard with null checks (already the pattern in `ApplyRegisters`).
+- Overall timeout `TimeoutSeconds = 30` covers the full bulk read.
 - `WriteAsync(device, address, value)` — FC06, address must be `4xxxx`
 - Registered as `AddTransient<IDeviceConfigService, DeviceConfigService>()` in `App.axaml.cs`
+
+**Why `MaxGap = 1` (only contiguous)**: with larger gaps the coalesced block would include addresses the device doesn't have. Some devices return a Modbus exception (handled now — see RTU transport note below), but others go fully silent → 1s read timeout per chunk. `MaxGap = 1` only coalesces adjacent registers (gap of exactly 1 between sorted addresses), so we never request a "phantom" register.
 
 ### DeviceConfigureViewModel
 Constructor: `(DeviceItemViewModel device, IDeviceConfigService, Func<Task> suspendRtuPolling, Action resumeRtuPolling, Action onGoBack)`
 - `HasEthernet`, `HasWireless`, `HasSntp`, `HasIot`, `HasClock`, `HasInputsOutputs`, `HasFieldKe`, `HasCurrentInvert` — computed from `DeviceCapabilityRegistry`
 - `LoadAsync()` — suspends RTU polling if needed, reads all profile addresses, calls `ApplyRegisters()`
-- `ApplyRegisters()` — maps register values to observable properties (to be filled once addresses are in the profile)
+- `ApplyRegisters()` — fully implemented for the KS-3000 profile (Geral, Wireless, SNTP, IoT, Relógio, Entradas/Saídas — all read-only). Float32 holding regs go through `DecodeFloat32` helper using `RegisterDecoder.Decode(..., WordOrder.ByteSwapped)` (see "Float32 byte order" below). Bit-fields and integers via `RegisterField.ExtractValue`. Strings via `ExtractString`. Clock via `ExtractTime`/`ExtractDate`. SQPF via `ApplySeqPf` (see "SQPF nibble labels" below).
+- **Sidebar navigation is data-driven**: VM exposes `Sections` (`IReadOnlyList<SidebarSection>` built in constructor) — only the sections enabled by `HasXxx` capabilities are added. `SidebarSection(int Code, string Label)` carries the section identity (0=General, 1=Ethernet, 2=Wireless, ...) so `IsGeneral`/`IsEthernet`/etc work based on `SelectedSection?.Code` regardless of how many sections were filtered out. The XAML uses `ItemsSource="{Binding Sections}"` + `SelectedItem="{Binding SelectedSection}"`.
+
+**Avalonia gotcha that drove this design**: inline `<ListBoxItem>` children declared directly inside a `<ListBox>` (instead of via `ItemsSource`) do NOT inherit the parent VM as DataContext — the `ListBoxItem` becomes the item itself and any `{Binding HasXxx}` silently resolves to `null`. Workarounds with `$parent[UserControl]`/`ReflectionBinding`/`ElementName` either fail to compile (compiled bindings can't find the cast target type) or fail to resolve at runtime. The data-driven `ItemsSource` approach sidesteps the problem entirely and is the canonical Avalonia pattern.
 
 ### Device register limits
 - **FC03/FC04 read**: max **32 registers per request** — `DeviceConfigService` splits blocks automatically
@@ -341,10 +350,30 @@ Edit `Modbus.Core/Services/DeviceConfigProfileRegistry.cs`.
 The file has a usage guide at the top. Each model (Ks3000, Konect120) has one property per field — replace `null` with the appropriate `RegisterField`.
 Multi-word and bit-field addresses pointing to the same register are deduplicated automatically by `AllAddresses`.
 
+### Float32 byte order on holding registers (TP, TC, HourmeterThr, ...)
+KS-3000 stores Float32 **holding** registers in **DCBA byte order** (`WordOrder.ByteSwapped` — full 4-byte reversal). This is independent from SQPF, which only applies to Float32 **input** registers. `RegisterDecoder.Decode(words, DataType.Float32, WordOrder.ByteSwapped)` handles it correctly via `Combine32` (swaps bytes within each word and swaps the words). Use the `DecodeFloat32` helper in `DeviceConfigureViewModel` — never `BitConverter.Int32BitsToSingle((int)ExtractValue(...))`, which assumes ABCD and would read 1.0 as ~0.0.
+
+### SQPF nibble labels
+KRON's display convention for register 42901 nibbles is **inverted from the natural F0..F2 expectation**:
+- nibble value `0` → label **F2**
+- nibble value `1` → label **F1**
+- nibble value `2` → label **F0**
+- nibble value `3` → label **EXP**
+
+So raw `0x3210` (Padrão KRON) displays as **F2, F1, F0, EXP** (in position order from `i=0` low-nibble to `i=3` high-nibble). The `ApplySeqPf` method in `DeviceConfigureViewModel` and the initial `_pfPos` array both follow this convention. If a future screen needs to display these labels, reuse the same array (`["F2", "F1", "F0", "EXP"]`).
+
+### MQTT Port is ASCII, not numeric
+KS-3000 stores the MQTT broker port as a **6-character ASCII string** at registers 43496–43498 (3 words), not as a 16-bit integer. The VM exposes `MqttPort` as `string?` and the XAML uses a `TextBox` (not `NumericUpDown`). All other MQTT fields (URL, User, Token, Topic, etc.) are also ASCII per the device doc.
+
+### RTU exception-response detection
+`RtuModbusTransport.ReadExactAsync` inspects the second byte of every response: if `(byte[1] & 0x80) != 0`, it's a Modbus exception frame (5 bytes total: slave + FC|0x80 + code + 2 CRC) and the transport stops reading immediately instead of waiting for a normal full-length response. Without this, requesting an unmapped address against a device that returns "Illegal Data Address" would hang for the full 1s read timeout per request, and `DeviceConfigService` would burn through its 30s budget. This matters once we implement writes (FC06/FC16) — devices often respond with exceptions for bad addresses, and the parser already throws `ModbusProtocolException` from those.
+
 ---
 
 ### Pending / future features - Attention! Keep it in the end of the file
 - Investigate if its necessary to prompt the user to reset the software when the language is changed, it seens like some texts won't change until a complete restart
-- Register write / configure screen / SQPF configuration UI (reading is implemented, writing is not)
+- Register write / configure screen / SQPF configuration UI (reading is implemented, writing is not). When implementing writes: KS-3000 doc says any string write in 43461+ needs a **Coil Reset** sent afterwards to commit the change.
+- Konect 120 config profile is empty — fill addresses once a device is available.
+- Verify Wi-Fi register addresses for KS-3000 (43101–43108 block was failing with timeouts during initial wiring — may need address correction once doc is consulted).
 - Mobile app (MAUI) connected to the same core as the desktop version with the same functions and styling
 - Mass memory readings

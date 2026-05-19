@@ -3,7 +3,8 @@
              xmlns:vm="using:Modbus.Desktop.ViewModels"
              xmlns:svc="using:Modbus.Desktop.Services"
              x:Class="Modbus.Desktop.Views.DeviceConfigureView"
-             x:DataType="vm:DeviceConfigureViewModel">
+             x:DataType="vm:DeviceConfigureViewModel"
+             Name="Root">
 
     <DockPanel Margin="{StaticResource MarginView}">
 
@@ -74,7 +75,8 @@
                     Margin="0,0,16,0">
                 <ListBox Background="Transparent"
                          Margin="6"
-                         SelectedIndex="{Binding SelectedSectionIndex}">
+                         ItemsSource="{Binding Sections}"
+                         SelectedItem="{Binding SelectedSection}">
                     <ListBox.Styles>
                         <Style Selector="ListBoxItem">
                             <Setter Property="Padding"      Value="12,10" />
@@ -92,13 +94,6 @@
                             <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
                         </Style>
                     </ListBox.Styles>
-                    <ListBoxItem Content="{Binding [CfgGeneral],      Source={x:Static svc:LocalizationService.Instance}}" />
-                    <ListBoxItem Content="{Binding [CfgEthernet],     Source={x:Static svc:LocalizationService.Instance}}" />
-                    <ListBoxItem Content="{Binding [CfgWireless],     Source={x:Static svc:LocalizationService.Instance}}" />
-                    <ListBoxItem Content="{Binding [CfgSntp],         Source={x:Static svc:LocalizationService.Instance}}" />
-                    <ListBoxItem Content="{Binding [CfgIot],          Source={x:Static svc:LocalizationService.Instance}}" />
-                    <ListBoxItem Content="{Binding [CfgClock],        Source={x:Static svc:LocalizationService.Instance}}" />
-                    <ListBoxItem Content="{Binding [CfgInputsOutputs],Source={x:Static svc:LocalizationService.Instance}}" />
                 </ListBox>
             </Border>
 

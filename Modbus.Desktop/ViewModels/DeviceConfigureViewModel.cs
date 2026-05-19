@@ -20,17 +20,24 @@ public partial class DeviceConfigureViewModel : ObservableObject
     public DeviceItemViewModel Device { get; }
 
     // ── Section navigation ───────────────────────────────────────────────────
-    [ObservableProperty] private int _selectedSectionIndex;
+    public sealed record SidebarSection(int Code, string Label)
+    {
+        public override string ToString() => Label;
+    }
 
-    public bool IsGeneral       => SelectedSectionIndex == 0;
-    public bool IsEthernet      => SelectedSectionIndex == 1;
-    public bool IsWireless      => SelectedSectionIndex == 2;
-    public bool IsSntp          => SelectedSectionIndex == 3;
-    public bool IsIot           => SelectedSectionIndex == 4;
-    public bool IsClock         => SelectedSectionIndex == 5;
-    public bool IsInputsOutputs => SelectedSectionIndex == 6;
+    public IReadOnlyList<SidebarSection> Sections { get; }
 
-    partial void OnSelectedSectionIndexChanged(int value)
+    [ObservableProperty] private SidebarSection? _selectedSection;
+
+    public bool IsGeneral       => SelectedSection?.Code == 0;
+    public bool IsEthernet      => SelectedSection?.Code == 1;
+    public bool IsWireless      => SelectedSection?.Code == 2;
+    public bool IsSntp          => SelectedSection?.Code == 3;
+    public bool IsIot           => SelectedSection?.Code == 4;
+    public bool IsClock         => SelectedSection?.Code == 5;
+    public bool IsInputsOutputs => SelectedSection?.Code == 6;
+
+    partial void OnSelectedSectionChanged(SidebarSection? value)
     {
         OnPropertyChanged(nameof(IsGeneral));
         OnPropertyChanged(nameof(IsEthernet));
@@ -180,6 +187,17 @@ public partial class DeviceConfigureViewModel : ObservableObject
         _onGoBack           = onGoBack;
         _editableSlaveId    = device.SlaveId;
         _description        = device.Name;
+
+        var loc = Modbus.Desktop.Services.LocalizationService.Instance;
+        var sections = new List<SidebarSection> { new(0, loc["CfgGeneral"]) };
+        if (HasEthernet)      sections.Add(new(1, loc["CfgEthernet"]));
+        if (HasWireless)      sections.Add(new(2, loc["CfgWireless"]));
+        if (HasSntp)          sections.Add(new(3, loc["CfgSntp"]));
+        if (HasIot)           sections.Add(new(4, loc["CfgIot"]));
+        if (HasClock)         sections.Add(new(5, loc["CfgClock"]));
+        if (HasInputsOutputs) sections.Add(new(6, loc["CfgInputsOutputs"]));
+        Sections = sections;
+        _selectedSection = sections[0];
     }
 
     public async Task LoadAsync()
