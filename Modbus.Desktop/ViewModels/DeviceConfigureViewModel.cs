@@ -4,6 +4,7 @@ using Modbus.Core.Domain.Enums;
 using Modbus.Core.Services;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -78,8 +79,22 @@ public partial class DeviceConfigureViewModel : ObservableObject
     [ObservableProperty] private decimal? _tp;
     [ObservableProperty] private decimal? _tc;
     [ObservableProperty] private decimal? _ke;
-    [ObservableProperty] private decimal? _tl;
+    [ObservableProperty] private TlOption? _tl;
     [ObservableProperty] private decimal? _ti;
+
+    public sealed record TlOption(int Code, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    public IReadOnlyList<TlOption> TlOptions { get; } =
+    [
+        new(0,  "00 – Trifásico Estrela 3 Elementos 4 Fios"),
+        new(1,  "01 – Bifásico"),
+        new(2,  "02 – Monofásico"),
+        new(3,  "03 – Trifásico Estrela Equilibrado 1 Elemento 2 Fios"),
+        new(48, "48 – Trifásico Delta 3 Elementos"),
+    ];
     [ObservableProperty] private bool _currentInvert;
     [ObservableProperty] private decimal? _hourmeterThr;
 
@@ -202,16 +217,14 @@ public partial class DeviceConfigureViewModel : ObservableObject
     private void ApplyRegisters(IReadOnlyDictionary<ushort, ushort> regs, DeviceConfigProfile p)
     {
         // ── General ──────────────────────────────────────────────────────────
-        if (p.AddrTp?.ExtractValue(regs) is uint tpRaw)
-            Tp = (decimal)BitConverter.Int32BitsToSingle((int)tpRaw);
-        if (p.AddrTc?.ExtractValue(regs) is uint tcRaw)
-            Tc = (decimal)BitConverter.Int32BitsToSingle((int)tcRaw);
+        if (DecodeFloat32(regs, p.AddrTp)           is decimal tp) Tp           = tp;
+        if (DecodeFloat32(regs, p.AddrTc)           is decimal tc) Tc           = tc;
+        if (DecodeFloat32(regs, p.AddrHourmeterThr) is decimal hm) HourmeterThr = hm;
         if (p.AddrKe?.ExtractValue(regs) is uint ke)        Ke = ke;
-        if (p.AddrTl?.ExtractValue(regs) is uint tl)        Tl = tl;
+        if (p.AddrTl?.ExtractValue(regs) is uint tl)
+            Tl = TlOptions.FirstOrDefault(o => o.Code == (int)tl);
         if (p.AddrTi?.ExtractValue(regs) is uint ti)        Ti = ti;
         if (p.AddrCurrentInvert?.ExtractValue(regs) is uint ci) CurrentInvert = ci != 0;
-        if (p.AddrHourmeterThr?.ExtractValue(regs) is uint hmRaw)
-            HourmeterThr = (decimal)BitConverter.Int32BitsToSingle((int)hmRaw);
         if (p.AddrSeqPf?.ExtractValue(regs) is uint sq)
             ApplySeqPf((ushort)sq);
 
@@ -271,6 +284,16 @@ public partial class DeviceConfigureViewModel : ObservableObject
         if (p.AddrDebounceEdp?.ExtractValue(regs) is uint deb) DebounceEdp = deb;
     }
 
+    private static decimal? DecodeFloat32(
+        IReadOnlyDictionary<ushort, ushort> regs, RegisterField? field)
+    {
+        if (field is not RegisterField f) return null;
+        if (!regs.TryGetValue(f.Addr, out var w0)) return null;
+        if (!regs.TryGetValue((ushort)(f.Addr + 1), out var w1)) return null;
+        return (decimal)RegisterDecoder.Decode(
+            new[] { w0, w1 }, Modbus.Core.Domain.Enums.DataType.Float32, Modbus.Core.Domain.Enums.WordOrder.ByteSwapped);
+    }
+
     private static string FormatIp(uint v) =>
         $"{(v >> 24) & 0xFF}.{(v >> 16) & 0xFF}.{(v >> 8) & 0xFF}.{v & 0xFF}";
 
@@ -288,7 +311,7 @@ public partial class DeviceConfigureViewModel : ObservableObject
 
     private void ApplySeqPf(ushort raw)
     {
-        string[] labels = ["F0", "F1", "F2", "EXP"];
+        string[] labels = ["F2", "F1", "F0", "EXP"];
         for (int i = 0; i < 4; i++)
         {
             int nibble = (raw >> (i * 4)) & 0xF;

@@ -166,13 +166,9 @@
                                 <StackPanel Grid.Column="3" Spacing="4" Margin="12,0,0,0">
                                     <TextBlock Classes="label-small"
                                                Text="{Binding [CfgConnectionType], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <ComboBox HorizontalAlignment="Stretch">
-                                        <ComboBoxItem Content="00 – Trifásico Estrela 3E 4F" />
-                                        <ComboBoxItem Content="01 – Trifásico Triângulo 2E 3F" />
-                                        <ComboBoxItem Content="02 – Trifásico Triângulo 3E 3F" />
-                                        <ComboBoxItem Content="03 – Bifásico" />
-                                        <ComboBoxItem Content="04 – Monofásico" />
-                                    </ComboBox>
+                                    <ComboBox ItemsSource="{Binding TlOptions}"
+                                              SelectedItem="{Binding Tl}"
+                                              HorizontalAlignment="Stretch" />
                                 </StackPanel>
                             </Grid>
 
