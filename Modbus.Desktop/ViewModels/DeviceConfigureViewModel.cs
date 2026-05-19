@@ -132,8 +132,31 @@ public partial class DeviceConfigureViewModel : ObservableObject
     }
 
     // ── Wireless ─────────────────────────────────────────────────────────────
+    public sealed record WirelessModeOption(int Code, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    // Bits D8 (WiFi disabled flag) and D9 (Bluetooth disabled flag) of register 40020,
+    // read as a 2-bit field (BitOffset:8 BitWidth:2). Code = (D9 << 1) | D8.
+    public IReadOnlyList<WirelessModeOption> WirelessModeOptions { get; } =
+    [
+        new(0, "Wi-Fi + Bluetooth"),
+        new(1, "Bluetooth"),
+        new(2, "Wi-Fi"),
+        new(3, "Desabilitado"),
+    ];
+
+    [ObservableProperty] private WirelessModeOption? _wirelessMode;
+
     [ObservableProperty] private string? _ssid;
     [ObservableProperty] private string? _wifiPassword;
+    [ObservableProperty] private bool _isWifiPasswordVisible;
+
+    public char WifiPasswordChar => IsWifiPasswordVisible ? '\0' : '•';
+
+    partial void OnIsWifiPasswordVisibleChanged(bool value)
+        => OnPropertyChanged(nameof(WifiPasswordChar));
     [ObservableProperty] private string? _moduleVersion;
     [ObservableProperty] private bool _wifiDhcp;
     [ObservableProperty] private bool _wifiDnsEnabled;
@@ -249,10 +272,12 @@ public partial class DeviceConfigureViewModel : ObservableObject
         // ── Wireless ─────────────────────────────────────────────────────────
         Ssid           = p.AddrSsid?.ExtractString(regs);
         WifiPassword   = p.AddrWifiPassword?.ExtractString(regs);
-        ModuleVersion  = p.AddrModuleVersion?.ExtractString(regs);
+        ModuleVersion  = FormatVersion(regs, p.AddrModuleVersion);
         BtDescription  = p.AddrBtDescription?.ExtractString(regs);
         BtPassword     = p.AddrBtPassword?.ExtractString(regs);
 
+        if (p.AddrWirelessMode?.ExtractValue(regs) is uint wMode)
+            WirelessMode = WirelessModeOptions.FirstOrDefault(o => o.Code == (int)wMode);
         if (p.AddrWifiDhcp?.ExtractValue(regs) is uint wDhcp)        WifiDhcp       = wDhcp != 0;
         if (p.AddrWifiDnsEnabled?.ExtractValue(regs) is uint wDnsEn) WifiDnsEnabled = wDnsEn != 0;
         if (p.AddrWifiIp?.ExtractValue(regs)      is uint wIp)  WifiIp      = FormatIp(wIp);
@@ -312,9 +337,11 @@ public partial class DeviceConfigureViewModel : ObservableObject
             new[] { w0, w1 }, Modbus.Core.Domain.Enums.DataType.Float32, Modbus.Core.Domain.Enums.WordOrder.ByteSwapped);
     }
 
+    // KS-3000 stores IP/Mask/Gateway/DNS in fully reversed byte order (low byte first).
     private static string FormatIp(uint v) =>
-        $"{(v >> 24) & 0xFF}.{(v >> 16) & 0xFF}.{(v >> 8) & 0xFF}.{v & 0xFF}";
+        $"{v & 0xFF}.{(v >> 8) & 0xFF}.{(v >> 16) & 0xFF}.{(v >> 24) & 0xFF}";
 
+    // KS-3000 stores MAC in fully reversed byte order. We read 3 words → 6 bytes, then reverse.
     private static string? FormatMac(IReadOnlyDictionary<ushort, ushort> regs, RegisterField f)
     {
         var bytes = new byte[6];
@@ -324,7 +351,18 @@ public partial class DeviceConfigureViewModel : ObservableObject
             bytes[i * 2]     = (byte)(w >> 8);
             bytes[i * 2 + 1] = (byte)(w & 0xFF);
         }
+        Array.Reverse(bytes);
         return $"{bytes[0]:X2}:{bytes[1]:X2}:{bytes[2]:X2}:{bytes[3]:X2}:{bytes[4]:X2}:{bytes[5]:X2}";
+    }
+
+    // Module version: 4 bytes in major.minor.patch.build order (NOT a string).
+    private static string? FormatVersion(
+        IReadOnlyDictionary<ushort, ushort> regs, RegisterField? field)
+    {
+        if (field is not RegisterField f) return null;
+        if (!regs.TryGetValue(f.Addr, out var w0)) return null;
+        if (!regs.TryGetValue((ushort)(f.Addr + 1), out var w1)) return null;
+        return $"{w0 >> 8}.{w0 & 0xFF}.{w1 >> 8}.{w1 & 0xFF}";
     }
 
     private void ApplySeqPf(ushort raw)

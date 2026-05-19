@@ -49,7 +49,9 @@ public static class DeviceConfigProfileRegistry
         AddrDnsServer     = null,
 
         // ── Wireless ──────────────────────────────────────────────────────────
-        AddrWirelessMode  = null,
+        // Bits D8 (WiFi disabled) + D9 (Bluetooth disabled) of register 40020.
+        // Combined value (0..3) maps to WiFi+BT / BT / WiFi / Disabled — see WirelessModeOptions in VM.
+        AddrWirelessMode  = new RegisterField(40020, BitOffset: 8, BitWidth: 2),
         AddrSsid          = new RegisterField(43121, WordCount: 15),
         AddrWifiPassword  = new RegisterField(43161, WordCount: 15),
         AddrModuleVersion = new RegisterField(39511, WordCount: 2),
@@ -62,7 +64,7 @@ public static class DeviceConfigProfileRegistry
         AddrWifiDns       = new RegisterField(43107, WordCount: 2),
         AddrBtDescription = new RegisterField(43001, WordCount: 8),
         AddrBtPassword    = new RegisterField(43011, WordCount: 8),
-        AddrBtMac         = new RegisterField(39501, WordCount: 3),
+        AddrBtMac         = new RegisterField(39507, WordCount: 3),
 
         // ── SNTP ──────────────────────────────────────────────────────────────
         AddrSntpEnabled   = new RegisterField(40007, BitOffset: 12, BitWidth: 1),
