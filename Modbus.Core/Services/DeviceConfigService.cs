@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Modbus.Core.Domain.Entities;
+using Modbus.Core.Protocol.Exceptions;
 
 namespace Modbus.Core.Services;
 
@@ -11,26 +12,25 @@ namespace Modbus.Core.Services;
 /// </summary>
 public sealed class DeviceConfigService : IDeviceConfigService
 {
-    private const int MaxGap       = 1;
-    private const int MaxBlockSize = 32;  // FC03/FC04 limit per request
+    private const int MaxBlockSize   = 32;  // FC03/FC04 spec limit per request
     private const int TimeoutSeconds = 30;
+    private const int MaxAttempts    = 3;   // Total attempts per block (1 initial + 2 retries)
+    private const int RetryDelayMs   = 150; // Pause between retries to let the device settle
 
     private readonly IModbusServiceFactory _factory;
 
     public DeviceConfigService(IModbusServiceFactory factory) => _factory = factory;
 
-    public async Task<IReadOnlyDictionary<ushort, ushort>> ReadAsync(
+    public async Task<ConfigReadResult> ReadAsync(
         ModbusDevice device,
-        IEnumerable<ushort> addresses,
+        IEnumerable<RegisterField> fields,
         CancellationToken cancellationToken = default)
     {
-        var all = addresses.Distinct().ToArray();
-        if (all.Length == 0) return new Dictionary<ushort, ushort>();
+        var allFields = fields.ToArray();
+        if (allFields.Length == 0)
+            return new ConfigReadResult(new Dictionary<ushort, ushort>(), Array.Empty<string>());
 
-        var holdingAddrs = all.Where(IsHolding).OrderBy(a => a).ToArray();
-        var inputAddrs   = all.Where(IsInput).OrderBy(a => a).ToArray();
-
-        var result = new Dictionary<ushort, ushort>(all.Length * 2);
+        var result = new Dictionary<ushort, ushort>(allFields.Length * 2);
         var failed = new List<string>();
 
         using var svc = _factory.Create(device);
@@ -40,47 +40,11 @@ public sealed class DeviceConfigService : IDeviceConfigService
         await svc.ConnectAsync(cts.Token);
         try
         {
-            foreach (var (rawStart, count, modiconBase) in BuildBlocks(holdingAddrs, 40001))
-            {
-                try
-                {
-                    var words = await svc.ReadHoldingRegistersAsync(
-                        device.SlaveId, rawStart, (ushort)count, cts.Token);
-
-                    for (int i = 0; i < words.Length; i++)
-                        result[(ushort)(modiconBase + rawStart + i)] = words[i];
-                }
-                catch (OperationCanceledException) { throw; }
-                catch (Exception ex)
-                {
-                    int firstModicon = modiconBase + rawStart;
-                    int lastModicon  = firstModicon + count - 1;
-                    string range = $"FC03 {firstModicon}-{lastModicon}";
-                    failed.Add($"{range}: {ex.GetType().Name}");
-                    Debug.WriteLine($"[DeviceConfigService] {range} failed: {ex.Message}");
-                }
-            }
-
-            foreach (var (rawStart, count, modiconBase) in BuildBlocks(inputAddrs, 30001))
-            {
-                try
-                {
-                    var words = await svc.ReadInputRegistersAsync(
-                        device.SlaveId, rawStart, (ushort)count, cts.Token);
-
-                    for (int i = 0; i < words.Length; i++)
-                        result[(ushort)(modiconBase + rawStart + i)] = words[i];
-                }
-                catch (OperationCanceledException) { throw; }
-                catch (Exception ex)
-                {
-                    int firstModicon = modiconBase + rawStart;
-                    int lastModicon  = firstModicon + count - 1;
-                    string range = $"FC04 {firstModicon}-{lastModicon}";
-                    failed.Add($"{range}: {ex.GetType().Name}");
-                    Debug.WriteLine($"[DeviceConfigService] {range} failed: {ex.Message}");
-                }
-            }
+            foreach (var blk in BuildBlocks(allFields))
+                await ReadBlockWithRetryAsync(
+                    svc, device.SlaveId,
+                    blk.RawStart, blk.Count, blk.ModiconBase,
+                    blk.IsHolding, result, failed, cts.Token);
         }
         finally
         {
@@ -88,10 +52,58 @@ public sealed class DeviceConfigService : IDeviceConfigService
         }
 
         if (failed.Count > 0)
-            Debug.WriteLine($"[DeviceConfigService] {failed.Count} block(s) failed:\n  - " +
+            Debug.WriteLine($"[DeviceConfigService] {failed.Count} block(s) failed after {MaxAttempts} attempts:\n  - " +
                             string.Join("\n  - ", failed));
 
-        return result;
+        return new ConfigReadResult(result, failed);
+    }
+
+    // Tries to read one block up to MaxAttempts times. Retries on transient failures
+    // (TimeoutException, IO errors); does NOT retry on ModbusProtocolException — those
+    // mean the device replied with an Illegal Data Address or similar deterministic
+    // error and retrying would just burn time. After all attempts, the block is recorded
+    // in `failed` and the dictionary keeps whatever was already accumulated.
+    private static async Task ReadBlockWithRetryAsync(
+        IModbusService svc, byte slaveId, ushort rawStart, int count, int modiconBase,
+        bool isHolding,
+        Dictionary<ushort, ushort> result, List<string> failed,
+        CancellationToken cancellationToken)
+    {
+        int firstModicon = modiconBase + rawStart;
+        int lastModicon  = firstModicon + count - 1;
+        string range     = $"{(isHolding ? "FC03" : "FC04")} {firstModicon}-{lastModicon}";
+
+        Exception? lastError = null;
+        for (int attempt = 1; attempt <= MaxAttempts; attempt++)
+        {
+            try
+            {
+                ushort[] words = isHolding
+                    ? await svc.ReadHoldingRegistersAsync(slaveId, rawStart, (ushort)count, cancellationToken)
+                    : await svc.ReadInputRegistersAsync(slaveId, rawStart, (ushort)count, cancellationToken);
+
+                for (int i = 0; i < words.Length; i++)
+                    result[(ushort)(modiconBase + rawStart + i)] = words[i];
+                return;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (ModbusProtocolException ex)
+            {
+                // Device explicitly replied with an exception — don't retry.
+                lastError = ex;
+                Debug.WriteLine($"[DeviceConfigService] {range} attempt {attempt}: protocol error ({ex.Message}); not retrying.");
+                break;
+            }
+            catch (Exception ex)
+            {
+                lastError = ex;
+                Debug.WriteLine($"[DeviceConfigService] {range} attempt {attempt}/{MaxAttempts} failed: {ex.Message}");
+                if (attempt < MaxAttempts)
+                    await Task.Delay(RetryDelayMs, cancellationToken);
+            }
+        }
+
+        failed.Add($"{range}: {lastError?.GetType().Name} — {lastError?.Message}");
     }
 
     public async Task WriteAsync(
@@ -121,47 +133,33 @@ public sealed class DeviceConfigService : IDeviceConfigService
     private static bool IsHolding(ushort a) => a is >= 40001 and <= 49999;
     private static bool IsInput(ushort a)   => a is >= 30001 and <= 39999;
 
-    // Groups Modicon addresses into (rawStart, wordCount, modiconBase) blocks,
-    // coalescing raw addresses within MaxGap and splitting at MaxBlockSize (32).
-    private static IEnumerable<(ushort RawStart, int Count, int ModiconBase)> BuildBlocks(
-        ushort[] sortedModicon, int modiconBase)
+    private readonly record struct ReadBlock(ushort RawStart, int Count, int ModiconBase, bool IsHolding);
+
+    // Builds one block per RegisterField. Fields sharing the same starting address
+    // (typically bit-fields on the same register) are merged into a single block whose
+    // size is the max WordCount among them. Fields at different addresses are NEVER
+    // coalesced — even when physically adjacent — because some devices reject reads
+    // that span multiple logical fields with IllegalDataValue. Multi-word fields longer
+    // than MaxBlockSize are split into MaxBlockSize-word chunks.
+    private static IEnumerable<ReadBlock> BuildBlocks(IEnumerable<RegisterField> fields)
     {
-        if (sortedModicon.Length == 0) yield break;
+        var groups = fields
+            .GroupBy(f => f.Addr)
+            .Select(g => new { Addr = g.Key, MaxCount = g.Max(f => f.WordCount) })
+            .OrderBy(g => g.Addr);
 
-        ushort ToRaw(ushort m) => (ushort)(m - modiconBase);
-
-        ushort blockRawStart = ToRaw(sortedModicon[0]);
-        ushort blockRawEnd   = blockRawStart;
-
-        for (int i = 1; i < sortedModicon.Length; i++)
+        foreach (var g in groups)
         {
-            ushort raw = ToRaw(sortedModicon[i]);
-            if (raw - blockRawEnd <= MaxGap)
-            {
-                blockRawEnd = raw;
-            }
-            else
-            {
-                foreach (var chunk in SplitBlock(blockRawStart, blockRawEnd, modiconBase))
-                    yield return chunk;
-                blockRawStart = raw;
-                blockRawEnd   = raw;
-            }
-        }
+            bool isHolding = IsHolding(g.Addr);
+            int modiconBase = isHolding ? 40001 : 30001;
+            ushort rawStart = (ushort)(g.Addr - modiconBase);
 
-        foreach (var chunk in SplitBlock(blockRawStart, blockRawEnd, modiconBase))
-            yield return chunk;
-    }
-
-    // Splits a single coalesced block into MaxBlockSize-word chunks.
-    private static IEnumerable<(ushort RawStart, int Count, int ModiconBase)> SplitBlock(
-        ushort rawStart, ushort rawEnd, int modiconBase)
-    {
-        int total = rawEnd - rawStart + 1;
-        for (int offset = 0; offset < total; offset += MaxBlockSize)
-        {
-            int count = Math.Min(MaxBlockSize, total - offset);
-            yield return ((ushort)(rawStart + offset), count, modiconBase);
+            for (int offset = 0; offset < g.MaxCount; offset += MaxBlockSize)
+            {
+                int count = Math.Min(MaxBlockSize, g.MaxCount - offset);
+                yield return new ReadBlock(
+                    (ushort)(rawStart + offset), count, modiconBase, isHolding);
+            }
         }
     }
 }

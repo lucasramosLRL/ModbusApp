@@ -65,6 +65,27 @@
             </StackPanel>
         </Border>
 
+        <!-- Read-failure banner: shows when any block failed after retries.
+             Stays visible until the user re-enters the screen (LoadAsync resets LoadError). -->
+        <Border DockPanel.Dock="Top"
+                IsVisible="{Binding LoadError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                Background="#3A1A1A"
+                BorderBrush="#C24040"
+                BorderThickness="1"
+                CornerRadius="{StaticResource RadiusCard}"
+                Padding="14,10"
+                Margin="0,0,0,16">
+            <StackPanel Spacing="4">
+                <TextBlock Text="Leitura incompleta — não grave configurações"
+                           FontWeight="SemiBold"
+                           Foreground="#F5B0B0" />
+                <TextBlock Text="{Binding LoadError}"
+                           TextWrapping="Wrap"
+                           Foreground="#E8C8C8"
+                           FontSize="{StaticResource FontSizeMeta}" />
+            </StackPanel>
+        </Border>
+
         <!-- Sidebar + content -->
         <Grid ColumnDefinitions="200,*">
 
@@ -229,59 +250,71 @@
                             <TextBlock Text="{Binding [CfgEthernet], Source={x:Static svc:LocalizationService.Instance}}"
                                        Classes="section-title" />
 
-                            <!-- DHCP -->
-                            <StackPanel Spacing="4">
-                                <TextBlock Classes="label-small" Text="DHCP" />
-                                <ComboBox Width="200" HorizontalAlignment="Left">
-                                    <ComboBoxItem Content="OFF" />
-                                    <ComboBoxItem Content="ON" />
-                                </ComboBox>
-                            </StackPanel>
+                            <Border Background="{StaticResource BrushBgElevated}"
+                                    CornerRadius="{StaticResource RadiusCardSmall}"
+                                    Padding="16">
+                                <StackPanel Spacing="14">
+                                    <TextBlock Text="Ethernet"
+                                               FontSize="{StaticResource FontSizeSectionTitle}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource BrushTextPrimary}"
+                                               Opacity="0.7" />
 
-                            <Border Height="1" Background="{StaticResource BrushBgSeparator}" Margin="-16,0" />
+                                    <!-- DHCP -->
+                                    <CheckBox Content="DHCP"
+                                              IsChecked="{Binding EthDhcp}"
+                                              Foreground="{StaticResource BrushTextPrimary}" />
 
-                            <!-- IP / Mask / Gateway -->
-                            <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto">
-                                <StackPanel Grid.Column="0" Spacing="4">
-                                    <TextBlock Classes="label-small"
-                                               Text="{Binding [CfgIpAddress], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <TextBox Watermark="0.0.0.0" />
+                                    <Border Height="1" Background="{StaticResource BrushBgSeparator}" Margin="-16,0" />
+
+                                    <!-- IP / Mask / Gateway (disabled when DHCP is on) -->
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Classes="label-small"
+                                                   Text="{Binding [CfgIpAddress], Source={x:Static svc:LocalizationService.Instance}}" />
+                                        <TextBox Text="{Binding EthIp}"
+                                                 IsEnabled="{Binding !EthDhcp}"
+                                                 Watermark="0.0.0.0" />
+                                    </StackPanel>
+                                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto">
+                                        <StackPanel Grid.Column="0" Spacing="4">
+                                            <TextBlock Classes="label-small"
+                                                       Text="{Binding [CfgSubnetMask], Source={x:Static svc:LocalizationService.Instance}}" />
+                                            <TextBox Text="{Binding EthMask}"
+                                                     IsEnabled="{Binding !EthDhcp}"
+                                                     Watermark="255.255.255.0" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="4" Margin="10,0,0,0">
+                                            <TextBlock Classes="label-small"
+                                                       Text="{Binding [CfgGateway], Source={x:Static svc:LocalizationService.Instance}}" />
+                                            <TextBox Text="{Binding EthGateway}"
+                                                     IsEnabled="{Binding !EthDhcp}"
+                                                     Watermark="0.0.0.0" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- MAC Address (read-only) -->
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Classes="label-small"
+                                                   Text="{Binding [CfgMacAddress], Source={x:Static svc:LocalizationService.Instance}}" />
+                                        <TextBlock Text="{Binding EthMac, FallbackValue=—, TargetNullValue=—}"
+                                                   FontFamily="Consolas, Courier New, monospace"
+                                                   FontSize="{StaticResource FontSizeSectionTitle}"
+                                                   FontWeight="Medium"
+                                                   Foreground="{StaticResource BrushTextPrimary}"
+                                                   Opacity="0.45" />
+                                    </StackPanel>
+
+                                    <!-- DNS (shared with Wireless tab — binds to the same VM properties) -->
+                                    <StackPanel Spacing="6">
+                                        <CheckBox Content="{Binding [CfgDns], Source={x:Static svc:LocalizationService.Instance}}"
+                                                  IsChecked="{Binding WifiDnsEnabled}"
+                                                  Foreground="{StaticResource BrushTextPrimary}" />
+                                        <TextBox Text="{Binding WifiDns}"
+                                                 IsEnabled="{Binding WifiDnsEnabled}"
+                                                 Watermark="208.67.222.222" />
+                                    </StackPanel>
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
-                                    <TextBlock Classes="label-small"
-                                               Text="{Binding [CfgSubnetMask], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <TextBox Watermark="255.255.255.0" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2" Spacing="4" Margin="12,0,0,0">
-                                    <TextBlock Classes="label-small"
-                                               Text="{Binding [CfgGateway], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <TextBox Watermark="0.0.0.0" />
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- MAC Address (read-only) -->
-                            <StackPanel Spacing="4">
-                                <TextBlock Classes="label-small"
-                                           Text="{Binding [CfgMacAddress], Source={x:Static svc:LocalizationService.Instance}}" />
-                                <TextBox IsReadOnly="True"
-                                         Watermark="—"
-                                         FontFamily="Consolas, Courier New, monospace"
-                                         Opacity="0.65"
-                                         HorizontalAlignment="Left"
-                                         Width="220" />
-                            </StackPanel>
-
-                            <Border Height="1" Background="{StaticResource BrushBgSeparator}" Margin="-16,0" />
-
-                            <!-- DNS -->
-                            <StackPanel Spacing="8">
-                                <CheckBox Content="{Binding [CfgDns], Source={x:Static svc:LocalizationService.Instance}}"
-                                          Foreground="{StaticResource BrushTextPrimary}" />
-                                <TextBox Watermark="208.67.222.222"
-                                         HorizontalAlignment="Left"
-                                         Width="200" />
-                            </StackPanel>
-
+                            </Border>
                         </StackPanel>
                     </Border>
 
@@ -698,43 +731,56 @@
 
                     <!-- ── Relógio ────────────────────────────────────────── -->
                     <Border Classes="card" IsVisible="{Binding IsClock}">
-                        <StackPanel Spacing="20" MaxWidth="400" HorizontalAlignment="Left">
+                        <StackPanel Spacing="20" MaxWidth="420" HorizontalAlignment="Left">
                             <TextBlock Text="{Binding [CfgClock], Source={x:Static svc:LocalizationService.Instance}}"
                                        Classes="section-title" />
 
-                            <!-- Form grid: label | control -->
-                            <Grid ColumnDefinitions="80,200"
-                                  RowDefinitions="Auto,12,Auto,16,Auto">
+                            <Border Background="{StaticResource BrushBgElevated}"
+                                    CornerRadius="{StaticResource RadiusCardSmall}"
+                                    Padding="20,16">
+                                <StackPanel Spacing="14">
+                                    <!-- Data -->
+                                    <Grid ColumnDefinitions="80,*" RowDefinitions="Auto">
+                                        <TextBlock Grid.Column="0" Classes="label-small"
+                                                   Text="{Binding [CfgDate], Source={x:Static svc:LocalizationService.Instance}}"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding ClockDateText}"
+                                                   FontFamily="Consolas, Courier New, monospace"
+                                                   FontSize="{StaticResource FontSizeSectionTitle}"
+                                                   FontWeight="Medium"
+                                                   Foreground="{StaticResource BrushTextPrimary}" />
+                                    </Grid>
 
-                                <!-- Data -->
-                                <TextBlock Grid.Row="0" Grid.Column="0" Classes="label-small"
-                                           Text="{Binding [CfgDate], Source={x:Static svc:LocalizationService.Instance}}"
-                                           VerticalAlignment="Center" />
-                                <DatePicker Grid.Row="0" Grid.Column="1"
-                                            SelectedDate="{Binding ClockDate}"
-                                            HorizontalAlignment="Stretch" />
+                                    <!-- Hora -->
+                                    <Grid ColumnDefinitions="80,*" RowDefinitions="Auto">
+                                        <TextBlock Grid.Column="0" Classes="label-small"
+                                                   Text="{Binding [CfgTime], Source={x:Static svc:LocalizationService.Instance}}"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding ClockTimeText}"
+                                                   FontFamily="Consolas, Courier New, monospace"
+                                                   FontSize="{StaticResource FontSizeSectionTitle}"
+                                                   FontWeight="Medium"
+                                                   Foreground="{StaticResource BrushTextPrimary}" />
+                                    </Grid>
 
-                                <!-- Hora -->
-                                <TextBlock Grid.Row="2" Grid.Column="0" Classes="label-small"
-                                           Text="{Binding [CfgTime], Source={x:Static svc:LocalizationService.Instance}}"
-                                           VerticalAlignment="Center" />
-                                <TimePicker Grid.Row="2" Grid.Column="1"
-                                            SelectedTime="{Binding ClockTime}"
-                                            HorizontalAlignment="Stretch" />
+                                    <Border Height="1" Background="{StaticResource BrushBgSeparator}" Margin="-20,4" />
 
-                                <!-- Sync source radio buttons -->
-                                <StackPanel Grid.Row="4" Grid.Column="1"
-                                            Orientation="Horizontal" Spacing="20">
-                                    <RadioButton Content="{Binding [CfgManual], Source={x:Static svc:LocalizationService.Instance}}"
-                                                 GroupName="ClockSync"
-                                                 Foreground="{StaticResource BrushTextPrimary}" />
-                                    <RadioButton Content="PC"
-                                                 GroupName="ClockSync"
-                                                 IsChecked="True"
-                                                 Foreground="{StaticResource BrushTextPrimary}" />
+                                    <!-- Sync source: when "PC" is selected, a 1s timer pushes
+                                         the current PC clock into the display above. "Manual"
+                                         stops the timer and freezes the displayed values. -->
+                                    <StackPanel Orientation="Horizontal" Spacing="20">
+                                        <RadioButton Content="{Binding [CfgManual], Source={x:Static svc:LocalizationService.Instance}}"
+                                                     GroupName="ClockSync"
+                                                     Foreground="{StaticResource BrushTextPrimary}" />
+                                        <RadioButton Content="PC"
+                                                     GroupName="ClockSync"
+                                                     IsChecked="{Binding ClockSyncFromPc}"
+                                                     Foreground="{StaticResource BrushTextPrimary}" />
+                                    </StackPanel>
                                 </StackPanel>
-
-                            </Grid>
+                            </Border>
                         </StackPanel>
                     </Border>
 

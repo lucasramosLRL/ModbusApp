@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Modbus.Core.Domain.Enums;
@@ -131,6 +132,16 @@ public partial class DeviceConfigureViewModel : ObservableObject
         OnPropertyChanged($"PfPos{index}");
     }
 
+    // ── Ethernet ─────────────────────────────────────────────────────────────
+    // DNS (enabled + server) is shared with the Wireless tab on devices like the
+    // Konect 120 where both interfaces read/write the same register. Both tabs
+    // bind to WifiDnsEnabled / WifiDns so changes propagate automatically.
+    [ObservableProperty] private bool _ethDhcp;
+    [ObservableProperty] private string? _ethIp;
+    [ObservableProperty] private string? _ethMask;
+    [ObservableProperty] private string? _ethGateway;
+    [ObservableProperty] private string? _ethMac;
+
     // ── Wireless ─────────────────────────────────────────────────────────────
     public sealed record WirelessModeOption(int Code, string Label)
     {
@@ -208,6 +219,50 @@ public partial class DeviceConfigureViewModel : ObservableObject
     [ObservableProperty] private DateTimeOffset? _clockDate;
     [ObservableProperty] private TimeSpan? _clockTime;
 
+    // Sync mode: when true, a 1-Hz timer pushes the current PC time into ClockDate/ClockTime
+    // so the user always sees an up-to-date timestamp. Defaults to true to match the old
+    // KRON software, which opens this tab with "PC" selected.
+    [ObservableProperty] private bool _clockSyncFromPc = true;
+
+    private DispatcherTimer? _clockTimer;
+
+    public string ClockDateText => ClockDate is { } d ? d.ToString("dd/MM/yyyy") : "—";
+    public string ClockTimeText => ClockTime is { } t ? t.ToString(@"hh\:mm\:ss") : "—";
+
+    partial void OnClockDateChanged(DateTimeOffset? value) => OnPropertyChanged(nameof(ClockDateText));
+    partial void OnClockTimeChanged(TimeSpan? value)       => OnPropertyChanged(nameof(ClockTimeText));
+
+    partial void OnClockSyncFromPcChanged(bool value) => UpdateClockTimerState();
+
+    private void UpdateClockTimerState()
+    {
+        if (ClockSyncFromPc)
+        {
+            if (_clockTimer is null)
+            {
+                _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+                _clockTimer.Tick += (_, _) => SetClockFromPc();
+            }
+            SetClockFromPc();   // immediate so the user doesn't wait a second for the first paint
+            _clockTimer.Start();
+        }
+        else
+        {
+            _clockTimer?.Stop();
+        }
+    }
+
+    private void SetClockFromPc()
+    {
+        var now = DateTime.Now;
+        // DateTimeOffset rejects Local DateTime with a non-matching offset; strip Kind so
+        // the Zero offset is accepted (matches what ApplyRegisters does for device reads).
+        var dateOnly = DateTime.SpecifyKind(now.Date, DateTimeKind.Unspecified);
+        if (ClockDate?.DateTime != dateOnly)
+            ClockDate = new DateTimeOffset(dateOnly, TimeSpan.Zero);
+        ClockTime = now.TimeOfDay;
+    }
+
     // ── Inputs / Outputs ─────────────────────────────────────────────────────
     [ObservableProperty] private decimal? _debounceEdp;
 
@@ -237,12 +292,16 @@ public partial class DeviceConfigureViewModel : ObservableObject
         if (HasInputsOutputs) sections.Add(new(6, loc["CfgInputsOutputs"]));
         Sections = sections;
         _selectedSection = sections[0];
+
+        // Kick off the PC-time updater so the Clock tab shows the current time
+        // immediately when the user opens it (field init doesn't fire OnChanged).
+        UpdateClockTimerState();
     }
 
     public async Task LoadAsync()
     {
         var profile = DeviceConfigProfileRegistry.Get(Device.Device.DeviceModel?.DeviceCode);
-        if (profile is null || profile.AllAddresses.Count == 0) return;
+        if (profile is null || profile.AllFields.Count == 0) return;
 
         IsLoading = true;
         LoadError = null;
@@ -252,9 +311,17 @@ public partial class DeviceConfigureViewModel : ObservableObject
             if (isRtu) await _suspendRtuPolling();
             try
             {
-                var regs = await _configService.ReadAsync(
-                    Device.Device, profile.AllAddresses, CancellationToken.None);
-                ApplyRegisters(regs, profile);
+                var read = await _configService.ReadAsync(
+                    Device.Device, profile.AllFields, CancellationToken.None);
+                ApplyRegisters(read.Values, profile);
+
+                // Surface partial-read failures: data is incomplete and must not be
+                // written back to the device until reloaded successfully.
+                if (read.FailedBlocks.Count > 0)
+                    LoadError =
+                        $"Falha ao ler {read.FailedBlocks.Count} bloco(s) após múltiplas tentativas. " +
+                        "Alguns campos podem estar vazios ou desatualizados — não grave configurações até a leitura completar:\n  • " +
+                        string.Join("\n  • ", read.FailedBlocks);
             }
             finally
             {
@@ -284,6 +351,14 @@ public partial class DeviceConfigureViewModel : ObservableObject
         if (p.AddrCurrentInvert?.ExtractValue(regs) is uint ci) CurrentInvert = ci != 0;
         if (p.AddrSeqPf?.ExtractValue(regs) is uint sq)
             ApplySeqPf((ushort)sq);
+
+        // ── Ethernet ─────────────────────────────────────────────────────────
+        // DNS settings are shared with Wireless — handled in the Wireless block below.
+        if (p.AddrDhcp?.ExtractValue(regs)       is uint eDhcp)  EthDhcp     = eDhcp != 0;
+        if (p.AddrIpAddress?.ExtractValue(regs)  is uint eIp)    EthIp       = FormatIp(eIp);
+        if (p.AddrSubnetMask?.ExtractValue(regs) is uint eMsk)   EthMask     = FormatIp(eMsk);
+        if (p.AddrGateway?.ExtractValue(regs)    is uint eGw)    EthGateway  = FormatIp(eGw);
+        if (p.AddrMacAddress is RegisterField eMac) EthMac = FormatMac(regs, eMac);
 
         // ── Wireless ─────────────────────────────────────────────────────────
         Ssid           = p.AddrSsid?.ExtractString(regs);
@@ -403,5 +478,9 @@ public partial class DeviceConfigureViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void GoBack() => _onGoBack();
+    private void GoBack()
+    {
+        _clockTimer?.Stop();
+        _onGoBack();
+    }
 }

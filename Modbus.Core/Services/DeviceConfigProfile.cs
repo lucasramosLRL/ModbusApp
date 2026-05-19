@@ -85,14 +85,26 @@ public sealed class DeviceConfigProfile
     /// Bit-fields sharing the same register appear only once.
     /// </summary>
     public IReadOnlyList<ushort> AllAddresses =>
+        AllFields
+            .SelectMany(f => f.AllAddresses())
+            .Distinct()
+            .OrderBy(a => a)
+            .ToList();
+
+    /// <summary>
+    /// All non-null <see cref="RegisterField"/> values declared on this profile.
+    /// Used by <c>DeviceConfigService.ReadAsync</c> to build read blocks aligned to
+    /// logical field boundaries — devices like the KRON Konect 120 reject reads that
+    /// coalesce multiple distinct fields into one request, even when the addresses
+    /// are physically contiguous.
+    /// </summary>
+    public IReadOnlyList<RegisterField> AllFields =>
         GetType()
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.Name.StartsWith("Addr", StringComparison.Ordinal)
                      && p.PropertyType == typeof(RegisterField?))
             .Select(p => (RegisterField?)p.GetValue(this))
             .Where(v => v.HasValue)
-            .SelectMany(v => v!.Value.AllAddresses())
-            .Distinct()
-            .OrderBy(a => a)
+            .Select(v => v!.Value)
             .ToList();
 }
