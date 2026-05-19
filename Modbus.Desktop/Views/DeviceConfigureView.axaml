@@ -147,17 +147,20 @@
                             <Grid ColumnDefinitions="*,*,*,2*" RowDefinitions="Auto">
                                 <StackPanel Grid.Column="0" Spacing="4">
                                     <TextBlock Classes="label-small" Text="TP  (0,01 – 9999,99)" />
-                                    <NumericUpDown Minimum="0.01" Maximum="9999.99" Increment="1"
+                                    <NumericUpDown Value="{Binding Tp}"
+                                                   Minimum="0.01" Maximum="9999.99" Increment="1"
                                                    FormatString="F2" HorizontalAlignment="Stretch" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
                                     <TextBlock Classes="label-small" Text="TC  (0,01 – 9999,99)" />
-                                    <NumericUpDown Minimum="0.01" Maximum="9999.99" Increment="1"
+                                    <NumericUpDown Value="{Binding Tc}"
+                                                   Minimum="0.01" Maximum="9999.99" Increment="1"
                                                    FormatString="F2" HorizontalAlignment="Stretch" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Spacing="4" Margin="12,0,0,0">
                                     <TextBlock Classes="label-small" Text="KE  (0 – 65535)" />
-                                    <NumericUpDown Minimum="0" Maximum="65535" Increment="1"
+                                    <NumericUpDown Value="{Binding Ke}"
+                                                   Minimum="0" Maximum="65535" Increment="1"
                                                    FormatString="0" HorizontalAlignment="Stretch" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="3" Spacing="4" Margin="12,0,0,0">
@@ -178,10 +181,12 @@
                                 <StackPanel Spacing="4">
                                     <TextBlock Classes="label-small"
                                                Text="{Binding [CfgIntegrationTime], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <NumericUpDown Minimum="0" Maximum="60" Increment="1"
+                                    <NumericUpDown Value="{Binding Ti}"
+                                                   Minimum="0" Maximum="60" Increment="1"
                                                    FormatString="0" Width="120" />
                                 </StackPanel>
                                 <CheckBox Content="{Binding [CfgCurrentInvert], Source={x:Static svc:LocalizationService.Instance}}"
+                                          IsChecked="{Binding CurrentInvert}"
                                           VerticalAlignment="Bottom"
                                           Foreground="{StaticResource BrushTextPrimary}" />
                             </StackPanel>
@@ -218,7 +223,8 @@
                             <StackPanel Spacing="4">
                                 <TextBlock Classes="label-small"
                                            Text="{Binding [CfgThreshold], Source={x:Static svc:LocalizationService.Instance}}" />
-                                <NumericUpDown Minimum="0.01" Maximum="9999.99" Increment="0.01"
+                                <NumericUpDown Value="{Binding HourmeterThr}"
+                                               Minimum="0.01" Maximum="9999.99" Increment="0.01"
                                                FormatString="F2" Width="180" HorizontalAlignment="Left" />
                             </StackPanel>
 
@@ -326,19 +332,19 @@
                                         <!-- SSID + Security + Password -->
                                         <StackPanel Spacing="4">
                                             <TextBlock Classes="label-small" Text="SSID" />
-                                            <TextBox />
+                                            <TextBox Text="{Binding Ssid}" />
                                         </StackPanel>
                                         <StackPanel Spacing="4">
                                             <TextBlock Classes="label-small"
                                                        Text="{Binding [CfgWifiPassword], Source={x:Static svc:LocalizationService.Instance}}" />
-                                            <TextBox PasswordChar="•" />
+                                            <TextBox Text="{Binding WifiPassword}" PasswordChar="•" />
                                         </StackPanel>
 
                                         <!-- Module version (read-only) -->
                                         <StackPanel Spacing="4">
                                             <TextBlock Classes="label-small"
                                                        Text="{Binding [CfgModuleVersion], Source={x:Static svc:LocalizationService.Instance}}" />
-                                            <TextBlock Text="—"
+                                            <TextBlock Text="{Binding ModuleVersion, FallbackValue=—, TargetNullValue=—}"
                                                        FontSize="{StaticResource FontSizeSectionTitle}"
                                                        FontWeight="Medium"
                                                        Foreground="{StaticResource BrushTextPrimary}"
@@ -351,18 +357,18 @@
                                         <StackPanel Spacing="4">
                                             <TextBlock Classes="label-small"
                                                        Text="{Binding [CfgIpAddress], Source={x:Static svc:LocalizationService.Instance}}" />
-                                            <TextBox Watermark="0.0.0.0" />
+                                            <TextBox Text="{Binding WifiIp}" Watermark="0.0.0.0" />
                                         </StackPanel>
                                         <Grid ColumnDefinitions="*,*" RowDefinitions="Auto">
                                             <StackPanel Grid.Column="0" Spacing="4">
                                                 <TextBlock Classes="label-small"
                                                            Text="{Binding [CfgSubnetMask], Source={x:Static svc:LocalizationService.Instance}}" />
-                                                <TextBox Watermark="255.255.255.0" />
+                                                <TextBox Text="{Binding WifiMask}" Watermark="255.255.255.0" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Spacing="4" Margin="10,0,0,0">
                                                 <TextBlock Classes="label-small"
                                                            Text="{Binding [CfgGateway], Source={x:Static svc:LocalizationService.Instance}}" />
-                                                <TextBox Watermark="0.0.0.0" />
+                                                <TextBox Text="{Binding WifiGateway}" Watermark="0.0.0.0" />
                                             </StackPanel>
                                         </Grid>
 
@@ -371,7 +377,7 @@
                                             <StackPanel Grid.Column="0" Spacing="4">
                                                 <TextBlock Classes="label-small"
                                                            Text="{Binding [CfgMacAddress], Source={x:Static svc:LocalizationService.Instance}}" />
-                                                <TextBlock Text="—"
+                                                <TextBlock Text="{Binding WifiMac, FallbackValue=—, TargetNullValue=—}"
                                                            FontFamily="Consolas, Courier New, monospace"
                                                            FontSize="{StaticResource FontSizeSectionTitle}"
                                                            FontWeight="Medium"
@@ -379,19 +385,18 @@
                                                            Opacity="0.45" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Spacing="4" Margin="10,0,0,0">
-                                                <TextBlock Classes="label-small" Text="DHCP" />
-                                                <ComboBox HorizontalAlignment="Stretch">
-                                                    <ComboBoxItem Content="OFF" />
-                                                    <ComboBoxItem Content="ON" />
-                                                </ComboBox>
+                                                <CheckBox Content="DHCP"
+                                                          IsChecked="{Binding WifiDhcp}"
+                                                          Foreground="{StaticResource BrushTextPrimary}" />
                                             </StackPanel>
                                         </Grid>
 
                                         <!-- DNS -->
                                         <StackPanel Spacing="6">
                                             <CheckBox Content="{Binding [CfgDns], Source={x:Static svc:LocalizationService.Instance}}"
+                                                      IsChecked="{Binding WifiDnsEnabled}"
                                                       Foreground="{StaticResource BrushTextPrimary}" />
-                                            <TextBox Watermark="208.67.222.222" />
+                                            <TextBox Text="{Binding WifiDns}" Watermark="208.67.222.222" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -411,17 +416,17 @@
                                         <StackPanel Spacing="4">
                                             <TextBlock Classes="label-small"
                                                        Text="{Binding [CfgDeviceDesc], Source={x:Static svc:LocalizationService.Instance}}" />
-                                            <TextBox />
+                                            <TextBox Text="{Binding BtDescription}" />
                                         </StackPanel>
                                         <StackPanel Spacing="4">
                                             <TextBlock Classes="label-small"
                                                        Text="{Binding [CfgBtPassword], Source={x:Static svc:LocalizationService.Instance}}" />
-                                            <TextBox />
+                                            <TextBox Text="{Binding BtPassword}" />
                                         </StackPanel>
                                         <StackPanel Spacing="4">
                                             <TextBlock Classes="label-small"
                                                        Text="{Binding [CfgMacAddress], Source={x:Static svc:LocalizationService.Instance}}" />
-                                            <TextBlock Text="—"
+                                            <TextBlock Text="{Binding BtMac, FallbackValue=—, TargetNullValue=—}"
                                                        FontFamily="Consolas, Courier New, monospace"
                                                        FontSize="{StaticResource FontSizeSectionTitle}"
                                                        FontWeight="Medium"
@@ -449,10 +454,10 @@
                                            Classes="label-small"
                                            Text="{Binding [CfgSntp], Source={x:Static svc:LocalizationService.Instance}}"
                                            VerticalAlignment="Center" />
-                                <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch">
-                                    <ComboBoxItem Content="{Binding [CfgEnabled],  Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <ComboBoxItem Content="{Binding [CfgDisabled], Source={x:Static svc:LocalizationService.Instance}}" />
-                                </ComboBox>
+                                <CheckBox Grid.Row="0" Grid.Column="1"
+                                          Content="{Binding [CfgEnabled], Source={x:Static svc:LocalizationService.Instance}}"
+                                          IsChecked="{Binding SntpEnabled}"
+                                          Foreground="{StaticResource BrushTextPrimary}" />
 
                                 <!-- Timezone -->
                                 <TextBlock Grid.Row="2" Grid.Column="0"
@@ -460,6 +465,7 @@
                                            Text="{Binding [CfgTimezone], Source={x:Static svc:LocalizationService.Instance}}"
                                            VerticalAlignment="Center" />
                                 <NumericUpDown Grid.Row="2" Grid.Column="1"
+                                               Value="{Binding Timezone}"
                                                Minimum="-12" Maximum="14" Increment="1"
                                                FormatString="0" HorizontalAlignment="Stretch" />
                                 <TextBlock Grid.Row="2" Grid.Column="2"
@@ -474,6 +480,7 @@
                                            Text="{Binding [CfgSyncInterval], Source={x:Static svc:LocalizationService.Instance}}"
                                            VerticalAlignment="Center" />
                                 <NumericUpDown Grid.Row="4" Grid.Column="1"
+                                               Value="{Binding SyncInterval}"
                                                Minimum="1" Maximum="1440" Increment="1"
                                                FormatString="0" HorizontalAlignment="Stretch" />
                                 <TextBlock Grid.Row="4" Grid.Column="2"
@@ -489,6 +496,7 @@
                                            VerticalAlignment="Center" />
                                 <TextBox Grid.Row="6" Grid.Column="1"
                                          Grid.ColumnSpan="2"
+                                         Text="{Binding NtpServer}"
                                          Watermark="a.st1.ntp.br" />
 
                             </Grid>
@@ -506,17 +514,17 @@
                                 <!-- IoT status -->
                                 <StackPanel Grid.Column="0" Spacing="4">
                                     <TextBlock Classes="label-small" Text="IoT" />
-                                    <ComboBox Width="160">
-                                        <ComboBoxItem Content="{Binding [CfgEnabled],  Source={x:Static svc:LocalizationService.Instance}}" />
-                                        <ComboBoxItem Content="{Binding [CfgDisabled], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    </ComboBox>
+                                    <CheckBox Content="{Binding [CfgEnabled], Source={x:Static svc:LocalizationService.Instance}}"
+                                              IsChecked="{Binding IotEnabled}"
+                                              Foreground="{StaticResource BrushTextPrimary}" />
                                 </StackPanel>
                                 <!-- Send interval -->
                                 <StackPanel Grid.Column="2" Spacing="4">
                                     <TextBlock Classes="label-small"
                                                Text="{Binding [CfgSendInterval], Source={x:Static svc:LocalizationService.Instance}}" />
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <NumericUpDown Minimum="1" Maximum="1440" Increment="1"
+                                        <NumericUpDown Value="{Binding SendInterval}"
+                                                       Minimum="1" Maximum="1440" Increment="1"
                                                        FormatString="0" Width="100" />
                                         <TextBlock Classes="label-small"
                                                    Text="{Binding [CfgUnitMinutes], Source={x:Static svc:LocalizationService.Instance}}"
@@ -527,6 +535,7 @@
                                 <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Right"
                                             Spacing="20" VerticalAlignment="Bottom">
                                     <CheckBox Content="{Binding [CfgSendOnHour], Source={x:Static svc:LocalizationService.Instance}}"
+                                              IsChecked="{Binding SendOnHour}"
                                               Foreground="{StaticResource BrushTextPrimary}" />
                                     <Button Content="{Binding [CfgClearBuffer], Source={x:Static svc:LocalizationService.Instance}}"
                                             Padding="{StaticResource PaddingButtonSmall}" />
@@ -561,19 +570,20 @@
                                                 <TextBlock Grid.Row="2" Grid.Column="0" Classes="label-small"
                                                            Text="URL"
                                                            VerticalAlignment="Center" />
-                                                <TextBox Grid.Row="2" Grid.Column="1" Watermark="broker.emqx.io" />
+                                                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding MqttUrl}" Watermark="broker.emqx.io" />
 
                                                 <!-- Descrição / ID -->
                                                 <TextBlock Grid.Row="4" Grid.Column="0" Classes="label-small"
                                                            Text="{Binding [CfgMqttDescId], Source={x:Static svc:LocalizationService.Instance}}"
                                                            VerticalAlignment="Center" />
-                                                <TextBox Grid.Row="4" Grid.Column="1" />
+                                                <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding MqttDescId}" />
 
                                                 <!-- Porta -->
                                                 <TextBlock Grid.Row="6" Grid.Column="0" Classes="label-small"
                                                            Text="{Binding [CfgMqttPort], Source={x:Static svc:LocalizationService.Instance}}"
                                                            VerticalAlignment="Center" />
                                                 <NumericUpDown Grid.Row="6" Grid.Column="1"
+                                                               Value="{Binding MqttPort}"
                                                                Minimum="1" Maximum="65535" Increment="1"
                                                                FormatString="0" HorizontalAlignment="Left" Width="120" />
 
@@ -581,19 +591,19 @@
                                                 <TextBlock Grid.Row="8" Grid.Column="0" Classes="label-small"
                                                            Text="{Binding [CfgMqttTopic], Source={x:Static svc:LocalizationService.Instance}}"
                                                            VerticalAlignment="Center" />
-                                                <TextBox Grid.Row="8" Grid.Column="1" />
+                                                <TextBox Grid.Row="8" Grid.Column="1" Text="{Binding MqttTopic}" />
 
                                                 <!-- Nome de usuário -->
                                                 <TextBlock Grid.Row="10" Grid.Column="0" Classes="label-small"
                                                            Text="{Binding [CfgMqttUser], Source={x:Static svc:LocalizationService.Instance}}"
                                                            VerticalAlignment="Center" />
-                                                <TextBox Grid.Row="10" Grid.Column="1" />
+                                                <TextBox Grid.Row="10" Grid.Column="1" Text="{Binding MqttUser}" />
 
                                                 <!-- Token / Senha -->
                                                 <TextBlock Grid.Row="12" Grid.Column="0" Classes="label-small"
                                                            Text="{Binding [CfgMqttToken], Source={x:Static svc:LocalizationService.Instance}}"
                                                            VerticalAlignment="Center" />
-                                                <TextBox Grid.Row="12" Grid.Column="1" PasswordChar="•" />
+                                                <TextBox Grid.Row="12" Grid.Column="1" Text="{Binding MqttToken}" PasswordChar="•" />
 
                                             </Grid>
 
@@ -601,10 +611,12 @@
                                             <StackPanel Grid.Column="1" Spacing="10" Margin="32,0,0,0"
                                                         VerticalAlignment="Top">
                                                 <CheckBox Content="{Binding [CfgKeepAlive], Source={x:Static svc:LocalizationService.Instance}}"
+                                                          IsChecked="{Binding KeepAlive}"
                                                           Foreground="{StaticResource BrushTextPrimary}" />
                                                 <CheckBox Content="{Binding [CfgKronCloud], Source={x:Static svc:LocalizationService.Instance}}"
                                                           Foreground="{StaticResource BrushTextPrimary}" />
                                                 <CheckBox Content="{Binding [CfgTls], Source={x:Static svc:LocalizationService.Instance}}"
+                                                          IsChecked="{Binding Tls}"
                                                           Foreground="{StaticResource BrushTextPrimary}" />
                                             </StackPanel>
 
@@ -683,6 +695,7 @@
                                            Text="{Binding [CfgDate], Source={x:Static svc:LocalizationService.Instance}}"
                                            VerticalAlignment="Center" />
                                 <DatePicker Grid.Row="0" Grid.Column="1"
+                                            SelectedDate="{Binding ClockDate}"
                                             HorizontalAlignment="Stretch" />
 
                                 <!-- Hora -->
@@ -690,6 +703,7 @@
                                            Text="{Binding [CfgTime], Source={x:Static svc:LocalizationService.Instance}}"
                                            VerticalAlignment="Center" />
                                 <TimePicker Grid.Row="2" Grid.Column="1"
+                                            SelectedTime="{Binding ClockTime}"
                                             HorizontalAlignment="Stretch" />
 
                                 <!-- Sync source radio buttons -->
@@ -719,6 +733,7 @@
                                            Text="{Binding [CfgDebounceEdp], Source={x:Static svc:LocalizationService.Instance}}"
                                            VerticalAlignment="Center" />
                                 <NumericUpDown Grid.Column="1"
+                                               Value="{Binding DebounceEdp}"
                                                Minimum="0" Maximum="9999" Increment="1"
                                                FormatString="0" HorizontalAlignment="Stretch" />
                                 <TextBlock Grid.Column="2" Classes="label-small"

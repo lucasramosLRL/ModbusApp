@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Modbus.Core.Domain.Entities;
 
 namespace Modbus.Core.Services;
@@ -10,9 +11,9 @@ namespace Modbus.Core.Services;
 /// </summary>
 public sealed class DeviceConfigService : IDeviceConfigService
 {
-    private const int MaxGap       = 5;
+    private const int MaxGap       = 1;
     private const int MaxBlockSize = 32;  // FC03/FC04 limit per request
-    private const int TimeoutSeconds = 10;
+    private const int TimeoutSeconds = 30;
 
     private readonly IModbusServiceFactory _factory;
 
@@ -30,6 +31,7 @@ public sealed class DeviceConfigService : IDeviceConfigService
         var inputAddrs   = all.Where(IsInput).OrderBy(a => a).ToArray();
 
         var result = new Dictionary<ushort, ushort>(all.Length * 2);
+        var failed = new List<string>();
 
         using var svc = _factory.Create(device);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -40,26 +42,54 @@ public sealed class DeviceConfigService : IDeviceConfigService
         {
             foreach (var (rawStart, count, modiconBase) in BuildBlocks(holdingAddrs, 40001))
             {
-                var words = await svc.ReadHoldingRegistersAsync(
-                    device.SlaveId, rawStart, (ushort)count, cts.Token);
+                try
+                {
+                    var words = await svc.ReadHoldingRegistersAsync(
+                        device.SlaveId, rawStart, (ushort)count, cts.Token);
 
-                for (int i = 0; i < words.Length; i++)
-                    result[(ushort)(modiconBase + rawStart + i)] = words[i];
+                    for (int i = 0; i < words.Length; i++)
+                        result[(ushort)(modiconBase + rawStart + i)] = words[i];
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    int firstModicon = modiconBase + rawStart;
+                    int lastModicon  = firstModicon + count - 1;
+                    string range = $"FC03 {firstModicon}-{lastModicon}";
+                    failed.Add($"{range}: {ex.GetType().Name}");
+                    Debug.WriteLine($"[DeviceConfigService] {range} failed: {ex.Message}");
+                }
             }
 
             foreach (var (rawStart, count, modiconBase) in BuildBlocks(inputAddrs, 30001))
             {
-                var words = await svc.ReadInputRegistersAsync(
-                    device.SlaveId, rawStart, (ushort)count, cts.Token);
+                try
+                {
+                    var words = await svc.ReadInputRegistersAsync(
+                        device.SlaveId, rawStart, (ushort)count, cts.Token);
 
-                for (int i = 0; i < words.Length; i++)
-                    result[(ushort)(modiconBase + rawStart + i)] = words[i];
+                    for (int i = 0; i < words.Length; i++)
+                        result[(ushort)(modiconBase + rawStart + i)] = words[i];
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    int firstModicon = modiconBase + rawStart;
+                    int lastModicon  = firstModicon + count - 1;
+                    string range = $"FC04 {firstModicon}-{lastModicon}";
+                    failed.Add($"{range}: {ex.GetType().Name}");
+                    Debug.WriteLine($"[DeviceConfigService] {range} failed: {ex.Message}");
+                }
             }
         }
         finally
         {
             try { await svc.DisconnectAsync(); } catch { }
         }
+
+        if (failed.Count > 0)
+            Debug.WriteLine($"[DeviceConfigService] {failed.Count} block(s) failed:\n  - " +
+                            string.Join("\n  - ", failed));
 
         return result;
     }

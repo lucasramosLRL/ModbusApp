@@ -60,15 +60,15 @@ public static class DeviceConfigProfileRegistry
         AddrWifiMac       = new RegisterField(39501, WordCount: 3),
         AddrWifiDnsEnabled= new RegisterField(40007, BitOffset: 14, BitWidth: 1),
         AddrWifiDns       = new RegisterField(43107, WordCount: 2),
-        AddrBtDescription = new RegisterField(43001, WordCount: 15),
-        AddrBtPassword    = new RegisterField(43011, WordCount: 15),
+        AddrBtDescription = new RegisterField(43001, WordCount: 8),
+        AddrBtPassword    = new RegisterField(43011, WordCount: 8),
         AddrBtMac         = new RegisterField(39501, WordCount: 3),
 
         // ── SNTP ──────────────────────────────────────────────────────────────
         AddrSntpEnabled   = new RegisterField(40007, BitOffset: 12, BitWidth: 1),
         AddrTimezone      = 43201,
         AddrSyncInterval  = 43202,
-        AddrNtpServer     = new RegisterField(43201, WordCount: 16),
+        AddrNtpServer     = new RegisterField(43205, WordCount: 16),
         // ── IoT ───────────────────────────────────────────────────────────────
         AddrIotEnabled    = new RegisterField(40007, BitOffset: 13, BitWidth: 1),
         AddrSendInterval  = 42101,

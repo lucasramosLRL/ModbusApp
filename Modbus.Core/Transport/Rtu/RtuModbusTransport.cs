@@ -79,34 +79,50 @@ public class RtuModbusTransport : IModbusTransport
     }
 
     /// <summary>
-    /// Reads exactly <paramref name="length"/> bytes using <see cref="SerialPort.BytesToRead"/> polling.
+    /// Reads up to <paramref name="length"/> bytes using <see cref="SerialPort.BytesToRead"/> polling.
+    /// If the second byte signals a Modbus exception (FC | 0x80), shrinks the target to 5 bytes
+    /// (slave + FC | 0x80 + exception code + CRC) so the caller's parser sees the exception frame
+    /// instead of timing out waiting for a full-length response that will never arrive.
     /// SerialPort.BaseStream.ReadAsync on Windows ignores both ReadTimeout and CancellationToken,
     /// so polling is the only reliable way to enforce a timeout and support cancellation.
     /// </summary>
     private static async Task<byte[]> ReadExactAsync(SerialPort port, int length, CancellationToken cancellationToken)
     {
+        const int ExceptionFrameLength = 5;
+
         var buffer = new byte[length];
         int received = 0;
+        int target   = length;
         var timer = System.Diagnostics.Stopwatch.StartNew();
 
-        while (received < length)
+        while (received < target)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             if (port.BytesToRead > 0)
             {
-                int toRead = Math.Min(port.BytesToRead, length - received);
+                int toRead = Math.Min(port.BytesToRead, target - received);
                 received += port.Read(buffer, received, toRead);
+
+                if (received >= 2 && target != ExceptionFrameLength && (buffer[1] & 0x80) != 0)
+                    target = ExceptionFrameLength;
             }
             else if (timer.ElapsedMilliseconds > 1000)
             {
                 throw new TimeoutException(
-                    $"RTU device did not respond (received {received}/{length} bytes).");
+                    $"RTU device did not respond (received {received}/{target} bytes).");
             }
             else
             {
                 await Task.Delay(5, cancellationToken);
             }
+        }
+
+        if (target == ExceptionFrameLength && length != ExceptionFrameLength)
+        {
+            var trimmed = new byte[ExceptionFrameLength];
+            Array.Copy(buffer, trimmed, ExceptionFrameLength);
+            return trimmed;
         }
 
         return buffer;
