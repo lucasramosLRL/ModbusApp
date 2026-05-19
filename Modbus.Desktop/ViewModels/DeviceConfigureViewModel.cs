@@ -176,6 +176,22 @@ public partial class DeviceConfigureViewModel : ObservableObject
     [ObservableProperty] private string? _ntpServer;
 
     // ── IoT ──────────────────────────────────────────────────────────────────
+    public sealed record MqttBrokerOption(int Code, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    // Bits D11-D12 of register 40020 (read as a 2-bit field).
+    public IReadOnlyList<MqttBrokerOption> MqttBrokerOptions { get; } =
+    [
+        new(0, "Padrão / AWS"),
+        new(1, "IBM"),
+        new(2, "Azure"),
+        new(3, "Losant / Wegnology"),
+    ];
+
+    [ObservableProperty] private MqttBrokerOption? _mqttBroker;
+
     [ObservableProperty] private bool _iotEnabled;
     [ObservableProperty] private bool _sendOnHour;
     [ObservableProperty] private bool _keepAlive;
@@ -299,9 +315,13 @@ public partial class DeviceConfigureViewModel : ObservableObject
         // ── IoT ──────────────────────────────────────────────────────────────
         if (p.AddrIotEnabled?.ExtractValue(regs) is uint iotEn)    IotEnabled = iotEn != 0;
         if (p.AddrSendOnHour?.ExtractValue(regs) is uint soh)      SendOnHour = soh != 0;
-        if (p.AddrKeepAlive?.ExtractValue(regs)  is uint ka)       KeepAlive  = ka != 0;
-        if (p.AddrTls?.ExtractValue(regs)        is uint tls)      Tls        = tls != 0;
+        // KeepAlive (bit 10 of 40007) and TLS (bit 10 of 40020) use "1 = disabled" semantics
+        // per the KS-3000 spec — invert so the checkboxes mean "enabled".
+        if (p.AddrKeepAlive?.ExtractValue(regs)  is uint ka)       KeepAlive  = ka == 0;
+        if (p.AddrTls?.ExtractValue(regs)        is uint tls)      Tls        = tls == 0;
         if (p.AddrSendInterval?.ExtractValue(regs) is uint sInt)   SendInterval = sInt;
+        if (p.AddrMqttBroker?.ExtractValue(regs) is uint mb)
+            MqttBroker = MqttBrokerOptions.FirstOrDefault(o => o.Code == (int)mb);
         MqttPort    = p.AddrMqttPort?.ExtractString(regs);
         MqttUrl     = p.AddrMqttUrl?.ExtractString(regs);
         MqttDescId  = p.AddrMqttDescId?.ExtractString(regs);

@@ -577,10 +577,10 @@
                                                 <TextBlock Grid.Row="0" Grid.Column="0" Classes="label-small"
                                                            Text="{Binding [CfgMqttBroker], Source={x:Static svc:LocalizationService.Instance}}"
                                                            VerticalAlignment="Center" />
-                                                <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch">
-                                                    <ComboBoxItem Content="{Binding [CfgBrokerDefault], Source={x:Static svc:LocalizationService.Instance}}" />
-                                                    <ComboBoxItem Content="AWS" />
-                                                </ComboBox>
+                                                <ComboBox Grid.Row="0" Grid.Column="1"
+                                                          HorizontalAlignment="Stretch"
+                                                          ItemsSource="{Binding MqttBrokerOptions}"
+                                                          SelectedItem="{Binding MqttBroker}" />
 
                                                 <!-- URL -->
                                                 <TextBlock Grid.Row="2" Grid.Column="0" Classes="label-small"
@@ -619,7 +619,7 @@
                                                 <TextBlock Grid.Row="12" Grid.Column="0" Classes="label-small"
                                                            Text="{Binding [CfgMqttToken], Source={x:Static svc:LocalizationService.Instance}}"
                                                            VerticalAlignment="Center" />
-                                                <TextBox Grid.Row="12" Grid.Column="1" Text="{Binding MqttToken}" PasswordChar="•" />
+                                                <TextBox Grid.Row="12" Grid.Column="1" Text="{Binding MqttToken}" />
 
                                             </Grid>
 

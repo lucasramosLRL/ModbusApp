@@ -75,7 +75,8 @@ public static class DeviceConfigProfileRegistry
         AddrIotEnabled    = new RegisterField(40007, BitOffset: 13, BitWidth: 1),
         AddrSendInterval  = 42101,
         AddrSendOnHour    = new RegisterField(40020, BitOffset: 6, BitWidth: 1),
-        AddrMqttBroker    = null,
+        // Bits D11-D12 of register 40020: 00=Padrão/AWS, 01=IBM, 10=Azure, 11=Losant/Wegnology
+        AddrMqttBroker    = new RegisterField(40020, BitOffset: 11, BitWidth: 2),
         AddrMqttUrl       = new RegisterField(43461, WordCount: 35),
         AddrMqttDescId    = new RegisterField(43553, WordCount: 13),
         AddrMqttPort      = new RegisterField(43496, WordCount: 3),
