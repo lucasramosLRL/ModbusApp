@@ -578,10 +578,10 @@
                                                 <TextBlock Grid.Row="6" Grid.Column="0" Classes="label-small"
                                                            Text="{Binding [CfgMqttPort], Source={x:Static svc:LocalizationService.Instance}}"
                                                            VerticalAlignment="Center" />
-                                                <NumericUpDown Grid.Row="6" Grid.Column="1"
-                                                               Value="{Binding MqttPort}"
-                                                               Minimum="1" Maximum="65535" Increment="1"
-                                                               FormatString="0" HorizontalAlignment="Left" Width="120" />
+                                                <TextBox Grid.Row="6" Grid.Column="1"
+                                                         Text="{Binding MqttPort}"
+                                                         MaxLength="6"
+                                                         HorizontalAlignment="Left" Width="120" />
 
                                                 <!-- Tópico -->
                                                 <TextBlock Grid.Row="8" Grid.Column="0" Classes="label-small"

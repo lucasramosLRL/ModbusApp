@@ -151,7 +151,7 @@ public partial class DeviceConfigureViewModel : ObservableObject
     [ObservableProperty] private bool _keepAlive;
     [ObservableProperty] private bool _tls;
     [ObservableProperty] private decimal? _sendInterval;
-    [ObservableProperty] private decimal? _mqttPort;
+    [ObservableProperty] private string? _mqttPort;
     [ObservableProperty] private string? _mqttUrl;
     [ObservableProperty] private string? _mqttDescId;
     [ObservableProperty] private string? _mqttTopic;
@@ -257,7 +257,7 @@ public partial class DeviceConfigureViewModel : ObservableObject
         if (p.AddrKeepAlive?.ExtractValue(regs)  is uint ka)       KeepAlive  = ka != 0;
         if (p.AddrTls?.ExtractValue(regs)        is uint tls)      Tls        = tls != 0;
         if (p.AddrSendInterval?.ExtractValue(regs) is uint sInt)   SendInterval = sInt;
-        if (p.AddrMqttPort?.ExtractValue(regs)     is uint mPort)  MqttPort     = mPort;
+        MqttPort    = p.AddrMqttPort?.ExtractString(regs);
         MqttUrl     = p.AddrMqttUrl?.ExtractString(regs);
         MqttDescId  = p.AddrMqttDescId?.ExtractString(regs);
         MqttTopic   = p.AddrMqttTopic?.ExtractString(regs);
