@@ -7,9 +7,8 @@ public static class DeviceCapabilityRegistry
 {
     private static readonly Dictionary<byte, DeviceCapabilities> _map = new()
     {
-        // KS-3000
-        [0xF2] = DeviceCapabilities.Ethernet       |
-                 DeviceCapabilities.Wireless        |
+        // KS-3000 — somente Wi-Fi, sem Ethernet por cabo
+        [0xF2] = DeviceCapabilities.Wireless        |
                  DeviceCapabilities.Sntp            |
                  DeviceCapabilities.Iot             |
                  DeviceCapabilities.Clock           |
@@ -17,7 +16,7 @@ public static class DeviceCapabilityRegistry
                  DeviceCapabilities.FieldKe         |
                  DeviceCapabilities.FieldCurrentInvert,
 
-        // Konect 120
+        // Konect 120 — Ethernet por cabo + Wi-Fi
         [0xF3] = DeviceCapabilities.Ethernet       |
                  DeviceCapabilities.Wireless        |
                  DeviceCapabilities.Sntp            |

@@ -276,6 +276,16 @@ DeviceConfigureViewModel  →  consumes both; exposes Has* props and loaded fiel
 Flags: `Ethernet`, `Wireless`, `Sntp`, `Iot`, `Clock`, `InputsOutputs`, `FieldKe`, `FieldCurrentInvert`.
 `DeviceCapabilityRegistry.Get(deviceCode)` maps device code → flags. Models not in the map return `None`.
 
+To enable or hide a feature for a model, edit `Modbus.Core/Services/DeviceCapabilityRegistry.cs` and add or remove the flag from that model's entry:
+```csharp
+// Show Ethernet tab:    include DeviceCapabilities.Ethernet
+// Hide Ethernet tab:    omit  DeviceCapabilities.Ethernet
+// Show KE field:        include DeviceCapabilities.FieldKe
+```
+Current model capabilities:
+- **KS-3000 (0xF2)**: Wireless, Sntp, Iot, Clock, InputsOutputs, FieldKe, FieldCurrentInvert — **no Ethernet** (Wi-Fi only)
+- **Konect 120 (0xF3)**: Ethernet, Wireless, Sntp, Iot, Clock, InputsOutputs, FieldKe, FieldCurrentInvert
+
 ### RegisterField struct
 `Modbus.Core/Services/RegisterField.cs` — describes one configuration field.
 
@@ -315,6 +325,16 @@ Constructor: `(DeviceItemViewModel device, IDeviceConfigService, Func<Task> susp
 - `HasEthernet`, `HasWireless`, `HasSntp`, `HasIot`, `HasClock`, `HasInputsOutputs`, `HasFieldKe`, `HasCurrentInvert` — computed from `DeviceCapabilityRegistry`
 - `LoadAsync()` — suspends RTU polling if needed, reads all profile addresses, calls `ApplyRegisters()`
 - `ApplyRegisters()` — maps register values to observable properties (to be filled once addresses are in the profile)
+
+### Device register limits
+- **FC03/FC04 read**: max **32 registers per request** — `DeviceConfigService` splits blocks automatically
+- **FC16 write (future)**: max **22 registers per request** — must be split when writing string fields; `WriteStringAsync` not yet implemented
+
+### String fields
+String registers are read as ASCII, high byte first per word, null-terminated.
+Use `RegisterField.ExtractString(regs)` in `ApplyRegisters` — returns `string?`, already trimmed.
+Example: MQTT URL spans 43461–43495 (35 words = 70 chars max) → `new RegisterField(43461, WordCount: 35)`.
+The service transparently issues two FC03 calls (32 + 3) for any block exceeding the 32-word limit.
 
 ### Filling in register addresses
 Edit `Modbus.Core/Services/DeviceConfigProfileRegistry.cs`.

@@ -75,7 +75,7 @@ public sealed class DeviceConfigProfile
     // ── Relógio ───────────────────────────────────────────────────────────────
     public RegisterField? AddrClockDate      { get; init; }
     public RegisterField? AddrClockTime      { get; init; }
-    public RegisterField? AddrClockSource    { get; init; }
+    // ClockSource não é registro — é toggle de UI (Medidor vs PC); ver ViewModel
 
     // ── Entradas e Saídas ─────────────────────────────────────────────────────
     public RegisterField? AddrDebounceEdp    { get; init; }

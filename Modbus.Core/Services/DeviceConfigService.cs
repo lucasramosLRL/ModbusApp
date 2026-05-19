@@ -10,7 +10,8 @@ namespace Modbus.Core.Services;
 /// </summary>
 public sealed class DeviceConfigService : IDeviceConfigService
 {
-    private const int MaxGap = 5;
+    private const int MaxGap       = 5;
+    private const int MaxBlockSize = 32;  // FC03/FC04 limit per request
     private const int TimeoutSeconds = 10;
 
     private readonly IModbusServiceFactory _factory;
@@ -91,7 +92,7 @@ public sealed class DeviceConfigService : IDeviceConfigService
     private static bool IsInput(ushort a)   => a is >= 30001 and <= 39999;
 
     // Groups Modicon addresses into (rawStart, wordCount, modiconBase) blocks,
-    // coalescing raw addresses within MaxGap of each other.
+    // coalescing raw addresses within MaxGap and splitting at MaxBlockSize (32).
     private static IEnumerable<(ushort RawStart, int Count, int ModiconBase)> BuildBlocks(
         ushort[] sortedModicon, int modiconBase)
     {
@@ -111,12 +112,26 @@ public sealed class DeviceConfigService : IDeviceConfigService
             }
             else
             {
-                yield return (blockRawStart, blockRawEnd - blockRawStart + 1, modiconBase);
+                foreach (var chunk in SplitBlock(blockRawStart, blockRawEnd, modiconBase))
+                    yield return chunk;
                 blockRawStart = raw;
                 blockRawEnd   = raw;
             }
         }
 
-        yield return (blockRawStart, blockRawEnd - blockRawStart + 1, modiconBase);
+        foreach (var chunk in SplitBlock(blockRawStart, blockRawEnd, modiconBase))
+            yield return chunk;
+    }
+
+    // Splits a single coalesced block into MaxBlockSize-word chunks.
+    private static IEnumerable<(ushort RawStart, int Count, int ModiconBase)> SplitBlock(
+        ushort rawStart, ushort rawEnd, int modiconBase)
+    {
+        int total = rawEnd - rawStart + 1;
+        for (int offset = 0; offset < total; offset += MaxBlockSize)
+        {
+            int count = Math.Min(MaxBlockSize, total - offset);
+            yield return ((ushort)(rawStart + offset), count, modiconBase);
+        }
     }
 }
