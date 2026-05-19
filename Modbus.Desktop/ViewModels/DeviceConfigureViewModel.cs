@@ -289,9 +289,11 @@ public partial class DeviceConfigureViewModel : ObservableObject
 
         // ── SNTP ─────────────────────────────────────────────────────────────
         if (p.AddrSntpEnabled?.ExtractValue(regs) is uint sntpEn) SntpEnabled = sntpEn != 0;
+        // KS-3000 stores single 16-bit numeric registers byte-swapped (little-endian byte order).
         if (p.AddrTimezone?.ExtractValue(regs) is uint tz)
-            Timezone = (short)(ushort)tz;
-        if (p.AddrSyncInterval?.ExtractValue(regs) is uint si) SyncInterval = si;
+            Timezone = (short)SwapBytes((ushort)tz);
+        if (p.AddrSyncInterval?.ExtractValue(regs) is uint si)
+            SyncInterval = SwapBytes((ushort)si);
         NtpServer = p.AddrNtpServer?.ExtractString(regs);
 
         // ── IoT ──────────────────────────────────────────────────────────────
@@ -336,6 +338,9 @@ public partial class DeviceConfigureViewModel : ObservableObject
         return (decimal)RegisterDecoder.Decode(
             new[] { w0, w1 }, Modbus.Core.Domain.Enums.DataType.Float32, Modbus.Core.Domain.Enums.WordOrder.ByteSwapped);
     }
+
+    // KS-3000 stores single 16-bit numeric registers byte-swapped.
+    private static ushort SwapBytes(ushort v) => (ushort)((v << 8) | (v >> 8));
 
     // KS-3000 stores IP/Mask/Gateway/DNS in fully reversed byte order (low byte first).
     private static string FormatIp(uint v) =>

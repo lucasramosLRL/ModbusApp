@@ -67,7 +67,11 @@ public readonly record struct RegisterField(
             bytes[i * 2]     = (byte)(word >> 8);
             bytes[i * 2 + 1] = (byte)(word & 0xFF);
         }
-        return Encoding.ASCII.GetString(bytes).TrimEnd('\0');
+        // Cut at first null so any junk left in the buffer past the C-string terminator
+        // (devices commonly don't zero-fill unused chars) is discarded.
+        int len = Array.IndexOf(bytes, (byte)0);
+        if (len < 0) len = bytes.Length;
+        return Encoding.ASCII.GetString(bytes, 0, len);
     }
 
     /// <summary>

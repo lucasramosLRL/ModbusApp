@@ -350,8 +350,24 @@ Edit `Modbus.Core/Services/DeviceConfigProfileRegistry.cs`.
 The file has a usage guide at the top. Each model (Ks3000, Konect120) has one property per field — replace `null` with the appropriate `RegisterField`.
 Multi-word and bit-field addresses pointing to the same register are deduplicated automatically by `AllAddresses`.
 
-### Float32 byte order on holding registers (TP, TC, HourmeterThr, ...)
-KS-3000 stores Float32 **holding** registers in **DCBA byte order** (`WordOrder.ByteSwapped` — full 4-byte reversal). This is independent from SQPF, which only applies to Float32 **input** registers. `RegisterDecoder.Decode(words, DataType.Float32, WordOrder.ByteSwapped)` handles it correctly via `Combine32` (swaps bytes within each word and swaps the words). Use the `DecodeFloat32` helper in `DeviceConfigureViewModel` — never `BitConverter.Int32BitsToSingle((int)ExtractValue(...))`, which assumes ABCD and would read 1.0 as ~0.0.
+### KS-3000 byte order: every multi-byte value is little-endian on the wire
+The device stores **every** multi-byte numeric/binary value byte-reversed compared to what Modbus normally expects. Modbus 16-bit registers are still transmitted MSB-first per spec, but the underlying byte sequence of values is little-endian. Apply byte-reversal at the decoding layer:
+
+| Field type | Where the reversal is applied | How |
+|---|---|---|
+| **Float32 holding** (TP, TC, HourmeterThr) | `DeviceConfigureViewModel.DecodeFloat32` | `RegisterDecoder.Decode(..., WordOrder.ByteSwapped)` — full 4-byte reversal |
+| **IP / Mask / Gateway / DNS** (32-bit IPv4) | `DeviceConfigureViewModel.FormatIp` | Reads low byte first: `$"{v&0xFF}.{(v>>8)&0xFF}.{(v>>16)&0xFF}.{(v>>24)&0xFF}"` |
+| **MAC** (48-bit, 3 words) | `DeviceConfigureViewModel.FormatMac` | `Array.Reverse(bytes)` after collecting 6 bytes |
+| **Single 16-bit ints** (Timezone signed, SyncInterval unsigned) | `DeviceConfigureViewModel.SwapBytes` | `(v << 8) \| (v >> 8)` before casting |
+
+**Float32 caveat**: SQPF (input registers only) is independent from this. Holding-register Float32 always uses `WordOrder.ByteSwapped`. Never call `BitConverter.Int32BitsToSingle((int)ExtractValue(...))` directly — it assumes ABCD and would read 1.0 as ~0.0.
+
+**Single 16-bit caveat**: bit-fields and pure flag bits (e.g. `AddrTl` and `AddrTi` sharing 40006, or `AddrSntpEnabled` bit in 40007) do **NOT** need swapping because individual bit positions don't change when you swap bytes within a single register — `ExtractValue` reads the whole word and bit-shifts. The swap only matters when you treat a 16-bit register as a single integer value (Timezone, SyncInterval and presumably KE/SendInterval/DebounceEdp once we have ground-truth values to verify).
+
+**Likely candidates still untested**: KE (40005), SendInterval (42101), DebounceEdp (40171), and others 16-bit ints. If the next ground-truth comparison shows them off by orders of magnitude, apply `SwapBytes` the same way.
+
+### ExtractString cuts at the first null
+`RegisterField.ExtractString` now finds the first `0x00` byte and truncates there (instead of only `TrimEnd('\0')`). Modbus devices commonly leave junk in unused buffer positions past the C-string terminator — without the cut, that junk shows up after the real string (e.g. `"a.st1.ntp.br?"` instead of `"a.st1.ntp.br"`).
 
 ### SQPF nibble labels
 KRON's display convention for register 42901 nibbles is **inverted from the natural F0..F2 expectation**:
