@@ -433,7 +433,11 @@ public partial class AddDeviceViewModel : ObservableObject
     private bool CanSave() => !IsScanning && !IsSaving && !string.IsNullOrWhiteSpace(DeviceName);
 
     [RelayCommand]
-    private void GoBack() => _parent.NavigateBack();
+    private void GoBack()
+    {
+        _scanCts?.Cancel();
+        _parent.NavigateBack();
+    }
 
     [RelayCommand]
     private void GoToSettings() => _parent.NavigateToSettings();
