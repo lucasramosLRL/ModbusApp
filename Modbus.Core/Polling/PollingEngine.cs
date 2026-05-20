@@ -254,7 +254,7 @@ public class PollingEngine : IPollingEngine
     /// Registers within <paramref name="maxGap"/> addresses of each other are merged into
     /// one block to reduce the number of Modbus requests.
     /// </summary>
-    private static IEnumerable<ReadBlock> GroupRegisters(
+    internal static IEnumerable<ReadBlock> GroupRegisters(
         IEnumerable<RegisterDefinition> registers,
         RegisterType type,
         int maxGap = 5)
@@ -302,7 +302,7 @@ public class PollingEngine : IPollingEngine
         public IModbusService Service { get; } = service;
     }
 
-    private readonly record struct ReadBlock(
+    internal readonly record struct ReadBlock(
         ushort Start,
         ushort Count,
         IReadOnlyList<RegisterDefinition> Registers);

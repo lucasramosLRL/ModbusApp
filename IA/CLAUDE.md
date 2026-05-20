@@ -198,15 +198,22 @@ Usage in XAML: `{Binding [KeyName], Source={x:Static svc:LocalizationService.Ins
 
 ### Project setup
 - **Project:** `Modbus.Core.Tests/Modbus.Core.Tests.csproj` (net8.0)
-- **Frameworks:** xUnit + FluentAssertions + NSubstitute (mocking) + coverlet.collector
+- **Frameworks:** xUnit + FluentAssertions + NSubstitute (mocking) + coverlet.collector + Microsoft.EntityFrameworkCore.Sqlite (integration tests)
 - **Run all tests:** `dotnet test Modbus.Core.Tests/Modbus.Core.Tests.csproj`
-- **InternalsVisibleTo:** `Modbus.Core.csproj` exposes internals to `Modbus.Core.Tests` (needed for `Crc16` and future `internal` test targets)
+- **InternalsVisibleTo:** `Modbus.Core.csproj` exposes internals to `Modbus.Core.Tests` — `Crc16`, `PollingEngine.GroupRegisters`, `PollingEngine.ReadBlock`
 
 ### Folder structure (mirrors source project)
 ```
 Modbus.Core.Tests/
-  Services/
-    RegisterDecoderTests.cs       — 37 tests: all DataType × WordOrder combos, SQPF permutations, scale factors
+  Infrastructure/
+    TestDbContextFactory.cs         — helper: creates isolated in-memory SQLite context per test
+  Persistence/
+    DeviceModelSeederTests.cs       — 9 tests: idempotent seeding, register count, WordOrder, both models
+    DeviceModelRepositoryTests.cs   — 6 tests: CRUD, GetByNameAsync, Registers navigation
+    DeviceRepositoryTests.cs        — 8 tests: TCP/RTU persist, ExistsBy*, DeleteAsync
+    RegisterValueRepositoryTests.cs — 4 tests: UpsertAsync insert/update/mixed, isolation by device
+  Polling/
+    PollingEngineTests.cs           — 11 tests: lifecycle, RTU gate, SQPF fallback/success, GroupRegisters unit
   Protocol/
     Rtu/
       Crc16Tests.cs                       — 8 tests: Compute/Append/Validate with known Modbus CRC vectors
@@ -215,19 +222,19 @@ Modbus.Core.Tests/
     Tcp/
       ModbusTcpFrameBuilderTests.cs       — 11 tests: MBAP header, Transaction ID increment, all FCs
       ModbusTcpFrameParserTests.cs        — 11 tests: parse, error responses, frame too short
+  Services/
+    RegisterDecoderTests.cs         — 46 tests: all DataType × WordOrder combos, SQPF permutations, scale factors
+    RegisterFieldTests.cs           — 25 tests: ExtractValue (whole/multi-word/bit-field), ExtractString, ApplyBits, BCD, ExtractTime/Date
+    DeviceConfigServiceTests.cs     — 9 tests: FC03/FC04 routing, bit-field merge, 32-word chunking, retry, partial failure, WriteAsync
 ```
 
-### What is covered (Phases 1 + 2 complete — 97 tests passing)
-- **RegisterDecoder** — all DataType × WordOrder combinations, SQPF byte-permutation with 3 known SQPF values, scale factors, edge cases (invalid enum values)
-- **Crc16** — Modbus polynomial 0xA001 with known test vectors, Append (LSB-first), Validate (round-trip + corruption + length checks)
-- **RTU Frame Builder** — FC03/04 (read), FC06 (write single), FC16 (write multiple), FC17 (report slave ID); CRC always validated
-- **RTU Frame Parser** — parse read responses, error responses (FC | 0x80 → ModbusProtocolException), ReportSlaveId, CRC failure, too-short frames
-- **TCP Frame Builder** — 12-byte fixed frames, MBAP header (TxId / ProtocolId=0 / Length / UnitId), variable-length write, transaction ID auto-increment
-- **TCP Frame Parser** — same coverage as RTU parser, no CRC (TCP uses MBAP length field)
-
-### Phases not yet implemented
-- **Phase 3 — Mocked service tests:** `PollingEngine` (lifecycle, RTU semaphore, SQPF fallback, RegisterValuesUpdated/DeviceConnectionFailed events), `DeviceModelSeeder` (idempotent seeding, Float32 → UseSqpf mapping). Will require making `GroupRegisters` `internal` instead of `private`.
-- **Phase 4 — EF Core integration tests:** `TestDbContextFactory` with `DataSource=:memory:` SQLite, repository CRUD, RegisterValue upsert behavior.
+### What is covered (Phases 1–5 complete — 179 tests passing)
+- **Phase 1 — RegisterDecoder** — all DataType × WordOrder combinations, SQPF byte-permutation with 3 known SQPF values, scale factors, edge cases (invalid enum values)
+- **Phase 2 — Protocol layer** — Crc16, RTU/TCP frame builders (FC03/04/06/16/17), RTU/TCP frame parsers (parse, error responses, CRC, too-short)
+- **Phase 3 — PollingEngine** — lifecycle (AddDevice/Start/Stop), RTU gate semaphore (suspend blocks RTU, resume allows poll), SQPF fallback to 0x3210 when holding read fails, SQPF success uses returned value; `GroupRegisters` unit-tested directly as `internal`
+- **Phase 3 — DeviceModelSeeder** — creates models when absent, skips AddAsync when already exists, seeds 29 registers, Float32 Input → UseSqpf, NS UInt32 → ByteSwapped, SqpfRegisterAddress = 2900, both KS-3000 and Konect 120 seeded
+- **Phase 4 — EF Core integration** — `TestDbContextFactory` with SQLite `:memory:`, `DeviceModelRepository` (CRUD, GetByNameAsync, Registers navigation), `DeviceRepository` (TCP/RTU config, ExistsByTcpIp/RtuSlaveId, Delete), `RegisterValueRepository` (UpsertAsync insert/update/mixed, device isolation)
+- **Phase 5 — Config screen** — `RegisterField` (whole/multi-word/bit-field extraction, ExtractString with null truncation, ApplyBits, BCD helpers, ExtractTime/Date), `DeviceConfigService` (FC03/FC04 routing, bit-fields merged to one read, 32-word chunking for large strings, transient retry up to 3×, ModbusProtocolException no retry, partial failure returns available data)
 
 ### Conventions and directives for future sessions
 
@@ -249,7 +256,7 @@ Modbus.Core.Tests/
 - Collections: `.Should().HaveCount(n)`, `.Should().Equal(expected)`.
 - Exceptions: `.Should().Throw<T>().Where(e => e.Property == ...)` — pattern works because production exceptions have public properties (`ModbusProtocolException.FunctionCode`, etc.).
 
-**Visibility rule:** if a private method is a pure function worth testing in isolation (e.g. `PollingEngine.GroupRegisters`), make it `internal` and rely on `InternalsVisibleTo`. Don't expose via `public` solely for tests.
+**Visibility rule:** if a private method is a pure function worth testing in isolation, make it `internal` and rely on `InternalsVisibleTo`. Don't expose via `public` solely for tests. Example applied: `PollingEngine.GroupRegisters` and `PollingEngine.ReadBlock` are `internal`.
 
 **SQPF test vector derivation:** the algorithm in `RegisterDecoder.DecodeFloat32WithSqpf` is `raw |= t[i] << (floatByteIdx * 8)` where `floatByteIdx = (sqpfValue >> (i*4)) & 0xF` and `t[i]` is the i-th transmitted byte (`t[0]=words[0]Hi, t[1]=words[0]Lo, t[2]=words[1]Hi, t[3]=words[1]Lo`). To build a test vector for value V with SQPF S: write V's IEEE 754 bytes (byte0=LSB ... byte3=MSB), then for each i set `t[i] = byte_at_position((S>>(i*4))&0xF)`, finally pack `words[0] = (t[0]<<8) | t[1]`, `words[1] = (t[2]<<8) | t[3]`.
 
