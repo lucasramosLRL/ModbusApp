@@ -141,9 +141,13 @@ Known values:
 During device scan, `DeviceListViewModel.SuspendRtuPollingAsync()` must be called before scanning
 and `ResumeRtuPolling()` after. This prevents port conflicts between polling and scanning.
 
-### RTU reconnect-per-poll
-For RTU devices, the engine disconnects after every poll to release the COM port between cycles.
-For TCP, it also reconnects each poll (simpler; avoids stale connection detection issues).
+### Polling: parallel + per-transport reconnect strategy
+`PollingEngine.RunLoopAsync` polls all active devices **in parallel** (`Task.WhenAll`) so TCP devices never wait for RTU devices to finish. Per-device failures are isolated via `PollDeviceSafeAsync` (swallows all exceptions so one failing device doesn't skip others). `PollTimeout = 8s` per device.
+
+**RTU:** always disconnect + reconnect at the start of every poll to release the COM port between cycles. Disconnects again after the poll completes.  
+**TCP:** reuses the existing connection (`IsConnected` check). Only reconnects when the connection is down (first poll, or after a failure). Stale TCP sockets are detected on the first failed I/O → caught by `DoPollAsync`'s catch → `DisconnectAsync` called → `IsConnected = false` → reconnects on the next poll.
+
+Multiple RTU devices are still serialized among themselves via `_rtuGate` (`SemaphoreSlim(1,1)`). TCP devices run fully in parallel.
 
 ### EF / Database
 - SQLite at `%LocalAppData%\ModbusApp\modbusapp.db`
@@ -396,7 +400,7 @@ KS-3000 stores the MQTT broker port as a **6-character ASCII string** at registe
 ### Pending / future features - Attention! Keep it in the end of the file
 - Investigate if its necessary to prompt the user to reset the software when the language is changed, it seens like some texts won't change until a complete restart
 - Register write / configure screen / SQPF configuration UI (reading is implemented, writing is not). When implementing writes: KS-3000 doc says any string write in 43461+ needs a **Coil Reset** sent afterwards to commit the change.
-- Konect 120 config profile is empty — fill addresses once a device is available.
+- Konect 120 config profile is fully filled — no `null` fields remaining. Key differences from KS-3000: has Ethernet (DHCP = D11 of 40007, IP/Mask/Gateway = 43101/43103/43105, MAC = 39501); Wi-Fi DHCP is D5 of 40007 (KS-3000 uses D11); Wi-Fi IP/Mask/Gateway = 43111/43123/43125; Wi-Fi MAC = 39504 (KS-3000 = 39501); BT MAC = 39507 (same as KS-3000); DNS server shared between Ethernet and Wi-Fi at 43117; `AddrModuleVersion` = 39511 (same as KS-3000).
 - Verify Wi-Fi register addresses for KS-3000 (43101–43108 block was failing with timeouts during initial wiring — may need address correction once doc is consulted).
 - Mobile app (MAUI) connected to the same core as the desktop version with the same functions and styling
 - Mass memory readings

@@ -84,24 +84,11 @@ public class PollingEngine : IPollingEngine
         {
             do
             {
-                foreach (var ctx in _devices.Values)
-                {
-                    if (cancellationToken.IsCancellationRequested) return;
-                    if (!ctx.Device.IsActive) continue;
+                var tasks = _devices.Values
+                    .Where(ctx => ctx.Device.IsActive)
+                    .Select(ctx => PollDeviceSafeAsync(ctx, cancellationToken));
 
-                    try
-                    {
-                        await PollDeviceAsync(ctx, cancellationToken);
-                    }
-                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                    {
-                        return; // Shutdown — exit.
-                    }
-                    catch
-                    {
-                        // Unexpected error for this device — continue polling others.
-                    }
-                }
+                await Task.WhenAll(tasks);
             }
             while (await timer.WaitForNextTickAsync(cancellationToken));
         }
@@ -111,8 +98,20 @@ public class PollingEngine : IPollingEngine
         }
     }
 
+    private async Task PollDeviceSafeAsync(DeviceContext ctx, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await PollDeviceAsync(ctx, cancellationToken);
+        }
+        catch
+        {
+            // Isolate per-device failures — don't affect other devices' polls.
+        }
+    }
+
     /// <summary>Maximum time allowed for a single device poll (connect + read).</summary>
-    private static readonly TimeSpan PollTimeout = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan PollTimeout = TimeSpan.FromSeconds(8);
 
     private async Task PollDeviceAsync(DeviceContext ctx, CancellationToken cancellationToken)
     {
@@ -134,10 +133,14 @@ public class PollingEngine : IPollingEngine
     {
         try
         {
-            // Always disconnect and reconnect to get a fresh connection state.
-            // TCP sockets don't reliably detect remote disconnection without I/O.
-            try { await ctx.Service.DisconnectAsync(); } catch { }
-            await ctx.Service.ConnectAsync(pollCts.Token);
+            // RTU: always disconnect/reconnect (COM port must be released between polls).
+            // TCP: reuse the existing connection — stale sockets are detected on the first
+            //      failed I/O and handled by the catch below; reconnect only when needed.
+            if (ctx.Device.TransportType == TransportType.Rtu || !ctx.Service.IsConnected)
+            {
+                try { await ctx.Service.DisconnectAsync(); } catch { }
+                await ctx.Service.ConnectAsync(pollCts.Token);
+            }
 
             var timestamp = DateTime.UtcNow;
 
