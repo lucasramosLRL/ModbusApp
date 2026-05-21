@@ -141,9 +141,68 @@
                 <TabItem.Header>
                     <TextBlock Text="{Binding [TabEnergiesDemands], Source={x:Static svc:LocalizationService.Instance}}" />
                 </TabItem.Header>
-                <TextBlock Text="{Binding [TabComingSoon], Source={x:Static svc:LocalizationService.Instance}}"
-                           Opacity="0.5"
-                           Margin="0,12" />
+
+                <ScrollViewer Padding="0,12,0,0">
+                    <StackPanel Spacing="12">
+
+                        <TextBlock Text="{Binding [NoLiveData], Source={x:Static svc:LocalizationService.Instance}}"
+                                   IsVisible="{Binding !EnergyGroups.Count}"
+                                   Opacity="0.5"
+                                   Margin="0,12" />
+
+                        <ItemsControl ItemsSource="{Binding EnergyGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ReadingGroupViewModel">
+                                    <Border Classes="reading-group" Margin="0,0,0,4">
+                                        <StackPanel Spacing="12">
+
+                                            <TextBlock Text="{Binding GroupName}"
+                                                       FontSize="{StaticResource FontSizeGroupHeader}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource BrushTextPrimary}"
+                                                       Opacity="0.85" />
+
+                                            <ItemsControl ItemsSource="{Binding Readings}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel Orientation="Horizontal" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:ElectricalReadingViewModel">
+                                                        <Border Classes="reading-box"
+                                                                Margin="0,0,8,8"
+                                                                MinWidth="170">
+                                                            <StackPanel Spacing="4">
+                                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                    <TextBlock Text="{Binding Name}"
+                                                                               FontSize="{StaticResource FontSizeMeta}"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="{StaticResource BrushTextMuted}" />
+                                                                    <TextBlock Text="{Binding Description}"
+                                                                               FontSize="{StaticResource FontSizeLabelSmall}"
+                                                                               Opacity="0.45"
+                                                                               Foreground="{StaticResource BrushTextPrimary}"
+                                                                               VerticalAlignment="Center" />
+                                                                </StackPanel>
+                                                                <TextBlock Text="{Binding DisplayValue}"
+                                                                           FontSize="20"
+                                                                           FontWeight="Medium"
+                                                                           Foreground="{StaticResource BrushTextPrimary}" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <!-- Tab 3: Inputs & Outputs -->

@@ -29,6 +29,7 @@ public partial class DeviceDetailViewModel : ObservableObject, IDisposable
     private int _selectedTabIndex;
 
     public ObservableCollection<ReadingGroupViewModel> ReadingGroups { get; } = new();
+    public ObservableCollection<ReadingGroupViewModel> EnergyGroups { get; } = new();
     public ObservableCollection<RegisterValueViewModel> RegisterValues { get; } = new();
 
     public DeviceDetailViewModel(
@@ -82,6 +83,29 @@ public partial class DeviceDetailViewModel : ObservableObject, IDisposable
                 _readingsByAddress[reg.Address] = reading;
             }
             ReadingGroups.Add(group);
+        }
+
+        var energyGroupDefs = new (string Key, Func<RegisterDefinition, bool> Match)[]
+        {
+            ("GroupEnergies", r => r.Name.StartsWith("EA") || r.Name.StartsWith("ER") || r.Name == "ES"),
+            ("GroupDemands",  r => r.Name.StartsWith("DA") || r.Name.StartsWith("DR") ||
+                                   r.Name.StartsWith("DS") || r.Name.StartsWith("DI") ||
+                                   r.Name.StartsWith("MD")),
+        };
+
+        foreach (var (key, match) in energyGroupDefs)
+        {
+            var matched = inputRegisters.Where(match).ToList();
+            if (matched.Count == 0) continue;
+
+            var group = new ReadingGroupViewModel(key);
+            foreach (var reg in matched)
+            {
+                var reading = new ElectricalReadingViewModel(reg.Name, reg.Address, reg.Unit);
+                group.Readings.Add(reading);
+                _readingsByAddress[reg.Address] = reading;
+            }
+            EnergyGroups.Add(group);
         }
     }
 

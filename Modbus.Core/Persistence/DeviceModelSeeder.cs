@@ -34,20 +34,18 @@ public class DeviceModelSeeder
     private async Task SeedKs3000RegistersAsync(DeviceModel model)
     {
         model.SqpfRegisterAddress = 2900; // holding register 42.901 (FC03, 0-based)
-        if (model.Registers.Count == 0)
-            model.Registers = RealTimeRegs(model);
-        else
-            ApplySqpfToExistingRegisters(model);
+        ApplySqpfToExistingRegisters(model);
+        MergeRegisters(model, RealTimeRegs(model));
+        MergeRegisters(model, EnergyDemandRegs(model));
         await _repository.UpdateAsync(model);
     }
 
     private async Task SeedKonect120RegistersAsync(DeviceModel model)
     {
         model.SqpfRegisterAddress = 2900; // holding register 42.901 (FC03, 0-based)
-        if (model.Registers.Count == 0)
-            model.Registers = RealTimeRegs(model);
-        else
-            ApplySqpfToExistingRegisters(model);
+        ApplySqpfToExistingRegisters(model);
+        MergeRegisters(model, RealTimeRegs(model));
+        MergeRegisters(model, EnergyDemandRegs(model));
         await _repository.UpdateAsync(model);
     }
 
@@ -58,6 +56,14 @@ public class DeviceModelSeeder
             if (reg.DataType == DataType.Float32 && reg.RegisterType == RegisterType.Input)
                 reg.WordOrder = WordOrder.UseSqpf;
         }
+    }
+
+    private static void MergeRegisters(DeviceModel model, IEnumerable<RegisterDefinition> candidates)
+    {
+        var existing = model.Registers.Select(r => r.Address).ToHashSet();
+        foreach (var reg in candidates)
+            if (!existing.Contains(reg.Address))
+                model.Registers.Add(reg);
     }
 
     // Real-time input registers (FC04) shared by KS-3000, Konect 120 and compatible models.
@@ -94,6 +100,23 @@ public class DeviceModelSeeder
         Reg(model, 60, "FP1",  DataType.Float32, null,  "Power Factor Line 1",         WordOrder.UseSqpf),
         Reg(model, 62, "FP2",  DataType.Float32, null,  "Power Factor Line 2",         WordOrder.UseSqpf),
         Reg(model, 64, "FP3",  DataType.Float32, null,  "Power Factor Line 3",         WordOrder.UseSqpf),
+    ];
+
+    private static List<RegisterDefinition> EnergyDemandRegs(DeviceModel model) =>
+    [
+        Reg(model, 200, "EA+", DataType.Float32, "kWh",   "Energia Ativa Positiva",   WordOrder.UseSqpf),
+        Reg(model, 202, "ER+", DataType.Float32, "kVArh", "Energia Reativa Positiva", WordOrder.UseSqpf),
+        Reg(model, 204, "EA-", DataType.Float32, "kWh",   "Energia Ativa Negativa",   WordOrder.UseSqpf),
+        Reg(model, 206, "ER-", DataType.Float32, "kVArh", "Energia Reativa Negativa", WordOrder.UseSqpf),
+        Reg(model, 208, "MDA", DataType.Float32, "kW",    "Máx. Demanda Ativa",       WordOrder.UseSqpf),
+        Reg(model, 210, "DA",  DataType.Float32, "kW",    "Demanda Ativa",            WordOrder.UseSqpf),
+        Reg(model, 212, "MDS", DataType.Float32, "kVA",   "Máx. Demanda Aparente",    WordOrder.UseSqpf),
+        Reg(model, 214, "DS",  DataType.Float32, "kVA",   "Demanda Aparente",         WordOrder.UseSqpf),
+        Reg(model, 216, "MDR", DataType.Float32, "kVAr",  "Máx. Demanda Reativa",     WordOrder.UseSqpf),
+        Reg(model, 218, "DR",  DataType.Float32, "kVAr",  "Demanda Reativa",          WordOrder.UseSqpf),
+        Reg(model, 220, "MDI", DataType.Float32, "A",     "Máx. Demanda Corrente",    WordOrder.UseSqpf),
+        Reg(model, 222, "DI",  DataType.Float32, "A",     "Demanda Corrente",         WordOrder.UseSqpf),
+        Reg(model, 224, "ES",  DataType.Float32, "kVA",   "Energia Aparente",         WordOrder.UseSqpf),
     ];
 
     private static RegisterDefinition Reg(

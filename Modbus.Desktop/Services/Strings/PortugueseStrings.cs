@@ -92,6 +92,8 @@ internal static class PortugueseStrings
         ["GroupReactivePower"]   = "Potência Reativa",
         ["GroupApparentPower"]   = "Potência Aparente",
         ["GroupPowerFactor"]     = "Fator de Potência",
+        ["GroupEnergies"]        = "Energias",
+        ["GroupDemands"]         = "Demandas",
 
         // Electrical Readings — Register descriptions
         ["RegU0"]                = "Trifásica",

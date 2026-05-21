@@ -92,6 +92,8 @@ internal static class EnglishStrings
         ["GroupReactivePower"]   = "Reactive Power",
         ["GroupApparentPower"]   = "Apparent Power",
         ["GroupPowerFactor"]     = "Power Factor",
+        ["GroupEnergies"]        = "Energies",
+        ["GroupDemands"]         = "Demands",
 
         // Electrical Readings — Register descriptions
         ["RegU0"]                = "Three-phase",
