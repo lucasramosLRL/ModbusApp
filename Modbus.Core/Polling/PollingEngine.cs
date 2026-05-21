@@ -115,17 +115,21 @@ public class PollingEngine : IPollingEngine
 
     private async Task PollDeviceAsync(DeviceContext ctx, CancellationToken cancellationToken)
     {
-        using var pollCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        pollCts.CancelAfter(PollTimeout);
-
         if (ctx.Device.TransportType == TransportType.Rtu)
         {
-            await _rtuGate.WaitAsync(pollCts.Token);
-            try   { await DoPollAsync(ctx, cancellationToken, pollCts); }
+            // Wait for exclusive RTU bus access. Uses only the shutdown token so that
+            // devices further back in the queue don't time out while waiting — the
+            // per-poll timeout starts only after the gate is acquired.
+            await _rtuGate.WaitAsync(cancellationToken);
+            using var rtuCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            rtuCts.CancelAfter(PollTimeout);
+            try   { await DoPollAsync(ctx, cancellationToken, rtuCts); }
             finally { _rtuGate.Release(); }
             return;
         }
 
+        using var pollCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        pollCts.CancelAfter(PollTimeout);
         await DoPollAsync(ctx, cancellationToken, pollCts);
     }
 
