@@ -59,7 +59,10 @@ public class PollingEngine : IPollingEngine
         }
 
         foreach (var ctx in _devices.Values)
+        {
             ctx.Service.Dispose();
+            ctx.Lock.Dispose();
+        }
 
         _devices.Clear();
         _rtuGate.Dispose();
@@ -100,14 +103,33 @@ public class PollingEngine : IPollingEngine
 
     private async Task PollDeviceSafeAsync(DeviceContext ctx, CancellationToken cancellationToken)
     {
+        // Non-blocking try: skip this cycle if the device lock is held by another caller
+        // (e.g. DeviceConfigService reading configuration).
+        if (!await ctx.Lock.WaitAsync(0))
+            return;
         try
         {
             await PollDeviceAsync(ctx, cancellationToken);
         }
-        catch
+        catch { }
+        finally
         {
-            // Isolate per-device failures — don't affect other devices' polls.
+            ctx.Lock.Release();
         }
+    }
+
+    public async Task AcquireDeviceLockAsync(int deviceId, CancellationToken cancellationToken = default)
+    {
+        if (!_devices.TryGetValue(deviceId, out var ctx)) return;
+        await ctx.Lock.WaitAsync(cancellationToken);
+        // Disconnect the transport so the caller can open a clean connection.
+        try { await ctx.Service.DisconnectAsync(); } catch { }
+    }
+
+    public void ReleaseDeviceLock(int deviceId)
+    {
+        if (_devices.TryGetValue(deviceId, out var ctx))
+            ctx.Lock.Release();
     }
 
     /// <summary>Maximum time allowed for a single device poll (connect + read).</summary>
@@ -137,9 +159,10 @@ public class PollingEngine : IPollingEngine
     {
         try
         {
-            // RTU: always disconnect/reconnect (COM port must be released between polls).
-            // TCP: reuse the existing connection — stale sockets are detected on the first
-            //      failed I/O and handled by the catch below; reconnect only when needed.
+            // RTU: always disconnect/reconnect (COM port must be released between cycles).
+            // TCP: reuse the existing connection — AcquireDeviceLockAsync disconnects it
+            //      before any external caller (e.g. DeviceConfigService) takes over,
+            //      so IsConnected will be false and a fresh connect happens naturally.
             if (ctx.Device.TransportType == TransportType.Rtu || !ctx.Service.IsConnected)
             {
                 try { await ctx.Service.DisconnectAsync(); } catch { }
@@ -172,8 +195,8 @@ public class PollingEngine : IPollingEngine
                 });
             }
 
-            // RTU: release the COM port immediately after the poll so other
-            // operations (e.g. device scan) can open the same port between cycles.
+            // RTU: release the COM port between cycles so scan and config can use it.
+            // TCP: keep the connection alive (avoids handshake overhead every 5 s).
             if (ctx.Device.TransportType == TransportType.Rtu)
                 try { await ctx.Service.DisconnectAsync(); } catch { }
         }
@@ -305,8 +328,9 @@ public class PollingEngine : IPollingEngine
 
     private sealed class DeviceContext(ModbusDevice device, IModbusService service)
     {
-        public ModbusDevice  Device  { get; } = device;
+        public ModbusDevice   Device  { get; } = device;
         public IModbusService Service { get; } = service;
+        public SemaphoreSlim  Lock    { get; } = new SemaphoreSlim(1, 1);
     }
 
     internal readonly record struct ReadBlock(

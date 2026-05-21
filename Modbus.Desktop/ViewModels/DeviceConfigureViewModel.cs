@@ -15,8 +15,8 @@ public partial class DeviceConfigureViewModel : ObservableObject
 {
     private readonly Action _onGoBack;
     private readonly IDeviceConfigService _configService;
-    private readonly Func<Task> _suspendRtuPolling;
-    private readonly Action _resumeRtuPolling;
+    private readonly Func<Task> _pausePolling;
+    private readonly Action _resumePolling;
 
     public DeviceItemViewModel Device { get; }
 
@@ -270,14 +270,14 @@ public partial class DeviceConfigureViewModel : ObservableObject
     public DeviceConfigureViewModel(
         DeviceItemViewModel device,
         IDeviceConfigService configService,
-        Func<Task> suspendRtuPolling,
-        Action resumeRtuPolling,
+        Func<Task> pausePolling,
+        Action resumePolling,
         Action onGoBack)
     {
         Device              = device;
         _configService      = configService;
-        _suspendRtuPolling  = suspendRtuPolling;
-        _resumeRtuPolling   = resumeRtuPolling;
+        _pausePolling  = pausePolling;
+        _resumePolling = resumePolling;
         _onGoBack           = onGoBack;
         _editableSlaveId    = device.SlaveId;
         _description        = device.Name;
@@ -307,8 +307,7 @@ public partial class DeviceConfigureViewModel : ObservableObject
         LoadError = null;
         try
         {
-            bool isRtu = Device.Device.TransportType == TransportType.Rtu;
-            if (isRtu) await _suspendRtuPolling();
+            await _pausePolling();
             try
             {
                 var read = await _configService.ReadAsync(
@@ -325,7 +324,7 @@ public partial class DeviceConfigureViewModel : ObservableObject
             }
             finally
             {
-                if (isRtu) _resumeRtuPolling();
+                _resumePolling();
             }
         }
         catch (Exception ex)

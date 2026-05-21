@@ -15,4 +15,12 @@ public interface IPollingEngine : IAsyncDisposable
 
     Task SuspendRtuPollingAsync(CancellationToken cancellationToken = default);
     void ResumeRtuPolling();
+
+    /// <summary>
+    /// Acquires exclusive access to a device's poll slot and disconnects its transport,
+    /// so callers (e.g. DeviceConfigService) can open a clean connection without conflict.
+    /// Must be paired with <see cref="ReleaseDeviceLock"/>.
+    /// </summary>
+    Task AcquireDeviceLockAsync(int deviceId, CancellationToken cancellationToken = default);
+    void ReleaseDeviceLock(int deviceId);
 }

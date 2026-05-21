@@ -141,13 +141,19 @@ Known values:
 During device scan, `DeviceListViewModel.SuspendRtuPollingAsync()` must be called before scanning
 and `ResumeRtuPolling()` after. This prevents port conflicts between polling and scanning.
 
-### Polling: parallel + per-transport reconnect strategy
-`PollingEngine.RunLoopAsync` polls all active devices **in parallel** (`Task.WhenAll`) so TCP devices never wait for RTU devices to finish. Per-device failures are isolated via `PollDeviceSafeAsync` (swallows all exceptions so one failing device doesn't skip others). `PollTimeout = 8s` per device.
+### Polling: parallel + per-transport reconnect strategy + per-device lock
+`PollingEngine.RunLoopAsync` polls all active devices **in parallel** (`Task.WhenAll`) so TCP devices never wait for RTU devices to finish. `PollTimeout = 8s` per device.
 
-**RTU:** always disconnect + reconnect at the start of every poll to release the COM port between cycles. Disconnects again after the poll completes.  
-**TCP:** reuses the existing connection (`IsConnected` check). Only reconnects when the connection is down (first poll, or after a failure). Stale TCP sockets are detected on the first failed I/O → caught by `DoPollAsync`'s catch → `DisconnectAsync` called → `IsConnected = false` → reconnects on the next poll.
+**Per-device lock (`DeviceContext.Lock`, `SemaphoreSlim(1,1)`):**
+- `PollDeviceSafeAsync` acquires the lock with `WaitAsync(0)` (non-blocking) — if the lock is held (e.g. config screen is open), that device is **skipped** for this cycle without affecting others.
+- `AcquireDeviceLockAsync(deviceId)` — called by `DeviceHubViewModel.OpenConfigure` for TCP devices. Waits (blocking) for any in-progress poll to finish, then disconnects the transport so `DeviceConfigService` can open a fresh connection. Must be paired with `ReleaseDeviceLock(deviceId)`.
+- For RTU devices, `SuspendRtuPollingAsync` / `ResumeRtuPolling` (the existing `_rtuGate` mechanism) is still used instead of the per-device lock.
 
-Multiple RTU devices are still serialized among themselves via `_rtuGate` (`SemaphoreSlim(1,1)`). TCP devices run fully in parallel.
+**RTU:** disconnect + reconnect every poll cycle (COM port released between cycles). `_rtuGate` (`SemaphoreSlim(1,1)`) serializes all RTU devices among themselves. The `rtuCts` (8s timeout) is created **after** acquiring `_rtuGate`, so the timeout applies only to the actual Modbus I/O — not to gate wait time.
+
+**TCP:** persistent connection — `DoPollAsync` only reconnects if `!ctx.Service.IsConnected`. Keeps socket alive between polls (~5s interval) to avoid status flickering. `AcquireDeviceLockAsync` disconnects the transport before handing off to `DeviceConfigService`.
+
+Multiple RTU devices are serialized via `_rtuGate`. TCP devices run fully in parallel.
 
 ### EF / Database
 - SQLite at `%LocalAppData%\ModbusApp\modbusapp.db`
@@ -338,9 +344,10 @@ Key methods on `RegisterField`:
 **Why `MaxGap = 1` (only contiguous)**: with larger gaps the coalesced block would include addresses the device doesn't have. Some devices return a Modbus exception (handled now — see RTU transport note below), but others go fully silent → 1s read timeout per chunk. `MaxGap = 1` only coalesces adjacent registers (gap of exactly 1 between sorted addresses), so we never request a "phantom" register.
 
 ### DeviceConfigureViewModel
-Constructor: `(DeviceItemViewModel device, IDeviceConfigService, Func<Task> suspendRtuPolling, Action resumeRtuPolling, Action onGoBack)`
+Constructor: `(DeviceItemViewModel device, IDeviceConfigService, Func<Task> pausePolling, Action resumePolling, Action onGoBack)`
+- `pausePolling` / `resumePolling` are transport-agnostic callbacks set by `DeviceHubViewModel.OpenConfigure`: RTU → `SuspendRtuPollingAsync` / `ResumeRtuPolling`; TCP → `AcquireDeviceLockAsync(id)` / `ReleaseDeviceLock(id)`.
 - `HasEthernet`, `HasWireless`, `HasSntp`, `HasIot`, `HasClock`, `HasInputsOutputs`, `HasFieldKe`, `HasCurrentInvert` — computed from `DeviceCapabilityRegistry`
-- `LoadAsync()` — suspends RTU polling if needed, reads all profile addresses, calls `ApplyRegisters()`
+- `LoadAsync()` — always calls `_pausePolling()` (transport-agnostic), reads all profile addresses, calls `ApplyRegisters()`, then `_resumePolling()` in a finally block.
 - `ApplyRegisters()` — fully implemented for the KS-3000 profile (Geral, Wireless, SNTP, IoT, Relógio, Entradas/Saídas — all read-only). Float32 holding regs go through `DecodeFloat32` helper using `RegisterDecoder.Decode(..., WordOrder.ByteSwapped)` (see "Float32 byte order" below). Bit-fields and integers via `RegisterField.ExtractValue`. Strings via `ExtractString`. Clock via `ExtractTime`/`ExtractDate`. SQPF via `ApplySeqPf` (see "SQPF nibble labels" below).
 - **Sidebar navigation is data-driven**: VM exposes `Sections` (`IReadOnlyList<SidebarSection>` built in constructor) — only the sections enabled by `HasXxx` capabilities are added. `SidebarSection(int Code, string Label)` carries the section identity (0=General, 1=Ethernet, 2=Wireless, ...) so `IsGeneral`/`IsEthernet`/etc work based on `SelectedSection?.Code` regardless of how many sections were filtered out. The XAML uses `ItemsSource="{Binding Sections}"` + `SelectedItem="{Binding SelectedSection}"`.
 

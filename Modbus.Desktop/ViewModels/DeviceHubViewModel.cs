@@ -51,12 +51,17 @@ public partial class DeviceHubViewModel : ObservableObject
     [RelayCommand]
     private void OpenConfigure()
     {
+        bool isRtu = Device.Device.TransportType == Modbus.Core.Domain.Enums.TransportType.Rtu;
         var configure = new DeviceConfigureViewModel(
             Device,
             _configService,
-            suspendRtuPolling:  () => _pollingEngine.SuspendRtuPollingAsync(),
-            resumeRtuPolling:   () => _pollingEngine.ResumeRtuPolling(),
-            onGoBack:           () => NavigationRequested?.Invoke(this, this));
+            pausePolling:  isRtu
+                ? () => _pollingEngine.SuspendRtuPollingAsync()
+                : () => _pollingEngine.AcquireDeviceLockAsync(Device.Id),
+            resumePolling: isRtu
+                ? () => _pollingEngine.ResumeRtuPolling()
+                : () => _pollingEngine.ReleaseDeviceLock(Device.Id),
+            onGoBack:      () => NavigationRequested?.Invoke(this, this));
 
         _ = configure.LoadAsync();
         NavigationRequested?.Invoke(this, configure);
