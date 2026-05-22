@@ -56,10 +56,37 @@ internal static class MeterErrorCodes
         ]
     );
 
-    // ── KS-3000 ───────────────────────────────────────────────────────────────
-    // Reuse Konect 120 tables until KS-3000 documentation specifies different codes.
-    private static readonly ErrorTable Ks3000Erro   = Konect120Erro;
-    private static readonly ErrorTable Ks3000ErroWF = Konect120ErroWF;
+    // ── KS-3000 — Erro (meter, Modicon 33.901) ───────────────────────────────
+    // LSB identical to Konect 120.
+    // MSB: bit 0 (01) is not listed in the KS doc (no "Reservado" entry either) → null.
+    private static readonly ErrorTable Ks3000Erro = new(
+        LsbBits: Konect120Erro.LsbBits,   // identical
+        MsbBits:
+        [
+            null,                                              // bit 0 → 001 (not listed in KS doc)
+            "Configuração incorreta do módulo de comunicação", // bit 1 → 002
+            "Configuração incorreta do Hardware utilizado",    // bit 2 → 004
+            "Proteção de Firmware ativa",                      // bit 3 → 008
+            "Alarme de curva de carga ativado",                // bit 4 → 016
+            null, null, null,
+        ]
+    );
+
+    // ── KS-3000 — ErroWF (WiFi module, Modicon 33.903) ───────────────────────
+    // LSB identical to Konect 120.
+    // MSB: bits 0 (01) and 1 (02) are Ethernet-specific and not present on KS → null.
+    //      bits 2 (04) and 3 (08) are WiFi — same as Konect 120.
+    private static readonly ErrorTable Ks3000ErroWF = new(
+        LsbBits: Konect120ErroWF.LsbBits,  // identical
+        MsbBits:
+        [
+            null,                                         // bit 0 → 001 (Ethernet: not on KS)
+            null,                                         // bit 1 → 002 (Ethernet: not on KS)
+            "WiFi não recebeu IP da rede",                // bit 2 → 004
+            "IP da rede WiFi configurado é inválido",     // bit 3 → 008
+            null, null, null, null,                       // bits 4-7 → reservado
+        ]
+    );
 
     // ── Lookup ────────────────────────────────────────────────────────────────
     private static readonly Dictionary<(string Model, string Reg), ErrorTable> Tables = new()
