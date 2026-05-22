@@ -39,6 +39,8 @@ public partial class DeviceDetailViewModel : ObservableObject, IDisposable
 
     public IReadOnlyList<DigitalInputViewModel>  DigitalInputs  { get; private set; } = [];
     public IReadOnlyList<DigitalOutputViewModel> DigitalOutputs { get; private set; } = [];
+    public HourmeterViewModel? Hourmeter { get; private set; }
+    public StatusViewModel? Status { get; private set; }
 
     public DeviceDetailViewModel(
         DeviceItemViewModel device,
@@ -58,7 +60,9 @@ public partial class DeviceDetailViewModel : ObservableObject, IDisposable
         _onGoBack = onGoBack;
 
         BuildReadingGroups();
+        BuildHourmeterChannel();
         BuildIoChannels();
+        BuildStatusChannel();
 
         _pollingEngine.RegisterValuesUpdated += OnRegisterValuesUpdated;
     }
@@ -124,6 +128,16 @@ public partial class DeviceDetailViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void BuildHourmeterChannel()
+    {
+        // Coil 62 (Modicon 1-based) → 0-based address 61
+        var hm = new HourmeterViewModel(() => WriteCoilSafeAsync(61, true));
+        Hourmeter = hm;
+
+        _ioUpdatesByAddress[150] = v => hm.UpdateStatus(v);
+        _ioUpdatesByAddress[160] = v => hm.UpdateHour(v);
+    }
+
     private void BuildIoChannels()
     {
         // Coil addresses (0-based): 20-22 = reset EDP1/2/3, 30-31 = SD1/2 on/off
@@ -148,6 +162,16 @@ public partial class DeviceDetailViewModel : ObservableObject, IDisposable
         _ioUpdatesByAddress[130] = v => edp1.UpdatePulse(v);
         _ioUpdatesByAddress[131] = v => edp2.UpdatePulse(v);
         _ioUpdatesByAddress[132] = v => edp3.UpdatePulse(v);
+    }
+
+    private void BuildStatusChannel()
+    {
+        var modelName = Device.Device.DeviceModel?.Name ?? string.Empty;
+        var status = new StatusViewModel(modelName);
+        Status = status;
+
+        _ioUpdatesByAddress[3900] = v => status.UpdateMeterStatus(v);
+        _ioUpdatesByAddress[3902] = v => status.UpdateModuleStatus(v);
     }
 
     private async Task WriteCoilSafeAsync(ushort coilAddress, bool value)

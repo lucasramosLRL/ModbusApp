@@ -287,13 +287,14 @@ public class PollingEngine : IPollingEngine
 
     /// <summary>
     /// Groups registers of a given type into contiguous read blocks.
-    /// Registers within <paramref name="maxGap"/> addresses of each other are merged into
-    /// one block to reduce the number of Modbus requests.
+    /// Only perfectly adjacent registers (gap = 0) are merged. Reading across
+    /// undefined address gaps causes many devices to return exception code 02
+    /// (Illegal Data Address), so no bridging is done.
     /// </summary>
     internal static IEnumerable<ReadBlock> GroupRegisters(
         IEnumerable<RegisterDefinition> registers,
         RegisterType type,
-        int maxGap = 5)
+        int maxGap = 0)
     {
         var sorted = registers
             .Where(r => r.RegisterType == type)

@@ -277,20 +277,23 @@ public sealed class PollingEngineTests : IAsyncLifetime
     }
 
     [Fact]
-    public void GroupRegisters_GapWithinMax_MergedIntoOneBlock()
+    public void GroupRegisters_NonAdjacentRegisters_SplitIntoSeparateBlocks()
     {
         var model = new DeviceModel { Name = "M", Id = 1 };
         var registers = new List<RegisterDefinition>
         {
             Reg(model, 0, DataType.UInt16, RegisterType.Input),  // ends at 1
-            Reg(model, 4, DataType.UInt16, RegisterType.Input),  // gap = 4-1 = 3 ≤ maxGap 5
+            Reg(model, 4, DataType.UInt16, RegisterType.Input),  // gap = 4-1 = 3 > maxGap 0
         };
 
         var blocks = PollingEngine.GroupRegisters(registers, RegisterType.Input).ToList();
 
-        blocks.Should().HaveCount(1);
+        // gap=3 > maxGap(0) → each register in its own block (no undefined addresses bridged)
+        blocks.Should().HaveCount(2);
         blocks[0].Start.Should().Be(0);
-        blocks[0].Count.Should().Be(5); // covers 0-4
+        blocks[0].Count.Should().Be(1);
+        blocks[1].Start.Should().Be(4);
+        blocks[1].Count.Should().Be(1);
     }
 
     [Fact]

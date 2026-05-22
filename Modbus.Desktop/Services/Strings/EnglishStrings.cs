@@ -95,6 +95,10 @@ internal static class EnglishStrings
         ["GroupEnergies"]        = "Energies",
         ["GroupDemands"]         = "Demands",
 
+        // Hourmeter Tab
+        ["HmTitle"]              = "Load 1",
+        ["HmHourmeter"]          = "Hourmeter",
+
         // IO Tab
         ["IoSectionInputs"]      = "Digital Inputs",
         ["IoSectionOutputs"]     = "Digital Outputs",
@@ -144,6 +148,12 @@ internal static class EnglishStrings
         ["HubMassMemoryDesc"]        = "Measurement history stored internally in the meter.",
         ["HubConfigure"]             = "Configure",
         ["HubConfigureDesc"]         = "Change meter parameters and settings by writing to registers.",
+
+        // Status Tab
+        ["StsMeterTitle"]        = "Meter Status",
+        ["StsModuleTitle"]       = "Module Status",
+        ["StsCodeHeader"]        = "Code - Description",
+        ["StsNoErrors"]          = "No active errors.",
 
         // DeviceItemViewModel
         ["Connected"]            = "Connected",

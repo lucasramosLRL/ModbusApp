@@ -332,9 +332,63 @@
                 <TabItem.Header>
                     <TextBlock Text="{Binding [TabHourmeter], Source={x:Static svc:LocalizationService.Instance}}" />
                 </TabItem.Header>
-                <TextBlock Text="{Binding [TabComingSoon], Source={x:Static svc:LocalizationService.Instance}}"
-                           Opacity="0.5"
-                           Margin="0,12" />
+
+                <ScrollViewer Padding="0,12,0,0">
+                    <StackPanel Spacing="12">
+
+                        <!-- Empty state when hourmeter not available -->
+                        <TextBlock Text="{Binding [TabComingSoon], Source={x:Static svc:LocalizationService.Instance}}"
+                                   IsVisible="{Binding Hourmeter, Converter={x:Static ObjectConverters.IsNull}}"
+                                   Opacity="0.5"
+                                   Margin="0,12" />
+
+                        <!-- Carga 1 card -->
+                        <Border Classes="reading-group"
+                                Margin="0,0,0,4"
+                                IsVisible="{Binding Hourmeter, Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <StackPanel Spacing="12" DataContext="{Binding Hourmeter}">
+
+                                <TextBlock Text="{Binding [HmTitle], Source={x:Static svc:LocalizationService.Instance}}"
+                                           FontSize="{StaticResource FontSizeGroupHeader}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource BrushTextPrimary}"
+                                           Opacity="0.85" />
+
+                                <WrapPanel Orientation="Horizontal">
+
+                                    <!-- Horímetro value box -->
+                                    <Border Classes="reading-box" Margin="0,0,8,8" MinWidth="200">
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="{Binding [HmHourmeter], Source={x:Static svc:LocalizationService.Instance}}"
+                                                       FontSize="{StaticResource FontSizeMeta}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource BrushTextMuted}" />
+                                            <TextBlock Text="{Binding HourText}"
+                                                       FontSize="22"
+                                                       FontWeight="Medium"
+                                                       Foreground="{StaticResource BrushTextPrimary}" />
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <TextBlock Text="{Binding [IoStatus], Source={x:Static svc:LocalizationService.Instance}}"
+                                                           Classes="label-small" />
+                                                <TextBlock Text="{Binding StatusText}"
+                                                           FontWeight="Medium"
+                                                           Foreground="{StaticResource BrushTextPrimary}" />
+                                            </StackPanel>
+                                            <Button Content="{Binding [IoReset], Source={x:Static svc:LocalizationService.Instance}}"
+                                                    Command="{Binding ZeroCommand}"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Center"
+                                                    Padding="{StaticResource PaddingButtonSmall}" />
+                                        </StackPanel>
+                                    </Border>
+
+                                </WrapPanel>
+
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <!-- Tab 5: Status -->
@@ -342,9 +396,86 @@
                 <TabItem.Header>
                     <TextBlock Text="{Binding [TabStatus], Source={x:Static svc:LocalizationService.Instance}}" />
                 </TabItem.Header>
-                <TextBlock Text="{Binding [TabComingSoon], Source={x:Static svc:LocalizationService.Instance}}"
-                           Opacity="0.5"
-                           Margin="0,12" />
+
+                <ScrollViewer Padding="0,12,0,0">
+                    <Grid ColumnDefinitions="*,16,*" DataContext="{Binding Status}">
+
+                        <!-- Status Medidor -->
+                        <Border Grid.Column="0" Classes="reading-group">
+                            <StackPanel Spacing="10">
+
+                                <TextBlock Text="{Binding [StsMeterTitle], Source={x:Static svc:LocalizationService.Instance}}"
+                                           FontSize="{StaticResource FontSizeGroupHeader}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource BrushTextPrimary}"
+                                           Opacity="0.85" />
+
+                                <TextBlock Text="{Binding [StsCodeHeader], Source={x:Static svc:LocalizationService.Instance}}"
+                                           Classes="label-small" />
+
+                                <Border Background="#1A1A2E"
+                                        CornerRadius="4"
+                                        Padding="8"
+                                        MinHeight="120">
+                                    <Panel>
+                                        <TextBlock Text="{Binding [StsNoErrors], Source={x:Static svc:LocalizationService.Instance}}"
+                                                   IsVisible="{Binding !HasMeterErrors}"
+                                                   Opacity="0.4"
+                                                   FontStyle="Italic" />
+                                        <ItemsControl ItemsSource="{Binding MeterErrors}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}"
+                                                               Foreground="{StaticResource BrushTextPrimary}"
+                                                               Margin="0,0,0,4" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Panel>
+                                </Border>
+
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Status Módulo -->
+                        <Border Grid.Column="2" Classes="reading-group">
+                            <StackPanel Spacing="10">
+
+                                <TextBlock Text="{Binding [StsModuleTitle], Source={x:Static svc:LocalizationService.Instance}}"
+                                           FontSize="{StaticResource FontSizeGroupHeader}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource BrushTextPrimary}"
+                                           Opacity="0.85" />
+
+                                <TextBlock Text="{Binding [StsCodeHeader], Source={x:Static svc:LocalizationService.Instance}}"
+                                           Classes="label-small" />
+
+                                <Border Background="#1A1A2E"
+                                        CornerRadius="4"
+                                        Padding="8"
+                                        MinHeight="120">
+                                    <Panel>
+                                        <TextBlock Text="{Binding [StsNoErrors], Source={x:Static svc:LocalizationService.Instance}}"
+                                                   IsVisible="{Binding !HasModuleErrors}"
+                                                   Opacity="0.4"
+                                                   FontStyle="Italic" />
+                                        <ItemsControl ItemsSource="{Binding ModuleErrors}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}"
+                                                               Foreground="{StaticResource BrushTextPrimary}"
+                                                               Margin="0,0,0,4" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Panel>
+                                </Border>
+
+                            </StackPanel>
+                        </Border>
+
+                    </Grid>
+                </ScrollViewer>
             </TabItem>
 
         </TabControl>

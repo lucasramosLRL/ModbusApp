@@ -37,7 +37,9 @@ public class DeviceModelSeeder
         ApplySqpfToExistingRegisters(model);
         MergeRegisters(model, RealTimeRegs(model));
         MergeRegisters(model, EnergyDemandRegs(model));
+        MergeRegisters(model, HourmeterRegs(model));
         MergeRegisters(model, IoRegs(model));
+        MergeRegisters(model, StatusRegs(model));
         await _repository.UpdateAsync(model);
     }
 
@@ -47,7 +49,9 @@ public class DeviceModelSeeder
         ApplySqpfToExistingRegisters(model);
         MergeRegisters(model, RealTimeRegs(model));
         MergeRegisters(model, EnergyDemandRegs(model));
+        MergeRegisters(model, HourmeterRegs(model));
         MergeRegisters(model, IoRegs(model));
+        MergeRegisters(model, StatusRegs(model));
         await _repository.UpdateAsync(model);
     }
 
@@ -125,6 +129,21 @@ public class DeviceModelSeeder
     // Counters are Float32 + UseSqpf (same byte order as real-time regs).
     // Status registers are UInt16 BigEndian (standard 0=off, 1=on).
     // Pulse width registers are UInt16 ByteSwapped (device stores LSB first) with scale 0.1 → seconds.
+    private static List<RegisterDefinition> HourmeterRegs(DeviceModel model) =>
+    [
+        Reg(model, 150, "LSTS",  DataType.UInt16,  null, "Status da Carga",        WordOrder.BigEndian,  1.0),
+        Reg(model, 160, "HORIM", DataType.Float32, "h",  "Horímetro",              WordOrder.UseSqpf,    1.0),
+    ];
+
+    // Error-status registers (FC04, Input type).
+    // Erro at Modicon 33.901 (0-based 3900): UInt16 — meter error bitmask (LSB + MSB).
+    // ErroWF at Modicon 33.903 (0-based 3902): UInt16 — communication module error bitmask.
+    private static List<RegisterDefinition> StatusRegs(DeviceModel model) =>
+    [
+        Reg(model, 3900, "Erro",   DataType.UInt16, null, "Código de Erro do Medidor",  WordOrder.BigEndian),
+        Reg(model, 3902, "ErroWF", DataType.UInt16, null, "Código de Erro do Módulo",   WordOrder.BigEndian),
+    ];
+
     private static List<RegisterDefinition> IoRegs(DeviceModel model) =>
     [
         Reg(model, 94,  "EDP1C", DataType.Float32, null, "Contador EDP-1",        WordOrder.UseSqpf,    1.0),
