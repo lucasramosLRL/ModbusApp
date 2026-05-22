@@ -246,9 +246,15 @@ public class PollingEngine : IPollingEngine
         {
             foreach (var block in GroupRegisters(registers, registerType))
             {
-                ushort[] words = registerType == RegisterType.Holding
-                    ? await service.ReadHoldingRegistersAsync(device.SlaveId, block.Start, block.Count, cancellationToken)
-                    : await service.ReadInputRegistersAsync(device.SlaveId, block.Start, block.Count, cancellationToken);
+                ushort[] words;
+                try
+                {
+                    words = registerType == RegisterType.Holding
+                        ? await service.ReadHoldingRegistersAsync(device.SlaveId, block.Start, block.Count, cancellationToken)
+                        : await service.ReadInputRegistersAsync(device.SlaveId, block.Start, block.Count, cancellationToken);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch { continue; } // Device does not support this block — skip and read remaining blocks.
 
                 foreach (var reg in block.Registers)
                 {

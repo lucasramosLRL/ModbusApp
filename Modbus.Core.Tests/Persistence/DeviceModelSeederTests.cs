@@ -70,7 +70,7 @@ public sealed class DeviceModelSeederTests
         await _seeder.SeedAsync();
 
         updated.Should().NotBeNull();
-        updated!.Registers.Should().HaveCount(29);
+        updated!.Registers.Should().HaveCount(42);
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public sealed class DeviceModelSeederTests
     // ── Idempotency ───────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task SeedAsync_ExistingModelWithRegisters_DoesNotReseed()
+    public async Task SeedAsync_ExistingModelWithRegisters_MergesNewRegisters()
     {
         var existingReg = MakeOneRegister();
         _repo.GetByNameAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -153,8 +153,10 @@ public sealed class DeviceModelSeederTests
 
         await _seeder.SeedAsync();
 
-        // Registers should remain at 1 (the existing one), not re-seeded to 29
-        updated!.Registers.Should().HaveCount(1);
+        // Existing register at address 0 is preserved; remaining 28 real-time + 13 energy registers
+        // are merged in (the NS register at address 0 is skipped because it already exists).
+        updated!.Registers.Should().HaveCount(42);
+        updated.Registers.Should().Contain(r => r.Address == 0 && r.Name == "Dummy");
     }
 
     [Fact]
