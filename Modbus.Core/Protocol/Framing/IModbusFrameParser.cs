@@ -10,6 +10,8 @@ public interface IModbusFrameParser
     /// </summary>
     ushort[] ParseReadRegisters(byte[] response);
 
+    void ValidateWriteSingleCoil(byte[] response);
+
     void ValidateWriteSingleRegister(byte[] response);
 
     void ValidateWriteMultipleRegisters(byte[] response);

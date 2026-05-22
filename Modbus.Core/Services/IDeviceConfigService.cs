@@ -36,4 +36,11 @@ public interface IDeviceConfigService
         ushort address,
         ushort value,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Opens a temporary connection and writes a single coil (FC05).</summary>
+    Task WriteCoilAsync(
+        ModbusDevice device,
+        ushort coilAddress,
+        bool value,
+        CancellationToken cancellationToken = default);
 }

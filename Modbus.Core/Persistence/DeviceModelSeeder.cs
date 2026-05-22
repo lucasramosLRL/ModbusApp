@@ -37,6 +37,7 @@ public class DeviceModelSeeder
         ApplySqpfToExistingRegisters(model);
         MergeRegisters(model, RealTimeRegs(model));
         MergeRegisters(model, EnergyDemandRegs(model));
+        MergeRegisters(model, IoRegs(model));
         await _repository.UpdateAsync(model);
     }
 
@@ -46,6 +47,7 @@ public class DeviceModelSeeder
         ApplySqpfToExistingRegisters(model);
         MergeRegisters(model, RealTimeRegs(model));
         MergeRegisters(model, EnergyDemandRegs(model));
+        MergeRegisters(model, IoRegs(model));
         await _repository.UpdateAsync(model);
     }
 
@@ -119,9 +121,28 @@ public class DeviceModelSeeder
         Reg(model, 224, "ES",  DataType.Float32, "kVA",   "Energia Aparente",         WordOrder.UseSqpf),
     ];
 
+    // Digital input/output registers (FC04, Input type).
+    // Counters are Float32 + UseSqpf (same byte order as real-time regs).
+    // Status registers are UInt16 BigEndian (standard 0=off, 1=on).
+    // Pulse width registers are UInt16 ByteSwapped (device stores LSB first) with scale 0.1 → seconds.
+    private static List<RegisterDefinition> IoRegs(DeviceModel model) =>
+    [
+        Reg(model, 94,  "EDP1C", DataType.Float32, null, "Contador EDP-1",        WordOrder.UseSqpf,    1.0),
+        Reg(model, 96,  "EDP2C", DataType.Float32, null, "Contador EDP-2",        WordOrder.UseSqpf,    1.0),
+        Reg(model, 98,  "EDP3C", DataType.Float32, null, "Contador EDP-3",        WordOrder.UseSqpf,    1.0),
+        Reg(model, 110, "EDP1S", DataType.UInt16,  null, "Status EDP-1",          WordOrder.BigEndian,  1.0),
+        Reg(model, 111, "EDP2S", DataType.UInt16,  null, "Status EDP-2",          WordOrder.BigEndian,  1.0),
+        Reg(model, 112, "EDP3S", DataType.UInt16,  null, "Status EDP-3",          WordOrder.BigEndian,  1.0),
+        Reg(model, 113, "OUT1S", DataType.UInt16,  null, "Status Saída-1",        WordOrder.BigEndian,  1.0),
+        Reg(model, 114, "OUT2S", DataType.UInt16,  null, "Status Saída-2",        WordOrder.BigEndian,  1.0),
+        Reg(model, 130, "EDP1W", DataType.UInt16,  "s",  "Largura do Pulso EDP-1",WordOrder.ByteSwapped,0.1),
+        Reg(model, 131, "EDP2W", DataType.UInt16,  "s",  "Largura do Pulso EDP-2",WordOrder.ByteSwapped,0.1),
+        Reg(model, 132, "EDP3W", DataType.UInt16,  "s",  "Largura do Pulso EDP-3",WordOrder.ByteSwapped,0.1),
+    ];
+
     private static RegisterDefinition Reg(
         DeviceModel model, ushort address, string name, DataType dataType, string? unit, string description,
-        WordOrder wordOrder = WordOrder.ByteSwapped) =>
+        WordOrder wordOrder = WordOrder.ByteSwapped, double scaleFactor = 1.0) =>
         new()
         {
             DeviceModel   = model,
@@ -132,7 +153,7 @@ public class DeviceModelSeeder
             DataType      = dataType,
             RegisterType  = RegisterType.Input,
             WordOrder     = wordOrder,
-            ScaleFactor   = 1.0,
+            ScaleFactor   = scaleFactor,
             Unit          = unit,
             IsWritable    = false,
         };

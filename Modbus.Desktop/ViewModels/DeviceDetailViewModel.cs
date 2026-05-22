@@ -5,6 +5,7 @@ using Modbus.Core.Domain.Entities;
 using Modbus.Core.Domain.Enums;
 using Modbus.Core.Domain.Repositories;
 using Modbus.Core.Polling;
+using Modbus.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -17,8 +18,12 @@ public partial class DeviceDetailViewModel : ObservableObject, IDisposable
 {
     private readonly IRegisterValueRepository _registerValueRepository;
     private readonly IPollingEngine _pollingEngine;
+    private readonly IDeviceConfigService _configService;
+    private readonly Func<Task>? _pausePolling;   // RTU: SuspendRtu | TCP: AcquireDeviceLock
+    private readonly Action? _resumePolling;       // RTU: ResumeRtu  | TCP: ReleaseDeviceLock
     private readonly Action _onGoBack;
     private readonly Dictionary<ushort, ElectricalReadingViewModel> _readingsByAddress = new();
+    private readonly Dictionary<ushort, Action<double>> _ioUpdatesByAddress = new();
 
     public DeviceItemViewModel Device { get; }
 
@@ -32,18 +37,28 @@ public partial class DeviceDetailViewModel : ObservableObject, IDisposable
     public ObservableCollection<ReadingGroupViewModel> EnergyGroups { get; } = new();
     public ObservableCollection<RegisterValueViewModel> RegisterValues { get; } = new();
 
+    public IReadOnlyList<DigitalInputViewModel>  DigitalInputs  { get; private set; } = [];
+    public IReadOnlyList<DigitalOutputViewModel> DigitalOutputs { get; private set; } = [];
+
     public DeviceDetailViewModel(
         DeviceItemViewModel device,
         IRegisterValueRepository registerValueRepository,
         IPollingEngine pollingEngine,
+        IDeviceConfigService configService,
+        Func<Task>? pausePolling,
+        Action? resumePolling,
         Action onGoBack)
     {
         Device = device;
         _registerValueRepository = registerValueRepository;
         _pollingEngine = pollingEngine;
+        _configService = configService;
+        _pausePolling = pausePolling;
+        _resumePolling = resumePolling;
         _onGoBack = onGoBack;
 
         BuildReadingGroups();
+        BuildIoChannels();
 
         _pollingEngine.RegisterValuesUpdated += OnRegisterValuesUpdated;
     }
@@ -109,6 +124,48 @@ public partial class DeviceDetailViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void BuildIoChannels()
+    {
+        // Coil addresses (0-based): 20-22 = reset EDP1/2/3, 30-31 = SD1/2 on/off
+        var edp1 = new DigitalInputViewModel("EDP-1", () => WriteCoilSafeAsync(20, true));
+        var edp2 = new DigitalInputViewModel("EDP-2", () => WriteCoilSafeAsync(21, true));
+        var edp3 = new DigitalInputViewModel("EDP-3", () => WriteCoilSafeAsync(22, true));
+        var sd1  = new DigitalOutputViewModel("SD-1", v => WriteCoilSafeAsync(30, v));
+        var sd2  = new DigitalOutputViewModel("SD-2", v => WriteCoilSafeAsync(31, v));
+
+        DigitalInputs  = [edp1, edp2, edp3];
+        DigitalOutputs = [sd1, sd2];
+
+        // Map polling addresses to update callbacks
+        _ioUpdatesByAddress[94]  = v => edp1.UpdateCounter(v);
+        _ioUpdatesByAddress[96]  = v => edp2.UpdateCounter(v);
+        _ioUpdatesByAddress[98]  = v => edp3.UpdateCounter(v);
+        _ioUpdatesByAddress[110] = v => edp1.UpdateStatus(v);
+        _ioUpdatesByAddress[111] = v => edp2.UpdateStatus(v);
+        _ioUpdatesByAddress[112] = v => edp3.UpdateStatus(v);
+        _ioUpdatesByAddress[113] = v => sd1.UpdateStatus(v);
+        _ioUpdatesByAddress[114] = v => sd2.UpdateStatus(v);
+        _ioUpdatesByAddress[130] = v => edp1.UpdatePulse(v);
+        _ioUpdatesByAddress[131] = v => edp2.UpdatePulse(v);
+        _ioUpdatesByAddress[132] = v => edp3.UpdatePulse(v);
+    }
+
+    private async Task WriteCoilSafeAsync(ushort coilAddress, bool value)
+    {
+        // RTU: SuspendRtuPollingAsync releases the serial port.
+        // TCP: AcquireDeviceLockAsync waits for the current poll to finish and disconnects
+        //      the transport — KS-3000 and similar devices only accept one TCP connection.
+        if (_pausePolling is not null) await _pausePolling();
+        try
+        {
+            await _configService.WriteCoilAsync(Device.Device, coilAddress, value);
+        }
+        finally
+        {
+            _resumePolling?.Invoke();
+        }
+    }
+
     private void OnRegisterValuesUpdated(object? sender, RegisterValuesUpdatedEventArgs e)
     {
         if (e.Device.Id != Device.Id) return;
@@ -119,6 +176,9 @@ public partial class DeviceDetailViewModel : ObservableObject, IDisposable
             {
                 if (_readingsByAddress.TryGetValue(val.Address, out var reading))
                     reading.Update(val.Value);
+
+                if (_ioUpdatesByAddress.TryGetValue(val.Address, out var ioUpdate))
+                    ioUpdate(val.Value);
             }
         });
     }

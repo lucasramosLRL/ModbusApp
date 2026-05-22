@@ -7,6 +7,8 @@ public interface IModbusFrameBuilder
     /// <summary>Builds a read request frame for FC03 (holding) or FC04 (input) registers.</summary>
     byte[] ReadRegisters(byte slaveId, FunctionCode functionCode, ushort startAddress, ushort quantity);
 
+    byte[] WriteSingleCoil(byte slaveId, ushort address, bool value);
+
     byte[] WriteSingleRegister(byte slaveId, ushort address, ushort value);
 
     byte[] WriteMultipleRegisters(byte slaveId, ushort startAddress, ushort[] values);

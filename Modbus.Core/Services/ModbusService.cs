@@ -40,6 +40,14 @@ public class ModbusService : IModbusService
         return _parser.ParseReadRegisters(response);
     }
 
+    public async Task WriteSingleCoilAsync(byte slaveId, ushort address, bool value, CancellationToken cancellationToken = default)
+    {
+        // RTU response: SlaveAddr(1) + FC(1) + Addr(2) + Value(2) + CRC(2) = 8
+        var request  = _builder.WriteSingleCoil(slaveId, address, value);
+        var response = await _transport.SendAsync(request, 8, cancellationToken);
+        _parser.ValidateWriteSingleCoil(response);
+    }
+
     public async Task WriteSingleRegisterAsync(byte slaveId, ushort address, ushort value, CancellationToken cancellationToken = default)
     {
         // RTU response: SlaveAddr(1) + FC(1) + Addr(2) + Value(2) + CRC(2) = 8

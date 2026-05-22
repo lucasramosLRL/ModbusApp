@@ -95,6 +95,18 @@ internal static class PortugueseStrings
         ["GroupEnergies"]        = "Energias",
         ["GroupDemands"]         = "Demandas",
 
+        // IO Tab
+        ["IoSectionInputs"]      = "Entradas Digitais",
+        ["IoSectionOutputs"]     = "Saídas Digitais",
+        ["IoStatus"]             = "Estado:",
+        ["IoCounter"]            = "Contador:",
+        ["IoPulseWidth"]         = "Largura do Pulso:",
+        ["IoReset"]              = "Zerar",
+        ["IoTurnOn"]             = "Ligar",
+        ["IoTurnOff"]            = "Desligar",
+        ["IoStateOn"]            = "LIGADA",
+        ["IoStateOff"]           = "DESLIGADA",
+
         // Electrical Readings — Register descriptions
         ["RegU0"]                = "Trifásica",
         ["RegU12"]               = "Fase A-B",

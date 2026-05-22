@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Modbus.Core.Domain.Enums;
 using Modbus.Core.Domain.Repositories;
 using Modbus.Core.Polling;
 using Modbus.Core.Services;
@@ -38,10 +39,18 @@ public partial class DeviceHubViewModel : ObservableObject
     [RelayCommand]
     private void OpenReadings()
     {
+        bool isRtu = Device.Device.TransportType == TransportType.Rtu;
         var detail = new DeviceDetailViewModel(
             Device,
             _registerValueRepository,
             _pollingEngine,
+            configService: _configService,
+            pausePolling:  isRtu
+                ? () => _pollingEngine.SuspendRtuPollingAsync()
+                : () => _pollingEngine.AcquireDeviceLockAsync(Device.Id),
+            resumePolling: isRtu
+                ? () => _pollingEngine.ResumeRtuPolling()
+                : () => _pollingEngine.ReleaseDeviceLock(Device.Id),
             onGoBack: () => NavigationRequested?.Invoke(this, this));
 
         _ = detail.LoadValuesAsync();

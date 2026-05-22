@@ -24,6 +24,9 @@ public class ModbusRtuFrameBuilder : IModbusFrameBuilder
     public byte[] ReadRegisters(byte slaveId, FunctionCode functionCode, ushort startAddress, ushort quantity) =>
         BuildFixedRequest(slaveId, (byte)functionCode, startAddress, quantity);
 
+    public byte[] WriteSingleCoil(byte slaveId, ushort address, bool value) =>
+        BuildFixedRequest(slaveId, (byte)FunctionCode.WriteSingleCoil, address, value ? (ushort)0xFF00 : (ushort)0x0000);
+
     public byte[] WriteSingleRegister(byte slaveId, ushort address, ushort value) =>
         BuildFixedRequest(slaveId, (byte)FunctionCode.WriteSingleRegister, address, value);
 

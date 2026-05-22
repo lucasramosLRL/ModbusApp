@@ -40,6 +40,9 @@ public class ModbusTcpFrameParser : IModbusFrameParser
         return registers;
     }
 
+    public void ValidateWriteSingleCoil(byte[] response) =>
+        CheckForError(response);
+
     public void ValidateWriteSingleRegister(byte[] response) =>
         CheckForError(response);
 

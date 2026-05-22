@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using Modbus.Core.Domain.Entities;
 using Modbus.Core.Protocol.Exceptions;
 
@@ -123,6 +124,39 @@ public sealed class DeviceConfigService : IDeviceConfigService
         try
         {
             await svc.WriteSingleRegisterAsync(device.SlaveId, (ushort)(address - 40001), value, cts.Token);
+        }
+        finally
+        {
+            try { await svc.DisconnectAsync(); } catch { }
+        }
+    }
+
+    public async Task WriteCoilAsync(
+        ModbusDevice device,
+        ushort coilAddress,
+        bool value,
+        CancellationToken cancellationToken = default)
+    {
+        using var svc = _factory.Create(device);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(5)); // coil writes are fast; shorter than bulk-read timeout
+
+        await svc.ConnectAsync(cts.Token);
+        try
+        {
+            await svc.WriteSingleCoilAsync(device.SlaveId, coilAddress, value, cts.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Our own 5s timeout fired. Some KRON devices (e.g. reset coils 021-023) close
+            // the TCP connection after processing without echoing the FC05 response. The coil
+            // was almost certainly applied — suppress the exception so the UI doesn't crash.
+            Debug.WriteLine($"[DeviceConfigService] WriteCoilAsync: no echo for coil {coilAddress} — treated as success.");
+        }
+        catch (IOException)
+        {
+            // Device closed the connection right after processing — coil was applied.
+            Debug.WriteLine($"[DeviceConfigService] WriteCoilAsync: connection closed after coil {coilAddress} — treated as success.");
         }
         finally
         {

@@ -38,6 +38,9 @@ public class ModbusRtuFrameParser : IModbusFrameParser
         return registers;
     }
 
+    public void ValidateWriteSingleCoil(byte[] response) =>
+        ValidateCrcAndErrors(response);
+
     public void ValidateWriteSingleRegister(byte[] response) =>
         ValidateCrcAndErrors(response);
 

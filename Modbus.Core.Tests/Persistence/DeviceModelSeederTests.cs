@@ -70,7 +70,7 @@ public sealed class DeviceModelSeederTests
         await _seeder.SeedAsync();
 
         updated.Should().NotBeNull();
-        updated!.Registers.Should().HaveCount(42);
+        updated!.Registers.Should().HaveCount(53); // 29 real-time + 13 energy/demand + 11 IO
     }
 
     [Fact]
@@ -153,9 +153,9 @@ public sealed class DeviceModelSeederTests
 
         await _seeder.SeedAsync();
 
-        // Existing register at address 0 is preserved; remaining 28 real-time + 13 energy registers
+        // Existing register at address 0 is preserved; remaining 28 real-time + 13 energy + 11 IO registers
         // are merged in (the NS register at address 0 is skipped because it already exists).
-        updated!.Registers.Should().HaveCount(42);
+        updated!.Registers.Should().HaveCount(53);
         updated.Registers.Should().Contain(r => r.Address == 0 && r.Name == "Dummy");
     }
 

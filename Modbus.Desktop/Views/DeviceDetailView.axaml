@@ -210,9 +210,121 @@
                 <TabItem.Header>
                     <TextBlock Text="{Binding [TabInputsOutputs], Source={x:Static svc:LocalizationService.Instance}}" />
                 </TabItem.Header>
-                <TextBlock Text="{Binding [TabComingSoon], Source={x:Static svc:LocalizationService.Instance}}"
-                           Opacity="0.5"
-                           Margin="0,12" />
+
+                <ScrollViewer Padding="0,12,0,0">
+                    <StackPanel Spacing="12">
+
+                        <!-- Entradas Digitais -->
+                        <Border Classes="reading-group" Margin="0,0,0,4">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="{Binding [IoSectionInputs], Source={x:Static svc:LocalizationService.Instance}}"
+                                           FontSize="{StaticResource FontSizeGroupHeader}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource BrushTextPrimary}"
+                                           Opacity="0.85" />
+
+                                <ItemsControl ItemsSource="{Binding DigitalInputs}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:DigitalInputViewModel">
+                                            <Border Classes="reading-box" Margin="0,0,8,8" MinWidth="170">
+                                                <StackPanel Spacing="8">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontSize="{StaticResource FontSizeMeta}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{StaticResource BrushTextMuted}" />
+
+                                                    <StackPanel Spacing="4">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <TextBlock Text="{Binding [IoStatus], Source={x:Static svc:LocalizationService.Instance}}"
+                                                                       Classes="label-small" />
+                                                            <TextBlock Text="{Binding StatusText}"
+                                                                       FontWeight="Medium"
+                                                                       Foreground="{StaticResource BrushTextPrimary}" />
+                                                        </StackPanel>
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <TextBlock Text="{Binding [IoCounter], Source={x:Static svc:LocalizationService.Instance}}"
+                                                                       Classes="label-small" />
+                                                            <TextBlock Text="{Binding CounterText}"
+                                                                       FontWeight="Medium"
+                                                                       Foreground="{StaticResource BrushTextPrimary}" />
+                                                        </StackPanel>
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <TextBlock Text="{Binding [IoPulseWidth], Source={x:Static svc:LocalizationService.Instance}}"
+                                                                       Classes="label-small" />
+                                                            <TextBlock Text="{Binding PulseText}"
+                                                                       FontWeight="Medium"
+                                                                       Foreground="{StaticResource BrushTextPrimary}" />
+                                                        </StackPanel>
+                                                    </StackPanel>
+
+                                                    <Button Content="{Binding [IoReset], Source={x:Static svc:LocalizationService.Instance}}"
+                                                            Command="{Binding ResetCounterCommand}"
+                                                            HorizontalAlignment="Stretch"
+                                                            HorizontalContentAlignment="Center"
+                                                            Padding="{StaticResource PaddingButtonSmall}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Saídas Digitais -->
+                        <Border Classes="reading-group" Margin="0,0,0,4">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="{Binding [IoSectionOutputs], Source={x:Static svc:LocalizationService.Instance}}"
+                                           FontSize="{StaticResource FontSizeGroupHeader}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource BrushTextPrimary}"
+                                           Opacity="0.85" />
+
+                                <ItemsControl ItemsSource="{Binding DigitalOutputs}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:DigitalOutputViewModel">
+                                            <Border Classes="reading-box" Margin="0,0,8,8" MinWidth="170">
+                                                <StackPanel Spacing="8">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontSize="{StaticResource FontSizeMeta}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{StaticResource BrushTextMuted}" />
+
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Text="{Binding [IoStatus], Source={x:Static svc:LocalizationService.Instance}}"
+                                                                   Classes="label-small" />
+                                                        <TextBlock Text="{Binding StatusText}"
+                                                                   FontWeight="Medium"
+                                                                   Foreground="{StaticResource BrushTextPrimary}" />
+                                                    </StackPanel>
+
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <Button Content="{Binding [IoTurnOn], Source={x:Static svc:LocalizationService.Instance}}"
+                                                                Command="{Binding TurnOnCommand}"
+                                                                Padding="{StaticResource PaddingButtonSmall}" />
+                                                        <Button Content="{Binding [IoTurnOff], Source={x:Static svc:LocalizationService.Instance}}"
+                                                                Command="{Binding TurnOffCommand}"
+                                                                Padding="{StaticResource PaddingButtonSmall}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <!-- Tab 4: Hourmeter -->

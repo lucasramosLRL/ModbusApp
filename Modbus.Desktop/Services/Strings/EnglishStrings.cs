@@ -95,6 +95,18 @@ internal static class EnglishStrings
         ["GroupEnergies"]        = "Energies",
         ["GroupDemands"]         = "Demands",
 
+        // IO Tab
+        ["IoSectionInputs"]      = "Digital Inputs",
+        ["IoSectionOutputs"]     = "Digital Outputs",
+        ["IoStatus"]             = "Status:",
+        ["IoCounter"]            = "Counter:",
+        ["IoPulseWidth"]         = "Pulse Width:",
+        ["IoReset"]              = "Reset",
+        ["IoTurnOn"]             = "Turn On",
+        ["IoTurnOff"]            = "Turn Off",
+        ["IoStateOn"]            = "ON",
+        ["IoStateOff"]           = "OFF",
+
         // Electrical Readings — Register descriptions
         ["RegU0"]                = "Three-phase",
         ["RegU12"]               = "Phase A-B",
