@@ -146,6 +146,12 @@ public sealed class DeviceConfigService : IDeviceConfigService
         {
             await svc.WriteSingleCoilAsync(device.SlaveId, coilAddress, value, cts.Token);
         }
+        catch (ModbusProtocolException ex)
+        {
+            // Device rejected the coil with a Modbus exception (e.g. IllegalDataValue 0x03
+            // when digital I/O is disabled on the meter). Log and swallow — the UI must not crash.
+            Debug.WriteLine($"[DeviceConfigService] WriteCoilAsync: coil {coilAddress} rejected — {ex.Message}");
+        }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             // Our own 5s timeout fired. Some KRON devices (e.g. reset coils 021-023) close
