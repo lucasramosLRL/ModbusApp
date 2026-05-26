@@ -86,6 +86,10 @@ public static class DeviceConfigProfileRegistry
         AddrKeepAlive     = new RegisterField(40007, BitOffset: 10, BitWidth: 1),
         AddrTls           = new RegisterField(40020, BitOffset: 10, BitWidth: 1),
 
+        // Grandezas selecionadas para envio MQTT/LoRa
+        AddrGrandezasSlots1to20  = new RegisterField(42102, WordCount: 20),
+        AddrGrandezasSlots21to50 = new RegisterField(42201, WordCount: 30),
+
         // ── Relógio ───────────────────────────────────────────────────────────
         // [42001] high=centésimo BCD, low=segundo BCD
         // [42002] high=minuto BCD,    low=hora BCD
@@ -159,6 +163,10 @@ public static class DeviceConfigProfileRegistry
         AddrMqttToken     = new RegisterField(43518, WordCount: 35),
         AddrKeepAlive     = new RegisterField(40007, BitOffset: 10, BitWidth: 1),
         AddrTls           = new RegisterField(40020, BitOffset: 10, BitWidth: 1),
+
+        // Grandezas selecionadas para envio MQTT/LoRa
+        AddrGrandezasSlots1to20  = new RegisterField(42102, WordCount: 20),
+        AddrGrandezasSlots21to50 = new RegisterField(42201, WordCount: 30),
 
         // ── Relógio ───────────────────────────────────────────────────────────
         // [42001] high=centésimo BCD, low=segundo BCD

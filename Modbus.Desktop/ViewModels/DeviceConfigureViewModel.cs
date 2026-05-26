@@ -5,6 +5,8 @@ using Modbus.Core.Domain.Enums;
 using Modbus.Core.Services;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -61,6 +63,7 @@ public partial class DeviceConfigureViewModel : ObservableObject
     public bool HasInputsOutputs => Capabilities.HasFlag(DeviceCapabilities.InputsOutputs);
     public bool HasFieldKe       => Capabilities.HasFlag(DeviceCapabilities.FieldKe);
     public bool HasCurrentInvert => Capabilities.HasFlag(DeviceCapabilities.FieldCurrentInvert);
+    public bool HasIotGrandezaSelection => Capabilities.HasFlag(DeviceCapabilities.IotGrandezaSelection);
 
     // ── Load state ───────────────────────────────────────────────────────────
     [ObservableProperty] private bool _isLoading;
@@ -215,6 +218,157 @@ public partial class DeviceConfigureViewModel : ObservableObject
     [ObservableProperty] private string? _mqttUser;
     [ObservableProperty] private string? _mqttToken;
 
+    // ── Grandezas selecionadas (MQTT/LoRa) ──────────────────────────────────
+    public sealed partial class GrandezaItemViewModel : ObservableObject
+    {
+        public Grandeza Model { get; }
+        public ushort MqttId => Model.MqttId;
+        public string Code => Model.Code;
+        public string Description => Model.Description;
+        public GrandezaCategory Category => Model.Category;
+
+        [ObservableProperty] private bool _isSelected;
+        [ObservableProperty] private int? _order;
+        [ObservableProperty] private bool _isVisible = true;
+
+        public GrandezaItemViewModel(Grandeza model) { Model = model; }
+
+        public bool MatchesSearch(string? query)
+        {
+            if (string.IsNullOrWhiteSpace(query)) return true;
+            return Code.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || Description.Contains(query, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    public sealed partial class GrandezaCategoryGroup : ObservableObject
+    {
+        public GrandezaCategory Category { get; }
+        public string Label { get; }
+        public IReadOnlyList<GrandezaItemViewModel> Items { get; }
+
+        [ObservableProperty] private bool _isVisible = true;
+
+        public GrandezaCategoryGroup(GrandezaCategory category, string label, IReadOnlyList<GrandezaItemViewModel> items)
+        {
+            Category = category;
+            Label = label;
+            Items = items;
+        }
+
+        public override string ToString() => Label;
+    }
+
+    public ObservableCollection<GrandezaCategoryGroup> AvailableGrouped { get; } = new();
+    public ObservableCollection<GrandezaItemViewModel> SelectedOrdered { get; } = new();
+
+    [ObservableProperty] private int _maxGrandezas = 50;
+    [ObservableProperty] private string _searchText = string.Empty;
+
+    public int SelectedCount => SelectedOrdered.Count;
+    public string GrandezaCounterText =>
+        string.Format(
+            Modbus.Desktop.Services.LocalizationService.Instance["CfgGrandezaCounter"],
+            SelectedCount, MaxGrandezas);
+
+    partial void OnMaxGrandezasChanged(int value) => OnPropertyChanged(nameof(GrandezaCounterText));
+
+    partial void OnSearchTextChanged(string value) => ApplyGrandezaFilter();
+
+    private void ApplyGrandezaFilter()
+    {
+        var query = SearchText;
+        foreach (var group in AvailableGrouped)
+        {
+            int visibleCount = 0;
+            foreach (var item in group.Items)
+            {
+                var matches = item.MatchesSearch(query);
+                item.IsVisible = matches;
+                if (matches) visibleCount++;
+            }
+            group.IsVisible = visibleCount > 0;
+        }
+    }
+
+    private readonly Dictionary<ushort, GrandezaItemViewModel> _grandezaById = new();
+
+    private void BuildGrandezaCatalog()
+    {
+        AvailableGrouped.Clear();
+        _grandezaById.Clear();
+
+        var deviceCode = Device.Device.DeviceModel?.DeviceCode;
+        var catalog = GrandezaCatalog.ForDeviceCode(deviceCode);
+        if (catalog.Count == 0) return;
+
+        MaxGrandezas = GrandezaCatalog.Limit(deviceCode, Device.Device.FirmwareVersion);
+
+        var loc = Modbus.Desktop.Services.LocalizationService.Instance;
+        foreach (var group in catalog.GroupBy(g => g.Category))
+        {
+            var items = group
+                .Select(g => { var vm = new GrandezaItemViewModel(g); _grandezaById[g.MqttId] = vm; return vm; })
+                .ToList();
+            AvailableGrouped.Add(new GrandezaCategoryGroup(group.Key, loc[CategoryLocalizationKey(group.Key)], items));
+        }
+    }
+
+    private static string CategoryLocalizationKey(GrandezaCategory c) => c switch
+    {
+        GrandezaCategory.Tensao            => "CfgCatTensao",
+        GrandezaCategory.Corrente          => "CfgCatCorrente",
+        GrandezaCategory.Frequencia        => "CfgCatFrequencia",
+        GrandezaCategory.PotenciaAtiva     => "CfgCatPotenciaAtiva",
+        GrandezaCategory.PotenciaReativa   => "CfgCatPotenciaReativa",
+        GrandezaCategory.PotenciaAparente  => "CfgCatPotenciaAparente",
+        GrandezaCategory.FatorPotencia     => "CfgCatFatorPotencia",
+        GrandezaCategory.EntradasSaidas    => "CfgCatEntradasSaidas",
+        GrandezaCategory.Horimetro         => "CfgCatHorimetro",
+        GrandezaCategory.Energia           => "CfgCatEnergia",
+        GrandezaCategory.DeltaEnergia      => "CfgCatDeltaEnergia",
+        GrandezaCategory.EnergiaPorFase    => "CfgCatEnergiaPorFase",
+        _                                  => "CfgCatOutros",
+    };
+
+    private void ApplyGrandezasFromRegs(IReadOnlyDictionary<ushort, ushort> regs, DeviceConfigProfile p)
+    {
+        SelectedOrdered.Clear();
+        foreach (var item in _grandezaById.Values)
+        {
+            item.IsSelected = false;
+            item.Order = null;
+        }
+
+        var slotAddrs = new List<ushort>();
+        if (p.AddrGrandezasSlots1to20 is RegisterField f1)
+            for (int i = 0; i < f1.WordCount; i++) slotAddrs.Add((ushort)(f1.Addr + i));
+        if (p.AddrGrandezasSlots21to50 is RegisterField f2)
+            for (int i = 0; i < f2.WordCount; i++) slotAddrs.Add((ushort)(f2.Addr + i));
+
+        int order = 0;
+        foreach (var addr in slotAddrs)
+        {
+            if (!regs.TryGetValue(addr, out var raw)) continue;
+            if (raw == 0xFFFF || raw == 0x0000) continue;
+
+            if (_grandezaById.TryGetValue(raw, out var item))
+            {
+                order++;
+                item.IsSelected = true;
+                item.Order = order;
+                SelectedOrdered.Add(item);
+            }
+            else
+            {
+                Debug.WriteLine($"[Grandezas] ID {raw} no slot {addr} não encontrado no catálogo do modelo.");
+            }
+        }
+
+        OnPropertyChanged(nameof(SelectedCount));
+        OnPropertyChanged(nameof(GrandezaCounterText));
+    }
+
     // ── Clock ────────────────────────────────────────────────────────────────
     [ObservableProperty] private DateTimeOffset? _clockDate;
     [ObservableProperty] private TimeSpan? _clockTime;
@@ -296,6 +450,8 @@ public partial class DeviceConfigureViewModel : ObservableObject
         // Kick off the PC-time updater so the Clock tab shows the current time
         // immediately when the user opens it (field init doesn't fire OnChanged).
         UpdateClockTimerState();
+
+        BuildGrandezaCatalog();
     }
 
     public async Task LoadAsync()
@@ -421,6 +577,10 @@ public partial class DeviceConfigureViewModel : ObservableObject
 
         // ── Inputs / Outputs ─────────────────────────────────────────────────
         if (p.AddrDebounceEdp?.ExtractValue(regs) is uint deb) DebounceEdp = deb;
+
+        // ── Grandezas selecionadas ───────────────────────────────────────────
+        if (HasIotGrandezaSelection)
+            ApplyGrandezasFromRegs(regs, p);
     }
 
     private static decimal? DecodeFloat32(

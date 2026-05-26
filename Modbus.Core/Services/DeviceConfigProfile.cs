@@ -72,6 +72,12 @@ public sealed class DeviceConfigProfile
     public RegisterField? AddrKronCloud      { get; init; }
     public RegisterField? AddrTls            { get; init; }
 
+    // ── IoT — grandezas selecionadas para envio MQTT/LoRa ──────────────────
+    // Slots 1..20 e 21..50; cada slot é um uint16 com o ID MQTT/LoRa da grandeza.
+    // 0xFFFF marca slot vazio.
+    public RegisterField? AddrGrandezasSlots1to20  { get; init; }
+    public RegisterField? AddrGrandezasSlots21to50 { get; init; }
+
     // ── Relógio ───────────────────────────────────────────────────────────────
     public RegisterField? AddrClockDate      { get; init; }
     public RegisterField? AddrClockTime      { get; init; }

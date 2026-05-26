@@ -694,34 +694,82 @@
                             <Border Height="1" Background="{StaticResource BrushBgSeparator}" Margin="-16,0" />
 
                             <!-- Variable selection panel -->
-                            <Grid ColumnDefinitions="*,48,*" MinHeight="180">
+                            <Grid ColumnDefinitions="3*,2*" MinHeight="320"
+                                  IsVisible="{Binding HasIotGrandezaSelection}">
 
-                                <!-- Available registers -->
-                                <StackPanel Grid.Column="0" Spacing="6">
+                                <!-- Available grandezas (left, grouped by category, with search) -->
+                                <StackPanel Grid.Column="0" Spacing="6" Margin="0,0,12,0">
                                     <TextBlock Classes="label-small"
                                                Text="{Binding [CfgAvailableRegisters], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <ListBox Background="{StaticResource BrushBgElevated}"
-                                             CornerRadius="{StaticResource RadiusCardSmall}"
-                                             Padding="4" />
+                                    <TextBox Watermark="{Binding [CfgGrandezaSearch], Source={x:Static svc:LocalizationService.Instance}}"
+                                             Text="{Binding SearchText, Mode=TwoWay}" />
+                                    <ScrollViewer Height="360"
+                                                  Background="{StaticResource BrushBgElevated}">
+                                        <ItemsControl ItemsSource="{Binding AvailableGrouped}" Padding="4">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="vm:DeviceConfigureViewModel+GrandezaCategoryGroup">
+                                                    <Expander Header="{Binding Label}"
+                                                              IsExpanded="True"
+                                                              IsVisible="{Binding IsVisible}"
+                                                              Margin="0,2,0,2">
+                                                        <ItemsControl ItemsSource="{Binding Items}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate DataType="vm:DeviceConfigureViewModel+GrandezaItemViewModel">
+                                                                    <Grid ColumnDefinitions="Auto,80,*" Margin="4,2"
+                                                                          IsVisible="{Binding IsVisible}">
+                                                                        <CheckBox Grid.Column="0"
+                                                                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                                                  VerticalAlignment="Center" />
+                                                                        <TextBlock Grid.Column="1"
+                                                                                   Text="{Binding Code}"
+                                                                                   FontWeight="SemiBold"
+                                                                                   VerticalAlignment="Center"
+                                                                                   Margin="6,0" />
+                                                                        <TextBlock Grid.Column="2"
+                                                                                   Text="{Binding Description}"
+                                                                                   Opacity="0.75"
+                                                                                   TextTrimming="CharacterEllipsis"
+                                                                                   VerticalAlignment="Center" />
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </Expander>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
                                 </StackPanel>
 
-                                <!-- Transfer buttons -->
-                                <StackPanel Grid.Column="1"
-                                            VerticalAlignment="Center"
-                                            HorizontalAlignment="Center"
-                                            Spacing="6">
-                                    <Button Content="→" Width="36" HorizontalContentAlignment="Center" />
-                                    <Button Content="←" Width="36" HorizontalContentAlignment="Center" />
-                                    <Button Content="✕" Width="36" HorizontalContentAlignment="Center" Opacity="0.7" />
-                                </StackPanel>
-
-                                <!-- Selected registers -->
-                                <StackPanel Grid.Column="2" Spacing="6">
+                                <!-- Selected grandezas (right, ordered) -->
+                                <StackPanel Grid.Column="1" Spacing="6">
                                     <TextBlock Classes="label-small"
-                                               Text="{Binding [CfgSelectedRegisters], Source={x:Static svc:LocalizationService.Instance}}" />
-                                    <ListBox Background="{StaticResource BrushBgElevated}"
-                                             CornerRadius="{StaticResource RadiusCardSmall}"
-                                             Padding="4" />
+                                               Text="{Binding GrandezaCounterText}" />
+                                    <ScrollViewer Height="395"
+                                                  Background="{StaticResource BrushBgElevated}">
+                                        <ItemsControl ItemsSource="{Binding SelectedOrdered}" Padding="4">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="vm:DeviceConfigureViewModel+GrandezaItemViewModel">
+                                                    <Grid ColumnDefinitions="32,72,*" Margin="4,3">
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{Binding Order}"
+                                                                   Opacity="0.55"
+                                                                   VerticalAlignment="Center"
+                                                                   FontFamily="Consolas" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding Code}"
+                                                                   FontWeight="SemiBold"
+                                                                   VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="2"
+                                                                   Text="{Binding Description}"
+                                                                   Opacity="0.75"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
                                 </StackPanel>
 
                             </Grid>
