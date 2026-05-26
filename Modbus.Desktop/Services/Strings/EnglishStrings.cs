@@ -181,6 +181,13 @@ internal static class EnglishStrings
         ["CfgEnabled"]           = "Enabled",
         ["CfgDisabled"]          = "Disabled",
         ["CfgManual"]            = "Manual",
+        ["CfgUseNow"]            = "Use now",
+        ["CfgEditButton"]        = "Edit",
+        ["CfgSaveButton"]        = "Save",
+        ["CfgCancelButton"]      = "Cancel",
+        ["CfgRetryRead"]         = "Retry",
+        ["CfgSaveSuccess"]       = "Configuration saved",
+        ["CfgSaveError"]         = "Failed to save configuration",
         ["CfgSecurityNone"]      = "None",
         ["CfgBrokerDefault"]     = "Default",
 

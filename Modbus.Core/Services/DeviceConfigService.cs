@@ -13,8 +13,10 @@ namespace Modbus.Core.Services;
 /// </summary>
 public sealed class DeviceConfigService : IDeviceConfigService
 {
-    private const int MaxBlockSize   = 32;  // FC03/FC04 spec limit per request
-    private const int TimeoutSeconds = 30;
+    private const int MaxBlockSize    = 32;  // FC03/FC04 spec limit per request
+    private const int MaxWriteBlockSize = 22; // KS-3000 FC16 limit per request
+    private const ushort CoilResetAddress = 6; // KS-3000 / Konect 120 commit coil for string writes ≥ 43461
+    private const int TimeoutSeconds  = 30;
     private const int MaxAttempts    = 3;   // Total attempts per block (1 initial + 2 retries)
     private const int RetryDelayMs   = 150; // Pause between retries to let the device settle
 
@@ -129,6 +131,159 @@ public sealed class DeviceConfigService : IDeviceConfigService
         {
             try { await svc.DisconnectAsync(); } catch { }
         }
+    }
+
+    public async Task WriteMultipleRegistersAsync(
+        ModbusDevice device,
+        ushort modiconAddress,
+        ushort[] values,
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsHolding(modiconAddress))
+            throw new ArgumentException($"Write requires a 4xxxx holding-register address; got {modiconAddress}.");
+        if (values is null || values.Length == 0)
+            return;
+
+        using var svc = _factory.Create(device);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(TimeoutSeconds));
+
+        await svc.ConnectAsync(cts.Token);
+        try
+        {
+            ushort rawStart = (ushort)(modiconAddress - 40001);
+            for (int offset = 0; offset < values.Length; offset += MaxWriteBlockSize)
+            {
+                int count = Math.Min(MaxWriteBlockSize, values.Length - offset);
+                var chunk = new ushort[count];
+                Array.Copy(values, offset, chunk, 0, count);
+                await svc.WriteMultipleRegistersAsync(
+                    device.SlaveId, (ushort)(rawStart + offset), chunk, cts.Token);
+            }
+        }
+        finally
+        {
+            try { await svc.DisconnectAsync(); } catch { }
+        }
+    }
+
+    public Task SendCoilResetAsync(ModbusDevice device, CancellationToken cancellationToken = default) =>
+        WriteCoilAsync(device, CoilResetAddress, true, cancellationToken);
+
+    public async Task WriteBatchAsync(
+        ModbusDevice device,
+        IReadOnlyList<RegisterWrite> writes,
+        bool sendCoilResetAfter,
+        CancellationToken cancellationToken = default)
+    {
+        if ((writes is null || writes.Count == 0) && !sendCoilResetAfter) return;
+
+        // KS-3000 / Konect 120 frequently drop the TCP socket between writes (and always
+        // after the commit coil). We use ONE IModbusService instance and reconnect lazily
+        // whenever the previous op left the connection dead — this avoids the per-op
+        // 30s timeout overhead of WriteAsync/WriteMultipleRegistersAsync without assuming
+        // the device keeps the socket alive across the whole batch.
+        int totalSeconds = Math.Max(TimeoutSeconds, (writes?.Count ?? 0) * 5 + 15);
+        using var svc = _factory.Create(device);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(totalSeconds));
+
+        try
+        {
+            if (writes is not null)
+            {
+                foreach (var w in writes)
+                {
+                    if (!IsHolding(w.ModiconAddress))
+                        throw new ArgumentException(
+                            $"WriteBatch requires 4xxxx holding-register addresses; got {w.ModiconAddress}.");
+                    if (w.Values is null || w.Values.Length == 0) continue;
+
+                    ushort rawStart = (ushort)(w.ModiconAddress - 40001);
+
+                    if (w.Values.Length == 1)
+                    {
+                        await RunWithReconnectAsync(svc, cts.Token,
+                            (s, ct) => s.WriteSingleRegisterAsync(device.SlaveId, rawStart, w.Values[0], ct),
+                            $"FC06 {w.ModiconAddress}");
+                    }
+                    else
+                    {
+                        for (int offset = 0; offset < w.Values.Length; offset += MaxWriteBlockSize)
+                        {
+                            int count = Math.Min(MaxWriteBlockSize, w.Values.Length - offset);
+                            var chunk = new ushort[count];
+                            Array.Copy(w.Values, offset, chunk, 0, count);
+                            ushort blockStart = (ushort)(rawStart + offset);
+                            await RunWithReconnectAsync(svc, cts.Token,
+                                (s, ct) => s.WriteMultipleRegistersAsync(device.SlaveId, blockStart, chunk, ct),
+                                $"FC16 {w.ModiconAddress + offset}+{count}");
+                        }
+                    }
+                }
+            }
+
+            if (sendCoilResetAfter)
+            {
+                // KS-3000 closes the socket after applying the commit coil and never echoes
+                // FC05 — treat timeout / IO / EndOfStream as success here.
+                try
+                {
+                    if (!svc.IsConnected) await svc.ConnectAsync(cts.Token);
+                    await svc.WriteSingleCoilAsync(device.SlaveId, CoilResetAddress, true, cts.Token);
+                }
+                catch (ModbusProtocolException ex)
+                {
+                    Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} rejected — {ex.Message}");
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} — no echo, treated as success.");
+                }
+                catch (IOException)
+                {
+                    Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} — connection closed, treated as success.");
+                }
+                catch (EndOfStreamException)
+                {
+                    Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} — connection closed, treated as success.");
+                }
+            }
+        }
+        finally
+        {
+            try { await svc.DisconnectAsync(); } catch { }
+        }
+    }
+
+    // Runs one write op, reconnecting the underlying transport when the device dropped the
+    // socket between operations (KS-3000 often does this). One retry is enough — the new
+    // socket is fresh, and a second back-to-back failure means the device is genuinely down.
+    private static async Task RunWithReconnectAsync(
+        IModbusService svc, CancellationToken ct,
+        Func<IModbusService, CancellationToken, Task> op,
+        string label)
+    {
+        const int MaxAttempts = 2;
+        Exception? lastError = null;
+        for (int attempt = 1; attempt <= MaxAttempts; attempt++)
+        {
+            try
+            {
+                if (!svc.IsConnected) await svc.ConnectAsync(ct);
+                await op(svc, ct);
+                return;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (ModbusProtocolException) { throw; }
+            catch (Exception ex) when (ex is IOException or EndOfStreamException)
+            {
+                lastError = ex;
+                Debug.WriteLine($"[DeviceConfigService] {label} attempt {attempt}: {ex.GetType().Name} — reconnecting and retrying.");
+                try { await svc.DisconnectAsync(); } catch { }
+            }
+        }
+        throw lastError ?? new IOException($"{label}: unknown write failure after {MaxAttempts} attempts.");
     }
 
     public async Task WriteCoilAsync(

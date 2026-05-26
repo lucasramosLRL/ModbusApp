@@ -132,6 +132,52 @@ public readonly record struct RegisterField(
     }
 
     /// <summary>
+    /// Encodes a string into <see cref="WordCount"/> registers (high byte first per word).
+    /// If the source is longer than the field capacity, it is truncated; if shorter, it
+    /// is null-terminated and the remainder is zero-padded. Inverse of <see cref="ExtractString"/>.
+    /// </summary>
+    public ushort[] EncodeString(string? value)
+    {
+        var bytes = new byte[WordCount * 2];
+        if (!string.IsNullOrEmpty(value))
+        {
+            int charsToTake = Math.Min(value.Length, bytes.Length);
+            int written     = Encoding.ASCII.GetBytes(value, 0, charsToTake, bytes, 0);
+            // Ensure the byte just past the string is a null terminator when there is room.
+            if (written < bytes.Length) bytes[written] = 0;
+        }
+
+        var words = new ushort[WordCount];
+        for (int i = 0; i < WordCount; i++)
+            words[i] = (ushort)((bytes[i * 2] << 8) | bytes[i * 2 + 1]);
+        return words;
+    }
+
+    /// <summary>
+    /// Encodes an RTC time into two consecutive registers. Inverse of <see cref="ExtractTime"/>.
+    ///   word0: high = centésimo BCD, low = segundo BCD
+    ///   word1: high = minuto BCD,    low = hora BCD
+    /// </summary>
+    public static (ushort Word0, ushort Word1) EncodeTime(int hour, int minute, int second, int centesimo = 0)
+    {
+        var word0 = (ushort)((ByteToBcd((byte)centesimo) << 8) | ByteToBcd((byte)second));
+        var word1 = (ushort)((ByteToBcd((byte)minute)    << 8) | ByteToBcd((byte)hour));
+        return (word0, word1);
+    }
+
+    /// <summary>
+    /// Encodes an RTC date into two consecutive registers. Inverse of <see cref="ExtractDate"/>.
+    ///   word0: high = dia da semana raw, low = dia BCD
+    ///   word1: high = mês BCD, low = ano BCD (year - 2000)
+    /// </summary>
+    public static (ushort Word0, ushort Word1) EncodeDate(int year, int month, int day, int weekday)
+    {
+        var word0 = (ushort)(((weekday & 0xFF) << 8) | ByteToBcd((byte)day));
+        var word1 = (ushort)((ByteToBcd((byte)month) << 8) | ByteToBcd((byte)(year - 2000)));
+        return (word0, word1);
+    }
+
+    /// <summary>
     /// Allows assigning a plain integer Modicon address in the profile registry
     /// without wrapping in <c>new RegisterField(...)</c>.
     /// Example: <c>AddrKe = 40005</c>  (whole register, WordCount = 1).

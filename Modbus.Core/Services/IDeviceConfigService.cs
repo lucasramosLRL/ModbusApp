@@ -12,6 +12,12 @@ public sealed record ConfigReadResult(
     IReadOnlyDictionary<ushort, ushort> Values,
     IReadOnlyList<string> FailedBlocks);
 
+/// <summary>
+/// One write operation in a batch. <see cref="Values"/> with length 1 is dispatched as FC06
+/// (single register); longer arrays go through FC16 with automatic 22-register chunking.
+/// </summary>
+public sealed record RegisterWrite(ushort ModiconAddress, ushort[] Values);
+
 public interface IDeviceConfigService
 {
     /// <summary>
@@ -42,5 +48,34 @@ public interface IDeviceConfigService
         ModbusDevice device,
         ushort coilAddress,
         bool value,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Opens a temporary connection and writes contiguous holding registers (FC16),
+    /// splitting into 22-register chunks so it fits the KS-3000/Konect 120 FC16 limit.
+    /// Address must be a 4xxxx Modicon number.
+    /// </summary>
+    Task WriteMultipleRegistersAsync(
+        ModbusDevice device,
+        ushort modiconAddress,
+        ushort[] values,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends the FC05 "commit/reset" coil (address 6) that KS-3000 / Konect 120 require
+    /// after writing string fields in the 43461+ range. Idempotent — safe to call once
+    /// per Save regardless of how many strings were modified.
+    /// </summary>
+    Task SendCoilResetAsync(ModbusDevice device, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Executes a batch of writes against a single persistent connection (and, optionally,
+    /// the commit coil at the end). Greatly faster than calling WriteAsync/WriteMultipleRegistersAsync
+    /// in a loop because each of those reopens the TCP socket from scratch.
+    /// </summary>
+    Task WriteBatchAsync(
+        ModbusDevice device,
+        IReadOnlyList<RegisterWrite> writes,
+        bool sendCoilResetAfter,
         CancellationToken cancellationToken = default);
 }

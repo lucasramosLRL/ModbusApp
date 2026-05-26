@@ -181,6 +181,13 @@ internal static class PortugueseStrings
         ["CfgEnabled"]           = "Habilitado",
         ["CfgDisabled"]          = "Desabilitado",
         ["CfgManual"]            = "Manual",
+        ["CfgUseNow"]            = "Usar agora",
+        ["CfgEditButton"]        = "Alterar",
+        ["CfgSaveButton"]        = "Salvar",
+        ["CfgCancelButton"]      = "Cancelar",
+        ["CfgRetryRead"]         = "Tentar novamente",
+        ["CfgSaveSuccess"]       = "Configurações gravadas",
+        ["CfgSaveError"]         = "Erro ao gravar configurações",
         ["CfgSecurityNone"]      = "Nenhuma",
         ["CfgBrokerDefault"]     = "Padrão",
 

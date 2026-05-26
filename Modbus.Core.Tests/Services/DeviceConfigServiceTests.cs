@@ -210,6 +210,78 @@ public sealed class DeviceConfigServiceTests
             .WithMessage("*4xxxx*");
     }
 
+    // ── WriteMultipleRegistersAsync (FC16) ────────────────────────────────────
+
+    [Fact]
+    public async Task WriteMultipleRegistersAsync_HoldingAddress_CallsService()
+    {
+        var values = new ushort[] { 0x1111, 0x2222, 0x3333 };
+
+        await _service.WriteMultipleRegistersAsync(Device, 40010, values);
+
+        await _svc.Received(1).WriteMultipleRegistersAsync(
+            Device.SlaveId,
+            (ushort)(40010 - 40001), // raw 9
+            Arg.Is<ushort[]>(a => a.Length == 3 && a[0] == 0x1111 && a[1] == 0x2222 && a[2] == 0x3333),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WriteMultipleRegistersAsync_InputAddress_ThrowsArgumentException()
+    {
+        var act = async () => await _service.WriteMultipleRegistersAsync(Device, 30001, [0x0000]);
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*4xxxx*");
+    }
+
+    [Fact]
+    public async Task WriteMultipleRegistersAsync_Over22Words_SplitsIntoChunks()
+    {
+        // 35-word write must split into 22 + 13 (KS-3000 FC16 limit)
+        var values = new ushort[35];
+        for (int i = 0; i < 35; i++) values[i] = (ushort)(0x1000 + i);
+
+        await _service.WriteMultipleRegistersAsync(Device, 43461, values);
+
+        // First chunk: 22 words starting at raw (43461-40001=3460)
+        await _svc.Received(1).WriteMultipleRegistersAsync(
+            Device.SlaveId,
+            (ushort)3460,
+            Arg.Is<ushort[]>(a => a.Length == 22 && a[0] == 0x1000 && a[21] == 0x1015),
+            Arg.Any<CancellationToken>());
+
+        // Second chunk: 13 words starting at raw (3460+22=3482)
+        await _svc.Received(1).WriteMultipleRegistersAsync(
+            Device.SlaveId,
+            (ushort)3482,
+            Arg.Is<ushort[]>(a => a.Length == 13 && a[0] == 0x1016 && a[12] == 0x1022),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WriteMultipleRegistersAsync_EmptyValues_DoesNothing()
+    {
+        await _service.WriteMultipleRegistersAsync(Device, 40010, []);
+
+        await _svc.DidNotReceive().WriteMultipleRegistersAsync(
+            Arg.Any<byte>(), Arg.Any<ushort>(), Arg.Any<ushort[]>(), Arg.Any<CancellationToken>());
+    }
+
+    // ── SendCoilResetAsync (FC05 coil 6) ──────────────────────────────────────
+
+    [Fact]
+    public async Task SendCoilResetAsync_WritesCoil6True()
+    {
+        await _service.SendCoilResetAsync(Device);
+
+        await _svc.Received(1).WriteSingleCoilAsync(
+            Device.SlaveId,
+            (ushort)6,
+            true,
+            Arg.Any<CancellationToken>());
+    }
+
     // ── Empty fields list ─────────────────────────────────────────────────────
 
     [Fact]

@@ -65,9 +65,39 @@ public partial class DeviceConfigureViewModel : ObservableObject
     public bool HasCurrentInvert => Capabilities.HasFlag(DeviceCapabilities.FieldCurrentInvert);
     public bool HasIotGrandezaSelection => Capabilities.HasFlag(DeviceCapabilities.IotGrandezaSelection);
 
-    // ── Load state ───────────────────────────────────────────────────────────
+    // ── Load / Edit / Save state ─────────────────────────────────────────────
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string? _loadError;
+
+    [ObservableProperty] private bool _isSaving;
+    [ObservableProperty] private string? _saveError;
+    [ObservableProperty] private string? _saveSuccess;
+
+    // Snapshot of the last fully-successful read. Acts as the baseline for the dirty diff
+    // in SaveAsync (so we only write fields the user actually changed) and as the source
+    // for Revert (which reverts the VM properties to these values).
+    private IReadOnlyDictionary<ushort, ushort>? _baseline;
+    private DeviceConfigProfile? _profile;
+
+    // Editing is unlocked the moment the read completes successfully — no "Edit" button needed.
+    public bool IsReady      => !IsLoading && !IsSaving
+                              && string.IsNullOrEmpty(LoadError)
+                              && _baseline is not null;
+    public bool CanSave      => IsReady;
+    public bool CanCancel    => IsReady;
+    public bool CanRetryRead => !IsLoading && !IsSaving;
+
+    partial void OnIsLoadingChanged(bool value)   { NotifyEditButtonsChanged(); }
+    partial void OnIsSavingChanged(bool value)    { NotifyEditButtonsChanged(); }
+    partial void OnLoadErrorChanged(string? value){ NotifyEditButtonsChanged(); }
+
+    private void NotifyEditButtonsChanged()
+    {
+        OnPropertyChanged(nameof(IsReady));
+        OnPropertyChanged(nameof(CanSave));
+        OnPropertyChanged(nameof(CanCancel));
+        OnPropertyChanged(nameof(CanRetryRead));
+    }
 
     // ── Device info strip (always visible) ──────────────────────────────────
     public string SerialNumberText =>
@@ -459,24 +489,17 @@ public partial class DeviceConfigureViewModel : ObservableObject
         var profile = DeviceConfigProfileRegistry.Get(Device.Device.DeviceModel?.DeviceCode);
         if (profile is null || profile.AllFields.Count == 0) return;
 
+        _profile = profile;
         IsLoading = true;
         LoadError = null;
+        SaveError = null;
+        SaveSuccess = null;
         try
         {
             await _pausePolling();
             try
             {
-                var read = await _configService.ReadAsync(
-                    Device.Device, profile.AllFields, CancellationToken.None);
-                ApplyRegisters(read.Values, profile);
-
-                // Surface partial-read failures: data is incomplete and must not be
-                // written back to the device until reloaded successfully.
-                if (read.FailedBlocks.Count > 0)
-                    LoadError =
-                        $"Falha ao ler {read.FailedBlocks.Count} bloco(s) após múltiplas tentativas. " +
-                        "Alguns campos podem estar vazios ou desatualizados — não grave configurações até a leitura completar:\n  • " +
-                        string.Join("\n  • ", read.FailedBlocks);
+                await DoReadFromDeviceAsync(profile);
             }
             finally
             {
@@ -485,11 +508,119 @@ public partial class DeviceConfigureViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            _baseline = null;
             LoadError = ex.Message;
         }
         finally
         {
             IsLoading = false;
+            NotifyEditButtonsChanged();
+        }
+    }
+
+    // Performs the read + ApplyRegisters + baseline update, but does NOT pause/resume polling.
+    // Both LoadAsync and SaveAsync call this — Save needs to hold a single pause across the
+    // write batch AND the confirmation re-read, because releasing the lock briefly between
+    // them lets the polling loop reconnect mid-cycle and the KS-3000 has been observed to
+    // drop subsequent connections when that happens immediately after a write batch.
+    private async Task DoReadFromDeviceAsync(DeviceConfigProfile profile)
+    {
+        var read = await _configService.ReadAsync(
+            Device.Device, profile.AllFields, CancellationToken.None);
+        ApplyRegisters(read.Values, profile);
+
+        if (read.FailedBlocks.Count == 0)
+        {
+            _baseline = read.Values;
+            LoadError = null;
+        }
+        else
+        {
+            _baseline = null;
+            LoadError =
+                $"Falha ao ler {read.FailedBlocks.Count} bloco(s) após múltiplas tentativas. " +
+                "Alguns campos podem estar vazios ou desatualizados — não grave configurações até a leitura completar:\n  • " +
+                string.Join("\n  • ", read.FailedBlocks);
+        }
+    }
+
+    [RelayCommand]
+    private Task RetryReadAsync() => LoadAsync();
+
+    [RelayCommand]
+    private void CancelEdit()
+    {
+        if (!CanCancel) return;
+        if (_baseline is not null && _profile is not null)
+            ApplyRegisters(_baseline, _profile); // revert in-memory edits to the last successful read
+        SaveError = null;
+    }
+
+    [RelayCommand]
+    private void UseNow()
+    {
+        if (!IsReady || ClockSyncFromPc) return;
+        SetClockFromPc();
+    }
+
+    [RelayCommand]
+    private async Task SaveAsync()
+    {
+        if (!CanSave || _baseline is null || _profile is null) return;
+
+        IsSaving = true;
+        SaveError = null;
+        SaveSuccess = null;
+        try
+        {
+            var ops = BuildWriteOperations(_baseline, _profile, out bool needsCoilReset);
+
+            if (ops.Count == 0 && !needsCoilReset)
+            {
+                // Nothing changed — exit silently without hitting the device.
+                return;
+            }
+
+            // Build a single batch so the service can run every write (and the optional
+            // commit coil) against ONE persistent connection. Doing them one-by-one
+            // reopens TCP per call, which adds seconds of handshake latency per field
+            // and can trip the 30s per-call timeout when editing several fields at once.
+            var batch = ops
+                .Select(o => new RegisterWrite(o.ModiconAddr, o.Words))
+                .ToList();
+
+            // Hold a single pause across both the write batch and the confirmation re-read.
+            // Releasing the lock in-between lets the polling loop reconnect immediately,
+            // which has been observed to put the KS-3000 in a transient state where the
+            // next read connection is reset with WSAECONNABORTED.
+            await _pausePolling();
+            try
+            {
+                await _configService.WriteBatchAsync(
+                    Device.Device, batch, needsCoilReset, CancellationToken.None);
+
+                // Give the device a moment to apply changes and stabilize its TCP stack.
+                await Task.Delay(500);
+
+                if (_profile is not null)
+                    await DoReadFromDeviceAsync(_profile);
+            }
+            finally
+            {
+                _resumePolling();
+            }
+
+            if (string.IsNullOrEmpty(LoadError))
+                SaveSuccess = Modbus.Desktop.Services.LocalizationService.Instance["CfgSaveSuccess"];
+        }
+        catch (Exception ex)
+        {
+            SaveError = ex.Message;
+            Debug.WriteLine($"[DeviceConfigureViewModel] SaveAsync failed: {ex}");
+        }
+        finally
+        {
+            IsSaving = false;
         }
     }
 
@@ -622,6 +753,225 @@ public partial class DeviceConfigureViewModel : ObservableObject
         if (!regs.TryGetValue(f.Addr, out var w0)) return null;
         if (!regs.TryGetValue((ushort)(f.Addr + 1), out var w1)) return null;
         return $"{w0 >> 8}.{w0 & 0xFF}.{w1 >> 8}.{w1 & 0xFF}";
+    }
+
+    // ── Save: dirty-diff and write-op builder ────────────────────────────────
+
+    private readonly record struct WriteOp(ushort ModiconAddr, ushort[] Words);
+
+    private List<WriteOp> BuildWriteOperations(
+        IReadOnlyDictionary<ushort, ushort> baseline,
+        DeviceConfigProfile p,
+        out bool needsCoilReset)
+    {
+        var ops = new List<WriteOp>();
+        needsCoilReset = false;
+
+        // ── Bit-fields and single-register bytes that share a holding register ──
+        // Collect every dirty bit-field by its parent register; then for each register,
+        // merge them on top of the baseline value via ApplyBits and emit one FC06.
+        // Whole single-register fields (Ke, SQPF, byte-swapped 16-bit, etc.) emit
+        // their own FC06 below.
+        var bitChanges = new List<(RegisterField Field, ushort NewValue)>();
+
+        AddBitDirty(p.AddrCurrentInvert, () => CurrentInvert ? (ushort)1 : (ushort)0);
+        AddBitDirty(p.AddrTl,            () => (ushort)(Tl?.Code ?? 0));
+        AddBitDirty(p.AddrTi,            () => (ushort)(Ti ?? 0));
+
+        AddBitDirty(p.AddrDhcp,            () => EthDhcp ? (ushort)1 : (ushort)0);
+        AddBitDirty(p.AddrDnsEnabled,      () => WifiDnsEnabled ? (ushort)1 : (ushort)0);
+
+        AddBitDirty(p.AddrWirelessMode,    () => (ushort)(WirelessMode?.Code ?? 0));
+        AddBitDirty(p.AddrWifiDhcp,        () => WifiDhcp ? (ushort)1 : (ushort)0);
+        AddBitDirty(p.AddrWifiDnsEnabled,  () => WifiDnsEnabled ? (ushort)1 : (ushort)0);
+
+        AddBitDirty(p.AddrSntpEnabled,     () => SntpEnabled ? (ushort)1 : (ushort)0);
+
+        AddBitDirty(p.AddrIotEnabled,      () => IotEnabled ? (ushort)1 : (ushort)0);
+        AddBitDirty(p.AddrSendOnHour,      () => SendOnHour ? (ushort)1 : (ushort)0);
+        // KeepAlive / TLS use "1 = disabled" semantics on the device.
+        AddBitDirty(p.AddrKeepAlive,       () => KeepAlive ? (ushort)0 : (ushort)1);
+        AddBitDirty(p.AddrTls,             () => Tls       ? (ushort)0 : (ushort)1);
+        AddBitDirty(p.AddrMqttBroker,      () => (ushort)(MqttBroker?.Code ?? 0));
+
+        foreach (var grp in bitChanges.GroupBy(c => c.Field.Addr))
+        {
+            if (!baseline.TryGetValue(grp.Key, out var baseValue)) continue;
+            ushort merged = baseValue;
+            foreach (var (field, newValue) in grp)
+                merged = field.ApplyBits(merged, newValue);
+            if (merged != baseValue)
+                ops.Add(new WriteOp(grp.Key, new[] { merged }));
+        }
+
+        // ── Whole single-register integers ───────────────────────────────────
+        AddSingleDirty(p.AddrKe,           () => (ushort)(Ke ?? 0));
+        AddSingleDirty(p.AddrSendInterval, () => (ushort)(SendInterval ?? 0));
+        AddSingleDirty(p.AddrDebounceEdp,  () => (ushort)(DebounceEdp ?? 0));
+        // Timezone / SyncInterval are stored byte-swapped on the device.
+        AddSingleDirty(p.AddrTimezone,     () => SwapBytes((ushort)(short)(Timezone ?? 0)));
+        AddSingleDirty(p.AddrSyncInterval, () => SwapBytes((ushort)(SyncInterval ?? 0)));
+        AddSingleDirty(p.AddrSeqPf,        EncodeSeqPf);
+
+        // ── Multi-word Float32 holding registers (byte-swapped) ──────────────
+        AddFloat32Dirty(p.AddrTp,           () => Tp);
+        AddFloat32Dirty(p.AddrTc,           () => Tc);
+        AddFloat32Dirty(p.AddrHourmeterThr, () => HourmeterThr);
+
+        // ── IPv4 addresses (2 words, fully little-endian per KS-3000 quirk) ──
+        AddIpDirty(p.AddrIpAddress,  () => EthIp);
+        AddIpDirty(p.AddrSubnetMask, () => EthMask);
+        AddIpDirty(p.AddrGateway,    () => EthGateway);
+        AddIpDirty(p.AddrWifiIp,     () => WifiIp);
+        AddIpDirty(p.AddrWifiMask,   () => WifiMask);
+        AddIpDirty(p.AddrWifiGateway,() => WifiGateway);
+        // DNS server is shared — write whichever address the profile exposes.
+        AddIpDirty(p.AddrWifiDns ?? p.AddrDnsServer, () => WifiDns);
+
+        // ── Strings ──────────────────────────────────────────────────────────
+        AddStringDirty(p.AddrSsid,         () => Ssid);
+        AddStringDirty(p.AddrWifiPassword, () => WifiPassword);
+        AddStringDirty(p.AddrBtDescription,() => BtDescription);
+        AddStringDirty(p.AddrBtPassword,   () => BtPassword);
+        AddStringDirty(p.AddrNtpServer,    () => NtpServer);
+        AddStringDirty(p.AddrMqttUrl,      () => MqttUrl);
+        AddStringDirty(p.AddrMqttDescId,   () => MqttDescId);
+        AddStringDirty(p.AddrMqttPort,     () => MqttPort);
+        AddStringDirty(p.AddrMqttTopic,    () => MqttTopic);
+        AddStringDirty(p.AddrMqttUser,     () => MqttUser);
+        AddStringDirty(p.AddrMqttToken,    () => MqttToken);
+
+        // ── Clock ────────────────────────────────────────────────────────────
+        // In PC sync mode, the timer keeps overwriting ClockDate/ClockTime so the baseline
+        // comparison is unreliable. Always write when in PC mode (intent: "sync now").
+        // In manual mode, write only if the user's chosen values differ from baseline.
+        if (p.AddrClockTime is RegisterField ctField && p.AddrClockDate is RegisterField cdField)
+        {
+            DateTime? when = null;
+            if (ClockSyncFromPc)
+            {
+                when = DateTime.Now;
+            }
+            else if (ClockDate is { } d && ClockTime is { } t)
+            {
+                var baselineTime = ctField.ExtractTime(baseline);
+                var baselineDate = cdField.ExtractDate(baseline);
+
+                bool timeChanged = baselineTime is null
+                    || baselineTime.Value.Hora    != (byte)t.Hours
+                    || baselineTime.Value.Minuto  != (byte)t.Minutes
+                    || baselineTime.Value.Segundo != (byte)t.Seconds;
+                bool dateChanged = baselineDate is null
+                    || baselineDate.Value.Ano != d.Year
+                    || baselineDate.Value.Mes != (byte)d.Month
+                    || baselineDate.Value.Dia != (byte)d.Day;
+
+                if (timeChanged || dateChanged)
+                    when = new DateTime(d.Year, d.Month, d.Day, t.Hours, t.Minutes, t.Seconds);
+            }
+
+            if (when is { } now)
+            {
+                var (tw0, tw1) = RegisterField.EncodeTime(now.Hour, now.Minute, now.Second);
+                var (dw0, dw1) = RegisterField.EncodeDate(now.Year, now.Month, now.Day, (int)now.DayOfWeek + 1);
+                ops.Add(new WriteOp(ctField.Addr, new[] { tw0, tw1 }));
+                ops.Add(new WriteOp(cdField.Addr, new[] { dw0, dw1 }));
+            }
+        }
+
+        // Any op whose start address is in the device's "needs commit" string range
+        // triggers a single FC05 coil-6 at the end of the Save flow.
+        if (ops.Any(o => o.ModiconAddr >= 43461))
+            needsCoilReset = true;
+
+        return ops;
+
+        // ── Local helpers ────────────────────────────────────────────────────
+        void AddBitDirty(RegisterField? field, Func<ushort> currentFactory)
+        {
+            if (field is not RegisterField f) return;
+            var existing = f.ExtractValue(baseline);
+            var current  = currentFactory();
+            if (existing is null || existing.Value != current)
+                bitChanges.Add((f, current));
+        }
+
+        void AddSingleDirty(RegisterField? field, Func<ushort> currentFactory)
+        {
+            if (field is not RegisterField f) return;
+            if (f.IsBitField) return; // safety: bit-fields use AddBitDirty
+            var existing = f.ExtractValue(baseline);
+            var current  = currentFactory();
+            if (existing is null || existing.Value != current)
+                ops.Add(new WriteOp(f.Addr, new[] { current }));
+        }
+
+        void AddFloat32Dirty(RegisterField? field, Func<decimal?> currentFactory)
+        {
+            if (field is not RegisterField f) return;
+            if (currentFactory() is not decimal current) return;
+            var existing = DecodeFloat32(baseline, f);
+            if (existing.HasValue && Math.Abs(existing.Value - current) < 0.0001m) return;
+            var words = RegisterDecoder.EncodeFloat32((float)current, WordOrder.ByteSwapped);
+            ops.Add(new WriteOp(f.Addr, words));
+        }
+
+        void AddIpDirty(RegisterField? field, Func<string?> currentFactory)
+        {
+            if (field is not RegisterField f) return;
+            var current  = currentFactory();
+            var existing = f.ExtractValue(baseline) is uint v ? FormatIp(v) : null;
+            if (string.Equals(existing, current, StringComparison.Ordinal)) return;
+            if (ParseIp(current) is not ushort[] words) return; // skip when malformed/null
+            ops.Add(new WriteOp(f.Addr, words));
+        }
+
+        void AddStringDirty(RegisterField? field, Func<string?> currentFactory)
+        {
+            if (field is not RegisterField f) return;
+            var current  = currentFactory() ?? string.Empty;
+            var existing = f.ExtractString(baseline) ?? string.Empty;
+            if (string.Equals(existing, current, StringComparison.Ordinal)) return;
+            ops.Add(new WriteOp(f.Addr, f.EncodeString(current)));
+        }
+
+        ushort EncodeSeqPf()
+        {
+            // Inverse of ApplySeqPf: label "F2"→0, "F1"→1, "F0"→2, "EXP"→3.
+            ushort raw = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                int nibble = _pfPos[i] switch
+                {
+                    "F2"  => 0,
+                    "F1"  => 1,
+                    "F0"  => 2,
+                    "EXP" => 3,
+                    _      => 0,
+                };
+                raw |= (ushort)(nibble << (i * 4));
+            }
+            return raw;
+        }
+    }
+
+    // Inverse of FormatIp. Returns null when the text isn't a valid IPv4 (skip the write).
+    private static ushort[]? ParseIp(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var parts = text.Split('.');
+        if (parts.Length != 4) return null;
+        var octets = new byte[4];
+        for (int i = 0; i < 4; i++)
+        {
+            if (!byte.TryParse(parts[i], out octets[i])) return null;
+        }
+        // word0 = (d << 8) | c ; word1 = (b << 8) | a  — mirrors the byte order assumed by FormatIp.
+        return new[]
+        {
+            (ushort)((octets[3] << 8) | octets[2]),
+            (ushort)((octets[1] << 8) | octets[0]),
+        };
     }
 
     private void ApplySeqPf(ushort raw)

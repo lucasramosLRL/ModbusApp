@@ -61,4 +61,26 @@ public static class RegisterDecoder
 
     private static ushort SwapBytes(ushort value) =>
         (ushort)((value >> 8) | (value << 8));
+
+    /// <summary>
+    /// Encodes a Float32 value into two Modbus words respecting the given word order.
+    /// Inverse of <see cref="Decode"/> for Float32. Used by the configure-write flow,
+    /// where holding-register floats on KS-3000/Konect 120 use <see cref="WordOrder.ByteSwapped"/>.
+    /// </summary>
+    public static ushort[] EncodeFloat32(float value, WordOrder wordOrder)
+    {
+        uint raw = (uint)BitConverter.SingleToInt32Bits(value);
+        return Split32(raw, wordOrder);
+    }
+
+    /// <summary>
+    /// Splits a 32-bit value into two Modbus words mirroring <see cref="Combine32"/>.
+    /// </summary>
+    private static ushort[] Split32(uint raw, WordOrder wordOrder) => wordOrder switch
+    {
+        WordOrder.BigEndian    => [ (ushort)(raw >> 16),            (ushort)(raw & 0xFFFF)             ],
+        WordOrder.LittleEndian => [ (ushort)(raw & 0xFFFF),         (ushort)(raw >> 16)                ],
+        WordOrder.ByteSwapped  => [ SwapBytes((ushort)(raw & 0xFFFF)), SwapBytes((ushort)(raw >> 16))  ],
+        _                      => throw new ArgumentOutOfRangeException(nameof(wordOrder), wordOrder, null)
+    };
 }
