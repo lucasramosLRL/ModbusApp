@@ -961,19 +961,21 @@ public partial class DeviceConfigureViewModel : ObservableObject
 
         ushort EncodeSeqPf()
         {
-            // Inverse of ApplySeqPf: label "F2"→0, "F1"→1, "F0"→2, "EXP"→3.
+            // Inverse of ApplySeqPf: label → nibble value, placed HIGH-to-LOW.
+            // Mapping: EXP→0, F0→1, F1→2, F2→3 (KRON convention).
             ushort raw = 0;
             for (int i = 0; i < 4; i++)
             {
                 int nibble = _pfPos[i] switch
                 {
-                    "F2"  => 0,
-                    "F1"  => 1,
-                    "F0"  => 2,
-                    "EXP" => 3,
+                    "EXP" => 0,
+                    "F0"  => 1,
+                    "F1"  => 2,
+                    "F2"  => 3,
                     _      => 0,
                 };
-                raw |= (ushort)(nibble << (i * 4));
+                int destNibbleIdx = 3 - i;
+                raw |= (ushort)(nibble << (destNibbleIdx * 4));
             }
             return raw;
         }
@@ -998,14 +1000,22 @@ public partial class DeviceConfigureViewModel : ObservableObject
         };
     }
 
+    // KRON SQPF convention (verified against the old KRON software with multiple
+    // ground-truth sequences):
+    //   • Display order is HIGH-to-LOW: leftmost position (PfPos0) is nibble 3
+    //     (bits 15-12 of the raw register), rightmost (PfPos3) is nibble 0 (bits 3-0).
+    //   • Nibble value → label mapping: 0=EXP, 1=F0, 2=F1, 3=F2.
+    // Default raw 0x3210 displays as "F2, F1, F0, EXP".
+    private static readonly string[] SeqPfLabels = ["EXP", "F0", "F1", "F2"];
+
     private void ApplySeqPf(ushort raw)
     {
-        string[] labels = ["F2", "F1", "F0", "EXP"];
         for (int i = 0; i < 4; i++)
         {
-            int nibble = (raw >> (i * 4)) & 0xF;
+            int srcNibbleIdx = 3 - i;
+            int nibble = (raw >> (srcNibbleIdx * 4)) & 0xF;
             if (nibble < 0 || nibble > 3) return; // bail on invalid SQPF
-            _pfPos[i] = labels[nibble];
+            _pfPos[i] = SeqPfLabels[nibble];
             OnPropertyChanged($"PfPos{i}");
         }
     }

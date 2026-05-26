@@ -387,14 +387,27 @@ The device stores **every** multi-byte numeric/binary value byte-reversed compar
 ### ExtractString cuts at the first null
 `RegisterField.ExtractString` now finds the first `0x00` byte and truncates there (instead of only `TrimEnd('\0')`). Modbus devices commonly leave junk in unused buffer positions past the C-string terminator — without the cut, that junk shows up after the real string (e.g. `"a.st1.ntp.br?"` instead of `"a.st1.ntp.br"`).
 
-### SQPF nibble labels
-KRON's display convention for register 42901 nibbles is **inverted from the natural F0..F2 expectation**:
-- nibble value `0` → label **F2**
-- nibble value `1` → label **F1**
-- nibble value `2` → label **F0**
-- nibble value `3` → label **EXP**
+### SQPF nibble labels (verified against the old KRON software)
+The KRON convention for register 42901 has **two non-obvious aspects** that don't follow naturally from the SQPF decoder semantics:
 
-So raw `0x3210` (Padrão KRON) displays as **F2, F1, F0, EXP** (in position order from `i=0` low-nibble to `i=3` high-nibble). The `ApplySeqPf` method in `DeviceConfigureViewModel` and the initial `_pfPos` array both follow this convention. If a future screen needs to display these labels, reuse the same array (`["F2", "F1", "F0", "EXP"]`).
+1. **Display order is HIGH-to-LOW**: leftmost position (PfPos0) is nibble 3 of the raw register (bits 15-12), rightmost (PfPos3) is nibble 0 (bits 3-0). Note this is the opposite of how the decoder's `for (int i = 0; i < 4; i++) { int floatByteIdx = (sqpfValue >> (i*4)) & 0xF; ... }` loop iterates the same bits.
+2. **Nibble value → label mapping**:
+   - `0` → **EXP**
+   - `1` → **F0**
+   - `2` → **F1**
+   - `3` → **F2**
+
+Default raw `0x3210` displays as `F2, F1, F0, EXP` (nibble 3 = 3 → F2, then 2 → F1, then 1 → F0, then 0 → EXP).
+
+`DeviceConfigureViewModel.ApplySeqPf` / `EncodeSeqPf` / initial `_pfPos` all follow this convention. If a future screen needs the labels, reuse `SeqPfLabels = ["EXP", "F0", "F1", "F2"]` (where index = nibble value).
+
+**Important: no byte-swap on SQPF.** Unlike KE/Timezone/SyncInterval, register 42901 is NOT one of the byte-swapped 16-bit ints. The raw register value is consumed verbatim by `RegisterDecoder.DecodeFloat32WithSqpf` (and by the device itself) as a Float32 byte-permutation table — applying `SwapBytes` would break that and produce wrong float readings.
+
+**How this was verified** (so a future session doesn't trip on it again): we tested two non-default sequences in the old KRON software:
+- Writing "F0, F1, F2, EXP" produces register `0x1230`.
+- Writing "F0, F2, EXP, F1" produces register `0x1302`.
+
+Both decode correctly with high-to-low + the `EXP/F0/F1/F2` mapping above. Earlier attempts to apply `SwapBytes` happened to work for the symmetric default `0x3210` but broke any asymmetric sequence with a pair-swap pattern.
 
 ### MQTT Port is ASCII, not numeric
 KS-3000 stores the MQTT broker port as a **6-character ASCII string** at registers 43496–43498 (3 words), not as a 16-bit integer. The VM exposes `MqttPort` as `string?` and the XAML uses a `TextBox` (not `NumericUpDown`). All other MQTT fields (URL, User, Token, Topic, etc.) are also ASCII per the device doc.
