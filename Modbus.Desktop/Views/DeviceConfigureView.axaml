@@ -335,6 +335,7 @@
                                         <TextBlock Classes="label-small"
                                                    Text="{Binding [CfgIpAddress], Source={x:Static svc:LocalizationService.Instance}}" />
                                         <TextBox Text="{Binding EthIp}"
+                                                 Classes.invalid="{Binding HasInvalidEthIp}"
                                                  IsEnabled="{Binding !EthDhcp}"
                                                  Watermark="0.0.0.0" />
                                     </StackPanel>
@@ -343,6 +344,7 @@
                                             <TextBlock Classes="label-small"
                                                        Text="{Binding [CfgSubnetMask], Source={x:Static svc:LocalizationService.Instance}}" />
                                             <TextBox Text="{Binding EthMask}"
+                                                     Classes.invalid="{Binding HasInvalidEthMask}"
                                                      IsEnabled="{Binding !EthDhcp}"
                                                      Watermark="255.255.255.0" />
                                         </StackPanel>
@@ -350,6 +352,7 @@
                                             <TextBlock Classes="label-small"
                                                        Text="{Binding [CfgGateway], Source={x:Static svc:LocalizationService.Instance}}" />
                                             <TextBox Text="{Binding EthGateway}"
+                                                     Classes.invalid="{Binding HasInvalidEthGateway}"
                                                      IsEnabled="{Binding !EthDhcp}"
                                                      Watermark="0.0.0.0" />
                                         </StackPanel>
@@ -373,6 +376,7 @@
                                                   IsChecked="{Binding WifiDnsEnabled}"
                                                   Foreground="{StaticResource BrushTextPrimary}" />
                                         <TextBox Text="{Binding WifiDns}"
+                                                 Classes.invalid="{Binding HasInvalidWifiDns}"
                                                  IsEnabled="{Binding WifiDnsEnabled}"
                                                  Watermark="208.67.222.222" />
                                     </StackPanel>
@@ -462,6 +466,7 @@
                                             <TextBlock Classes="label-small"
                                                        Text="{Binding [CfgIpAddress], Source={x:Static svc:LocalizationService.Instance}}" />
                                             <TextBox Text="{Binding WifiIp}"
+                                                     Classes.invalid="{Binding HasInvalidWifiIp}"
                                                      IsEnabled="{Binding !WifiDhcp}"
                                                      Watermark="0.0.0.0" />
                                         </StackPanel>
@@ -470,6 +475,7 @@
                                                 <TextBlock Classes="label-small"
                                                            Text="{Binding [CfgSubnetMask], Source={x:Static svc:LocalizationService.Instance}}" />
                                                 <TextBox Text="{Binding WifiMask}"
+                                                         Classes.invalid="{Binding HasInvalidWifiMask}"
                                                          IsEnabled="{Binding !WifiDhcp}"
                                                          Watermark="255.255.255.0" />
                                             </StackPanel>
@@ -477,6 +483,7 @@
                                                 <TextBlock Classes="label-small"
                                                            Text="{Binding [CfgGateway], Source={x:Static svc:LocalizationService.Instance}}" />
                                                 <TextBox Text="{Binding WifiGateway}"
+                                                         Classes.invalid="{Binding HasInvalidWifiGateway}"
                                                          IsEnabled="{Binding !WifiDhcp}"
                                                          Watermark="0.0.0.0" />
                                             </StackPanel>

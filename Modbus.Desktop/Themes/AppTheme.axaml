@@ -113,4 +113,16 @@
         <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}"/>
     </Style>
 
+    <!-- Invalid input border: applied via Classes.invalid="{Binding HasInvalidXxx}".
+         Used by the config screen IP fields so the user can see at a glance which
+         field is blocking the Save button. -->
+    <Style Selector="TextBox.invalid">
+        <Setter Property="BorderBrush"     Value="#C24040"/>
+        <Setter Property="BorderThickness" Value="1.5"/>
+    </Style>
+    <Style Selector="TextBox.invalid:focus /template/ Border#PART_BorderElement">
+        <Setter Property="BorderBrush"     Value="#C24040"/>
+        <Setter Property="BorderThickness" Value="1.5"/>
+    </Style>
+
 </Styles>

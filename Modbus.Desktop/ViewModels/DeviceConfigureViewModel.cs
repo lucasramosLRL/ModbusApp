@@ -83,12 +83,13 @@ public partial class DeviceConfigureViewModel : ObservableObject
     public bool IsReady      => !IsLoading && !IsSaving
                               && string.IsNullOrEmpty(LoadError)
                               && _baseline is not null;
-    public bool CanSave      => IsReady;
+    public bool CanSave      => IsReady && !HasInvalidInput;
     public bool CanCancel    => IsReady;
     public bool CanRetryRead => !IsLoading && !IsSaving;
+    public bool CanGoBack    => !IsSaving;
 
     partial void OnIsLoadingChanged(bool value)   { NotifyEditButtonsChanged(); }
-    partial void OnIsSavingChanged(bool value)    { NotifyEditButtonsChanged(); }
+    partial void OnIsSavingChanged(bool value)    { NotifyEditButtonsChanged(); GoBackCommand.NotifyCanExecuteChanged(); }
     partial void OnLoadErrorChanged(string? value){ NotifyEditButtonsChanged(); }
 
     private void NotifyEditButtonsChanged()
@@ -97,6 +98,42 @@ public partial class DeviceConfigureViewModel : ObservableObject
         OnPropertyChanged(nameof(CanSave));
         OnPropertyChanged(nameof(CanCancel));
         OnPropertyChanged(nameof(CanRetryRead));
+        OnPropertyChanged(nameof(CanGoBack));
+    }
+
+    // ── IP validation ────────────────────────────────────────────────────────
+    // Each IP field exposes a "HasInvalidXxx" flag that is true only when the field
+    // is non-empty AND can't be parsed. Empty strings are valid (the dirty diff
+    // silently skips writing them). HasInvalidInput aggregates all of them and gates
+    // the Save button so the user can't ship malformed IPs to the device.
+    public bool HasInvalidEthIp       => IsMalformedIp(EthIp);
+    public bool HasInvalidEthMask     => IsMalformedIp(EthMask);
+    public bool HasInvalidEthGateway  => IsMalformedIp(EthGateway);
+    public bool HasInvalidWifiIp      => IsMalformedIp(WifiIp);
+    public bool HasInvalidWifiMask    => IsMalformedIp(WifiMask);
+    public bool HasInvalidWifiGateway => IsMalformedIp(WifiGateway);
+    public bool HasInvalidWifiDns     => IsMalformedIp(WifiDns);
+
+    public bool HasInvalidInput =>
+        HasInvalidEthIp || HasInvalidEthMask || HasInvalidEthGateway ||
+        HasInvalidWifiIp || HasInvalidWifiMask || HasInvalidWifiGateway ||
+        HasInvalidWifiDns;
+
+    private static bool IsMalformedIp(string? s) =>
+        !string.IsNullOrWhiteSpace(s) && ParseIp(s) is null;
+
+    partial void OnEthIpChanged(string? value)       { OnPropertyChanged(nameof(HasInvalidEthIp));       NotifyInvalidInputChanged(); }
+    partial void OnEthMaskChanged(string? value)     { OnPropertyChanged(nameof(HasInvalidEthMask));     NotifyInvalidInputChanged(); }
+    partial void OnEthGatewayChanged(string? value)  { OnPropertyChanged(nameof(HasInvalidEthGateway));  NotifyInvalidInputChanged(); }
+    partial void OnWifiIpChanged(string? value)      { OnPropertyChanged(nameof(HasInvalidWifiIp));      NotifyInvalidInputChanged(); }
+    partial void OnWifiMaskChanged(string? value)    { OnPropertyChanged(nameof(HasInvalidWifiMask));    NotifyInvalidInputChanged(); }
+    partial void OnWifiGatewayChanged(string? value) { OnPropertyChanged(nameof(HasInvalidWifiGateway)); NotifyInvalidInputChanged(); }
+    partial void OnWifiDnsChanged(string? value)     { OnPropertyChanged(nameof(HasInvalidWifiDns));     NotifyInvalidInputChanged(); }
+
+    private void NotifyInvalidInputChanged()
+    {
+        OnPropertyChanged(nameof(HasInvalidInput));
+        OnPropertyChanged(nameof(CanSave));
     }
 
     // ── Device info strip (always visible) ──────────────────────────────────
@@ -589,46 +626,107 @@ public partial class DeviceConfigureViewModel : ObservableObject
                 .Select(o => new RegisterWrite(o.ModiconAddr, o.Words))
                 .ToList();
 
-            // Hold a single pause across both the write batch and the confirmation re-read.
-            // Releasing the lock in-between lets the polling loop reconnect immediately,
-            // which has been observed to put the KS-3000 in a transient state where the
-            // next read connection is reset with WSAECONNABORTED.
+            // Hold a single pause across the write batch, all reboot-retries and the
+            // confirmation re-read. Releasing the lock in-between lets the polling loop
+            // reconnect immediately, which has been observed to put the KS-3000 in a
+            // transient state where the next read connection is reset with WSAECONNABORTED.
             await _pausePolling();
             var loc = Modbus.Desktop.Services.LocalizationService.Instance;
             try
             {
-                await _configService.WriteBatchAsync(
-                    Device.Device, batch, needsCoilReset, CancellationToken.None);
+                // Resume-after-reboot loop. When the device reboots in the middle of a
+                // batch (typical after Wi-Fi / Ethernet config writes), WriteBatchAsync
+                // returns the unfinished ops in Remaining; we wait for the device to come
+                // back and re-submit them. Bounded by MaxRebootRetries to avoid loops if
+                // a specific op consistently triggers a reboot.
+                const int MaxRebootRetries = 3;
+                IReadOnlyList<RegisterWrite> pending = batch;
+                bool stillNeedsCoilReset = needsCoilReset;
+                int totalCompleted = 0;
+                int totalOps = batch.Count;
+                bool gaveUp = false;
 
-                // The KS-3000 frequently reboots after applying certain configuration writes
-                // (~23s boot + Wi-Fi rejoin). Poll for the device to come back before doing
-                // the confirmation re-read — otherwise the re-read fires against a dead host
-                // and shows a misleading "leitura incompleta" banner even though the writes
-                // succeeded. The write itself is considered done regardless of what happens
-                // here: if the user is editing config registers, they're inherently committing
-                // to a reboot cycle, and the device's own software shows the values were applied.
+                for (int attempt = 0; attempt <= MaxRebootRetries; attempt++)
+                {
+                    var result = await _configService.WriteBatchAsync(
+                        Device.Device, pending, stillNeedsCoilReset, CancellationToken.None);
+
+                    totalCompleted += result.Completed;
+                    // If the coil reset was deferred (reboot interrupted before it ran),
+                    // try again on the next attempt.
+                    stillNeedsCoilReset = stillNeedsCoilReset && !result.CoilResetSent;
+
+                    if (!result.DeviceRebooted || result.Remaining.Count == 0)
+                    {
+                        pending = result.Remaining;
+                        break;
+                    }
+
+                    if (attempt == MaxRebootRetries)
+                    {
+                        // Used all the retries — leave the loop with pending still populated;
+                        // the post-loop block surfaces the partial outcome.
+                        pending = result.Remaining;
+                        gaveUp = true;
+                        break;
+                    }
+
+                    // Reboot detected — show progress and wait for the device to come back.
+                    SaveSuccess = string.Format(loc["CfgSavePartialReboot"], totalCompleted, totalOps);
+                    var back = await _configService.WaitForDeviceReachableAsync(
+                        Device.Device, maxWaitSeconds: 60, CancellationToken.None);
+                    if (!back)
+                    {
+                        SaveSuccess = null;
+                        SaveError = string.Format(loc["CfgSaveDeviceDownAfterPartial"], totalCompleted, totalOps);
+                        return;
+                    }
+                    pending = result.Remaining;
+                }
+
+                if (gaveUp || pending.Count > 0)
+                {
+                    SaveSuccess = null;
+                    SaveError = string.Format(loc["CfgSaveStillIncomplete"], totalCompleted, totalOps, MaxRebootRetries);
+                    return;
+                }
+
+                // All ops landed — mark success and try the confirmation re-read.
                 SaveSuccess = loc["CfgSaveSuccess"];
 
+                // Even after a clean batch, the device may have rebooted on the very last op
+                // (coil reset, certain string writes). Probe before re-reading so the re-read
+                // doesn't fire against a dead host.
                 bool reachable = await _configService.WaitForDeviceReachableAsync(
                     Device.Device, maxWaitSeconds: 60, CancellationToken.None);
 
                 if (reachable && _profile is not null)
                 {
-                    await DoReadFromDeviceAsync(_profile);
-                    if (!string.IsNullOrEmpty(LoadError))
+                    // The post-save re-read is informational — it refreshes the baseline so
+                    // the user can keep editing without reopening the screen. If it fails
+                    // (timeout, partial blocks, IO error), the WRITES themselves are still
+                    // confirmed done; we just soften the success banner with a note and
+                    // suppress the load-error banner. Never let a re-read failure flip the
+                    // save outcome to "Erro ao gravar configurações" — that would be a lie.
+                    try
                     {
-                        // Device responded but the full re-read still missed some blocks —
-                        // keep the save success but soften the load-error wording so the
-                        // user understands the writes themselves are not in doubt.
-                        SaveSuccess = loc["CfgSaveSuccess"]
-                            + " — não foi possível reler todos os campos para confirmar (verifique no software KRON se necessário).";
+                        await DoReadFromDeviceAsync(_profile);
+                        if (!string.IsNullOrEmpty(LoadError))
+                        {
+                            SaveSuccess = loc["CfgSaveSuccessReadIncomplete"];
+                            LoadError = null;
+                        }
+                    }
+                    catch (Exception readEx)
+                    {
+                        Debug.WriteLine($"[DeviceConfigureViewModel] post-save re-read failed (soft): {readEx.GetType().Name} — {readEx.Message}");
+                        SaveSuccess = loc["CfgSaveSuccessReadIncomplete"];
                         LoadError = null;
                     }
                 }
                 else
                 {
-                    SaveSuccess = loc["CfgSaveSuccess"]
-                        + " — o dispositivo está reiniciando. Clique em 'Tentar novamente' assim que estiver online para reler.";
+                    SaveSuccess = loc["CfgSaveSuccessDeviceRebooting"];
                 }
             }
             finally
@@ -638,6 +736,10 @@ public partial class DeviceConfigureViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            // Real save failure — clear any tentative success message so the red banner
+            // is the single source of truth (avoids "Erro" + "Configurações gravadas"
+            // showing at the same time).
+            SaveSuccess = null;
             SaveError = ex.Message;
             Debug.WriteLine($"[DeviceConfigureViewModel] SaveAsync failed: {ex}");
         }
@@ -1020,7 +1122,7 @@ public partial class DeviceConfigureViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanGoBack))]
     private void GoBack()
     {
         _clockTimer?.Stop();

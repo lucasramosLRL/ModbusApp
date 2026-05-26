@@ -188,6 +188,11 @@ internal static class EnglishStrings
         ["CfgRetryRead"]         = "Retry",
         ["CfgSaveSuccess"]       = "Configuration saved",
         ["CfgSaveError"]         = "Failed to save configuration",
+        ["CfgSavePartialReboot"] = "Applied {0} of {1}. Device is rebooting, resuming…",
+        ["CfgSaveDeviceDownAfterPartial"] = "Applied {0} of {1}. Device did not come back in time. Wait a moment and retry the missing fields.",
+        ["CfgSaveStillIncomplete"] = "Applied {0} of {1} after {2} reboots. Some fields were not written.",
+        ["CfgSaveSuccessReadIncomplete"] = "Configuration saved — could not read all fields back to confirm.",
+        ["CfgSaveSuccessDeviceRebooting"] = "Configuration saved — the device is rebooting. Click 'Retry' once it is back online to read the values again.",
         ["CfgSecurityNone"]      = "None",
         ["CfgBrokerDefault"]     = "Default",
 

@@ -18,6 +18,22 @@ public sealed record ConfigReadResult(
 /// </summary>
 public sealed record RegisterWrite(ushort ModiconAddress, ushort[] Values);
 
+/// <summary>
+/// Result of a <see cref="IDeviceConfigService.WriteBatchAsync"/> call.
+/// <para>
+/// When the KS-3000 reboots in the middle of a batch (typical after writing Wi-Fi / Ethernet
+/// config), the IOException raised by the next op is treated as a graceful "device went away
+/// for reboot" signal. Already-applied ops are counted in <see cref="Completed"/>; ops that
+/// did not run land in <see cref="Remaining"/> so the caller can wait for the device to come
+/// back and resume the batch.
+/// </para>
+/// </summary>
+public sealed record WriteBatchResult(
+    int Completed,
+    IReadOnlyList<RegisterWrite> Remaining,
+    bool DeviceRebooted,
+    bool CoilResetSent);
+
 public interface IDeviceConfigService
 {
     /// <summary>
@@ -73,7 +89,7 @@ public interface IDeviceConfigService
     /// the commit coil at the end). Greatly faster than calling WriteAsync/WriteMultipleRegistersAsync
     /// in a loop because each of those reopens the TCP socket from scratch.
     /// </summary>
-    Task WriteBatchAsync(
+    Task<WriteBatchResult> WriteBatchAsync(
         ModbusDevice device,
         IReadOnlyList<RegisterWrite> writes,
         bool sendCoilResetAfter,

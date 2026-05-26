@@ -188,6 +188,11 @@ internal static class PortugueseStrings
         ["CfgRetryRead"]         = "Tentar novamente",
         ["CfgSaveSuccess"]       = "Configurações gravadas",
         ["CfgSaveError"]         = "Erro ao gravar configurações",
+        ["CfgSavePartialReboot"] = "Aplicado {0} de {1}. Dispositivo reiniciando, retomando…",
+        ["CfgSaveDeviceDownAfterPartial"] = "Aplicado {0} de {1}. Dispositivo não voltou a tempo. Aguarde alguns instantes e tente novamente os campos faltantes.",
+        ["CfgSaveStillIncomplete"] = "Aplicado {0} de {1} após {2} reinicializações. Alguns campos não foram gravados.",
+        ["CfgSaveSuccessReadIncomplete"] = "Configurações gravadas — não foi possível reler todos os campos para confirmar.",
+        ["CfgSaveSuccessDeviceRebooting"] = "Configurações gravadas — o dispositivo está reiniciando. Clique em 'Tentar novamente' assim que voltar online para reler.",
         ["CfgSecurityNone"]      = "Nenhuma",
         ["CfgBrokerDefault"]     = "Padrão",
 

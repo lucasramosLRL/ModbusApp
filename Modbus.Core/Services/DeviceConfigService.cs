@@ -179,74 +179,84 @@ public sealed class DeviceConfigService : IDeviceConfigService
     public Task SendCoilResetAsync(ModbusDevice device, CancellationToken cancellationToken = default) =>
         WriteCoilAsync(device, CoilResetAddress, true, cancellationToken);
 
-    public async Task WriteBatchAsync(
+    public async Task<WriteBatchResult> WriteBatchAsync(
         ModbusDevice device,
         IReadOnlyList<RegisterWrite> writes,
         bool sendCoilResetAfter,
         CancellationToken cancellationToken = default)
     {
-        if ((writes is null || writes.Count == 0) && !sendCoilResetAfter) return;
+        var writeList = writes ?? Array.Empty<RegisterWrite>();
+        if (writeList.Count == 0 && !sendCoilResetAfter)
+            return new WriteBatchResult(0, Array.Empty<RegisterWrite>(), false, false);
 
         // KS-3000 / Konect 120 frequently drop the TCP socket between writes (and always
         // after the commit coil). We use ONE IModbusService instance and reconnect lazily
         // whenever the previous op left the connection dead — this avoids the per-op
         // 30s timeout overhead of WriteAsync/WriteMultipleRegistersAsync without assuming
         // the device keeps the socket alive across the whole batch.
-        int totalSeconds = Math.Max(TimeoutSeconds, (writes?.Count ?? 0) * 5 + 15);
+        int totalSeconds = Math.Max(TimeoutSeconds, writeList.Count * 5 + 15);
         using var svc = _factory.Create(device);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(TimeSpan.FromSeconds(totalSeconds));
 
-        bool anyWriteSucceeded = false;
+        int completed = 0;
+        bool deviceRebooted = false;
+        bool coilResetSent = false;
+        IReadOnlyList<RegisterWrite> remaining = Array.Empty<RegisterWrite>();
+
         try
         {
-            if (writes is not null)
+            for (int i = 0; i < writeList.Count; i++)
             {
-                foreach (var w in writes)
+                var w = writeList[i];
+                if (!IsHolding(w.ModiconAddress))
+                    throw new ArgumentException(
+                        $"WriteBatch requires 4xxxx holding-register addresses; got {w.ModiconAddress}.");
+                if (w.Values is null || w.Values.Length == 0) { completed++; continue; }
+
+                ushort rawStart = (ushort)(w.ModiconAddress - 40001);
+
+                try
                 {
-                    if (!IsHolding(w.ModiconAddress))
-                        throw new ArgumentException(
-                            $"WriteBatch requires 4xxxx holding-register addresses; got {w.ModiconAddress}.");
-                    if (w.Values is null || w.Values.Length == 0) continue;
-
-                    ushort rawStart = (ushort)(w.ModiconAddress - 40001);
-
-                    try
+                    if (w.Values.Length == 1)
                     {
-                        if (w.Values.Length == 1)
+                        await RunWithReconnectAsync(svc, cts.Token,
+                            (s, ct) => s.WriteSingleRegisterAsync(device.SlaveId, rawStart, w.Values[0], ct),
+                            $"FC06 {w.ModiconAddress}");
+                    }
+                    else
+                    {
+                        for (int offset = 0; offset < w.Values.Length; offset += MaxWriteBlockSize)
                         {
+                            int count = Math.Min(MaxWriteBlockSize, w.Values.Length - offset);
+                            var chunk = new ushort[count];
+                            Array.Copy(w.Values, offset, chunk, 0, count);
+                            ushort blockStart = (ushort)(rawStart + offset);
                             await RunWithReconnectAsync(svc, cts.Token,
-                                (s, ct) => s.WriteSingleRegisterAsync(device.SlaveId, rawStart, w.Values[0], ct),
-                                $"FC06 {w.ModiconAddress}");
+                                (s, ct) => s.WriteMultipleRegistersAsync(device.SlaveId, blockStart, chunk, ct),
+                                $"FC16 {w.ModiconAddress + offset}+{count}");
                         }
-                        else
-                        {
-                            for (int offset = 0; offset < w.Values.Length; offset += MaxWriteBlockSize)
-                            {
-                                int count = Math.Min(MaxWriteBlockSize, w.Values.Length - offset);
-                                var chunk = new ushort[count];
-                                Array.Copy(w.Values, offset, chunk, 0, count);
-                                ushort blockStart = (ushort)(rawStart + offset);
-                                await RunWithReconnectAsync(svc, cts.Token,
-                                    (s, ct) => s.WriteMultipleRegistersAsync(device.SlaveId, blockStart, chunk, ct),
-                                    $"FC16 {w.ModiconAddress + offset}+{count}");
-                            }
-                        }
-                        anyWriteSucceeded = true;
                     }
-                    catch (Exception ex) when (anyWriteSucceeded && ex is IOException)
-                    {
-                        // After at least one successful write, an IO failure almost certainly
-                        // means the KS-3000 accepted the write and is now rebooting (~23s boot
-                        // + Wi-Fi rejoin). Stop the batch here and let the caller poll for the
-                        // device to come back. The remaining writes are abandoned silently
-                        // because we have no way to resume after a reboot — caller's Save
-                        // success message should reflect "partial" / "device rebooted".
-                        Debug.WriteLine(
-                            $"[DeviceConfigService] WriteBatch: device dropped socket after partial success — assuming reboot. Skipping remaining writes ({ex.GetType().Name}).");
-                        sendCoilResetAfter = false; // pointless if device is rebooting
-                        break;
-                    }
+                    completed++;
+                }
+                catch (Exception ex) when (
+                    completed > 0
+                    && (ex is IOException
+                        || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested)))
+                {
+                    // After at least one successful write, an IO failure (or the internal
+                    // batch-timeout firing) almost certainly means the KS-3000 accepted the
+                    // write and is now rebooting (~23s boot + Wi-Fi rejoin). Snapshot the
+                    // unfinished ops (starting at the one that failed) so the caller can
+                    // resume after WaitForDeviceReachableAsync confirms it's back.
+                    Debug.WriteLine(
+                        $"[DeviceConfigService] WriteBatch: device dropped socket after {completed} write(s) — assuming reboot. {writeList.Count - i} op(s) deferred ({ex.GetType().Name}).");
+                    deviceRebooted = true;
+                    var tail = new RegisterWrite[writeList.Count - i];
+                    for (int j = 0; j < tail.Length; j++) tail[j] = writeList[i + j];
+                    remaining = tail;
+                    // Coil reset cannot fire on a dead socket — caller must re-request it.
+                    return new WriteBatchResult(completed, remaining, deviceRebooted, coilResetSent);
                 }
             }
 
@@ -258,19 +268,23 @@ public sealed class DeviceConfigService : IDeviceConfigService
                 {
                     if (!svc.IsConnected) await svc.ConnectAsync(cts.Token);
                     await svc.WriteSingleCoilAsync(device.SlaveId, CoilResetAddress, true, cts.Token);
+                    coilResetSent = true;
                 }
                 catch (ModbusProtocolException ex)
                 {
                     Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} rejected — {ex.Message}");
+                    coilResetSent = true; // device deliberately refused — don't retry
                 }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                 {
                     Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} — no echo, treated as success.");
+                    coilResetSent = true;
                 }
                 catch (IOException)
                 {
                     // IOException covers EndOfStreamException as well.
                     Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} — connection closed, treated as success.");
+                    coilResetSent = true;
                 }
             }
         }
@@ -278,6 +292,8 @@ public sealed class DeviceConfigService : IDeviceConfigService
         {
             try { await svc.DisconnectAsync(); } catch { }
         }
+
+        return new WriteBatchResult(completed, remaining, deviceRebooted, coilResetSent);
     }
 
     public async Task<bool> WaitForDeviceReachableAsync(
@@ -322,8 +338,17 @@ public sealed class DeviceConfigService : IDeviceConfigService
     // Runs one write op, reconnecting the underlying transport when the device dropped the
     // socket between operations (KS-3000 often does this). One retry is enough — the new
     // socket is fresh, and a second back-to-back failure means the device is genuinely down.
+    //
+    // Each attempt has its own short timeout (PerAttemptTimeout). The KS-3000 reboot scenario
+    // is the main motivator: when the device starts rebooting mid-op, the socket read just
+    // hangs until SOMETHING times out. Without a per-attempt cap, we'd wait the full per-batch
+    // budget (potentially minutes for a many-field save), then the user sees a hard error.
+    // With the cap, we detect the hang in ~30s (2 attempts × 15s), surface IOException to
+    // the caller, and the resume-after-reboot loop in SaveAsync kicks in promptly.
+    private static readonly TimeSpan PerAttemptTimeout = TimeSpan.FromSeconds(15);
+
     private static async Task RunWithReconnectAsync(
-        IModbusService svc, CancellationToken ct,
+        IModbusService svc, CancellationToken outerCt,
         Func<IModbusService, CancellationToken, Task> op,
         string label)
     {
@@ -331,13 +356,29 @@ public sealed class DeviceConfigService : IDeviceConfigService
         Exception? lastError = null;
         for (int attempt = 1; attempt <= MaxAttempts; attempt++)
         {
+            using var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
+            attemptCts.CancelAfter(PerAttemptTimeout);
             try
             {
-                if (!svc.IsConnected) await svc.ConnectAsync(ct);
-                await op(svc, ct);
+                if (!svc.IsConnected) await svc.ConnectAsync(attemptCts.Token);
+                await op(svc, attemptCts.Token);
                 return;
             }
-            catch (OperationCanceledException) { throw; }
+            catch (OperationCanceledException) when (outerCt.IsCancellationRequested)
+            {
+                // The outer batch (or caller) is canceling — propagate the real cancellation.
+                throw;
+            }
+            catch (OperationCanceledException ex)
+            {
+                // Per-attempt timeout fired (outer is still alive). Treat as a transport failure
+                // — surface to the caller as IOException so the "device rebooted" handler in
+                // WriteBatchAsync kicks in.
+                lastError = new IOException(
+                    $"{label}: per-attempt timeout after {PerAttemptTimeout.TotalSeconds:0}s.", ex);
+                Debug.WriteLine($"[DeviceConfigService] {label} attempt {attempt}: per-attempt timeout — reconnecting and retrying.");
+                try { await svc.DisconnectAsync(); } catch { }
+            }
             catch (ModbusProtocolException) { throw; }
             catch (Exception ex) when (ex is IOException or EndOfStreamException)
             {

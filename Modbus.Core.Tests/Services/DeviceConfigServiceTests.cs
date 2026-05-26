@@ -282,6 +282,72 @@ public sealed class DeviceConfigServiceTests
             Arg.Any<CancellationToken>());
     }
 
+    // ── WriteBatchAsync (resume-after-reboot semantics) ──────────────────────
+
+    [Fact]
+    public async Task WriteBatchAsync_AllOpsSucceed_ReturnsCompletedWithNoRemaining()
+    {
+        // Service uses IsConnected to decide whether to call ConnectAsync — true keeps it happy.
+        _svc.IsConnected.Returns(true);
+        var batch = new List<RegisterWrite>
+        {
+            new(40005, [ (ushort)11 ]),
+            new(40010, [ (ushort)0x1111, (ushort)0x2222 ]),
+        };
+
+        var result = await _service.WriteBatchAsync(Device, batch, sendCoilResetAfter: false);
+
+        result.Completed.Should().Be(2);
+        result.Remaining.Should().BeEmpty();
+        result.DeviceRebooted.Should().BeFalse();
+        result.CoilResetSent.Should().BeFalse(); // sendCoilResetAfter was false
+    }
+
+    [Fact]
+    public async Task WriteBatchAsync_IoFailurePostSuccess_ReturnsRemainingOps()
+    {
+        _svc.IsConnected.Returns(true);
+        // First write succeeds (default Returns is Task.CompletedTask). Second write throws IOException.
+        _svc.WriteSingleRegisterAsync(
+                Arg.Any<byte>(),
+                Arg.Is<ushort>(addr => addr == (ushort)(40010 - 40001)),
+                Arg.Any<ushort>(),
+                Arg.Any<CancellationToken>())
+            .ThrowsAsync(new System.IO.IOException("device dropped socket"));
+
+        var batch = new List<RegisterWrite>
+        {
+            new(40005, [ (ushort)11 ]),   // succeeds
+            new(40010, [ (ushort)22 ]),   // fails (triggers reboot detection)
+            new(40020, [ (ushort)33 ]),   // never attempted — should be in Remaining
+        };
+
+        var result = await _service.WriteBatchAsync(Device, batch, sendCoilResetAfter: true);
+
+        result.Completed.Should().Be(1, "the first op should have committed before the IOException");
+        result.DeviceRebooted.Should().BeTrue();
+        result.Remaining.Should().HaveCount(2);
+        result.Remaining[0].ModiconAddress.Should().Be((ushort)40010);
+        result.Remaining[1].ModiconAddress.Should().Be((ushort)40020);
+        result.CoilResetSent.Should().BeFalse("coil reset was deferred because the reboot interrupted the batch");
+    }
+
+    [Fact]
+    public async Task WriteBatchAsync_AllOpsSucceedWithCoilReset_ReportsCoilSent()
+    {
+        _svc.IsConnected.Returns(true);
+        var batch = new List<RegisterWrite> { new(43461, [ (ushort)0x4142 ]) };
+
+        var result = await _service.WriteBatchAsync(Device, batch, sendCoilResetAfter: true);
+
+        result.Completed.Should().Be(1);
+        result.Remaining.Should().BeEmpty();
+        result.DeviceRebooted.Should().BeFalse();
+        result.CoilResetSent.Should().BeTrue();
+        await _svc.Received(1).WriteSingleCoilAsync(
+            Device.SlaveId, (ushort)6, true, Arg.Any<CancellationToken>());
+    }
+
     // ── Empty fields list ─────────────────────────────────────────────────────
 
     [Fact]
