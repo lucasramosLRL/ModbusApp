@@ -376,13 +376,13 @@ The device stores **every** multi-byte numeric/binary value byte-reversed compar
 | **Float32 holding** (TP, TC, HourmeterThr) | `DeviceConfigureViewModel.DecodeFloat32` | `RegisterDecoder.Decode(..., WordOrder.ByteSwapped)` — full 4-byte reversal |
 | **IP / Mask / Gateway / DNS** (32-bit IPv4) | `DeviceConfigureViewModel.FormatIp` | Reads low byte first: `$"{v&0xFF}.{(v>>8)&0xFF}.{(v>>16)&0xFF}.{(v>>24)&0xFF}"` |
 | **MAC** (48-bit, 3 words) | `DeviceConfigureViewModel.FormatMac` | `Array.Reverse(bytes)` after collecting 6 bytes |
-| **Single 16-bit ints** (Timezone signed, SyncInterval unsigned) | `DeviceConfigureViewModel.SwapBytes` | `(v << 8) \| (v >> 8)` before casting |
+| **Single 16-bit ints** (Timezone signed, SyncInterval unsigned, KE unsigned) | `DeviceConfigureViewModel.SwapBytes` | `(v << 8) \| (v >> 8)` before casting. Applied on both read and write — symmetric so the dirty diff stays consistent. |
 
 **Float32 caveat**: SQPF (input registers only) is independent from this. Holding-register Float32 always uses `WordOrder.ByteSwapped`. Never call `BitConverter.Int32BitsToSingle((int)ExtractValue(...))` directly — it assumes ABCD and would read 1.0 as ~0.0.
 
 **Single 16-bit caveat**: bit-fields and pure flag bits (e.g. `AddrTl` and `AddrTi` sharing 40006, or `AddrSntpEnabled` bit in 40007) do **NOT** need swapping because individual bit positions don't change when you swap bytes within a single register — `ExtractValue` reads the whole word and bit-shifts. The swap only matters when you treat a 16-bit register as a single integer value (Timezone, SyncInterval and presumably KE/SendInterval/DebounceEdp once we have ground-truth values to verify).
 
-**Likely candidates still untested**: KE (40005), SendInterval (42101), DebounceEdp (40171), and others 16-bit ints. If the next ground-truth comparison shows them off by orders of magnitude, apply `SwapBytes` the same way.
+**Confirmed NOT to need swapping** (ground-truthed against the old KRON software): SendInterval (42101), DebounceEdp (40171). These are 16-bit whole-register ints that the device stores in normal MSB-first byte order, unlike KE/Timezone/SyncInterval. The pattern is not predictable from the spec — each new 16-bit int must be verified individually: write a known value (e.g. `22`) and check the old KRON software; if it displays `5632` (= `0x1600`) the bytes are reversed and `SwapBytes` must be applied on both read and write paths.
 
 ### ExtractString cuts at the first null
 `RegisterField.ExtractString` now finds the first `0x00` byte and truncates there (instead of only `TrimEnd('\0')`). Modbus devices commonly leave junk in unused buffer positions past the C-string terminator — without the cut, that junk shows up after the real string (e.g. `"a.st1.ntp.br?"` instead of `"a.st1.ntp.br"`).

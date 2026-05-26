@@ -594,24 +594,47 @@ public partial class DeviceConfigureViewModel : ObservableObject
             // which has been observed to put the KS-3000 in a transient state where the
             // next read connection is reset with WSAECONNABORTED.
             await _pausePolling();
+            var loc = Modbus.Desktop.Services.LocalizationService.Instance;
             try
             {
                 await _configService.WriteBatchAsync(
                     Device.Device, batch, needsCoilReset, CancellationToken.None);
 
-                // Give the device a moment to apply changes and stabilize its TCP stack.
-                await Task.Delay(500);
+                // The KS-3000 frequently reboots after applying certain configuration writes
+                // (~23s boot + Wi-Fi rejoin). Poll for the device to come back before doing
+                // the confirmation re-read — otherwise the re-read fires against a dead host
+                // and shows a misleading "leitura incompleta" banner even though the writes
+                // succeeded. The write itself is considered done regardless of what happens
+                // here: if the user is editing config registers, they're inherently committing
+                // to a reboot cycle, and the device's own software shows the values were applied.
+                SaveSuccess = loc["CfgSaveSuccess"];
 
-                if (_profile is not null)
+                bool reachable = await _configService.WaitForDeviceReachableAsync(
+                    Device.Device, maxWaitSeconds: 60, CancellationToken.None);
+
+                if (reachable && _profile is not null)
+                {
                     await DoReadFromDeviceAsync(_profile);
+                    if (!string.IsNullOrEmpty(LoadError))
+                    {
+                        // Device responded but the full re-read still missed some blocks —
+                        // keep the save success but soften the load-error wording so the
+                        // user understands the writes themselves are not in doubt.
+                        SaveSuccess = loc["CfgSaveSuccess"]
+                            + " — não foi possível reler todos os campos para confirmar (verifique no software KRON se necessário).";
+                        LoadError = null;
+                    }
+                }
+                else
+                {
+                    SaveSuccess = loc["CfgSaveSuccess"]
+                        + " — o dispositivo está reiniciando. Clique em 'Tentar novamente' assim que estiver online para reler.";
+                }
             }
             finally
             {
                 _resumePolling();
             }
-
-            if (string.IsNullOrEmpty(LoadError))
-                SaveSuccess = Modbus.Desktop.Services.LocalizationService.Instance["CfgSaveSuccess"];
         }
         catch (Exception ex)
         {
@@ -630,7 +653,8 @@ public partial class DeviceConfigureViewModel : ObservableObject
         if (DecodeFloat32(regs, p.AddrTp)           is decimal tp) Tp           = tp;
         if (DecodeFloat32(regs, p.AddrTc)           is decimal tc) Tc           = tc;
         if (DecodeFloat32(regs, p.AddrHourmeterThr) is decimal hm) HourmeterThr = hm;
-        if (p.AddrKe?.ExtractValue(regs) is uint ke)        Ke = ke;
+        // KE is stored byte-swapped on KS-3000 like the other single 16-bit ints (Timezone/SyncInterval).
+        if (p.AddrKe?.ExtractValue(regs) is uint ke)        Ke = SwapBytes((ushort)ke);
         if (p.AddrTl?.ExtractValue(regs) is uint tl)
             Tl = TlOptions.FirstOrDefault(o => o.Code == (int)tl);
         if (p.AddrTi?.ExtractValue(regs) is uint ti)        Ti = ti;
@@ -805,7 +829,7 @@ public partial class DeviceConfigureViewModel : ObservableObject
         }
 
         // ── Whole single-register integers ───────────────────────────────────
-        AddSingleDirty(p.AddrKe,           () => (ushort)(Ke ?? 0));
+        AddSingleDirty(p.AddrKe,           () => SwapBytes((ushort)(Ke ?? 0)));
         AddSingleDirty(p.AddrSendInterval, () => (ushort)(SendInterval ?? 0));
         AddSingleDirty(p.AddrDebounceEdp,  () => (ushort)(DebounceEdp ?? 0));
         // Timezone / SyncInterval are stored byte-swapped on the device.

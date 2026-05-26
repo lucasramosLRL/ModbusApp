@@ -78,4 +78,15 @@ public interface IDeviceConfigService
         IReadOnlyList<RegisterWrite> writes,
         bool sendCoilResetAfter,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Polls the device until a small probe read succeeds or <paramref name="maxWaitSeconds"/>
+    /// elapses. Used after a write batch when the KS-3000 reboots (~23s boot + Wi-Fi rejoin)
+    /// so the post-save re-read doesn't fire while the device is still offline.
+    /// Returns true when the device responds, false on timeout.
+    /// </summary>
+    Task<bool> WaitForDeviceReachableAsync(
+        ModbusDevice device,
+        int maxWaitSeconds = 60,
+        CancellationToken cancellationToken = default);
 }

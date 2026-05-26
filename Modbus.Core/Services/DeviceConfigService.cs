@@ -66,6 +66,11 @@ public sealed class DeviceConfigService : IDeviceConfigService
     // mean the device replied with an Illegal Data Address or similar deterministic
     // error and retrying would just burn time. After all attempts, the block is recorded
     // in `failed` and the dictionary keeps whatever was already accumulated.
+    //
+    // When an IO error fires, the underlying TCP socket is almost always dead — the
+    // KS-3000 has been observed to drop the socket mid-read after a handful of FC03
+    // requests. Retrying on the SAME svc just hits a dead pipe; we disconnect and
+    // reconnect between attempts so the next try gets a fresh socket.
     private static async Task ReadBlockWithRetryAsync(
         IModbusService svc, byte slaveId, ushort rawStart, int count, int modiconBase,
         bool isHolding,
@@ -81,6 +86,8 @@ public sealed class DeviceConfigService : IDeviceConfigService
         {
             try
             {
+                if (!svc.IsConnected) await svc.ConnectAsync(cancellationToken);
+
                 ushort[] words = isHolding
                     ? await svc.ReadHoldingRegistersAsync(slaveId, rawStart, (ushort)count, cancellationToken)
                     : await svc.ReadInputRegistersAsync(slaveId, rawStart, (ushort)count, cancellationToken);
@@ -101,6 +108,8 @@ public sealed class DeviceConfigService : IDeviceConfigService
             {
                 lastError = ex;
                 Debug.WriteLine($"[DeviceConfigService] {range} attempt {attempt}/{MaxAttempts} failed: {ex.Message}");
+                // Socket likely dead — drop it so the next attempt opens a fresh one.
+                try { await svc.DisconnectAsync(); } catch { }
                 if (attempt < MaxAttempts)
                     await Task.Delay(RetryDelayMs, cancellationToken);
             }
@@ -188,6 +197,7 @@ public sealed class DeviceConfigService : IDeviceConfigService
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(TimeSpan.FromSeconds(totalSeconds));
 
+        bool anyWriteSucceeded = false;
         try
         {
             if (writes is not null)
@@ -201,24 +211,41 @@ public sealed class DeviceConfigService : IDeviceConfigService
 
                     ushort rawStart = (ushort)(w.ModiconAddress - 40001);
 
-                    if (w.Values.Length == 1)
+                    try
                     {
-                        await RunWithReconnectAsync(svc, cts.Token,
-                            (s, ct) => s.WriteSingleRegisterAsync(device.SlaveId, rawStart, w.Values[0], ct),
-                            $"FC06 {w.ModiconAddress}");
-                    }
-                    else
-                    {
-                        for (int offset = 0; offset < w.Values.Length; offset += MaxWriteBlockSize)
+                        if (w.Values.Length == 1)
                         {
-                            int count = Math.Min(MaxWriteBlockSize, w.Values.Length - offset);
-                            var chunk = new ushort[count];
-                            Array.Copy(w.Values, offset, chunk, 0, count);
-                            ushort blockStart = (ushort)(rawStart + offset);
                             await RunWithReconnectAsync(svc, cts.Token,
-                                (s, ct) => s.WriteMultipleRegistersAsync(device.SlaveId, blockStart, chunk, ct),
-                                $"FC16 {w.ModiconAddress + offset}+{count}");
+                                (s, ct) => s.WriteSingleRegisterAsync(device.SlaveId, rawStart, w.Values[0], ct),
+                                $"FC06 {w.ModiconAddress}");
                         }
+                        else
+                        {
+                            for (int offset = 0; offset < w.Values.Length; offset += MaxWriteBlockSize)
+                            {
+                                int count = Math.Min(MaxWriteBlockSize, w.Values.Length - offset);
+                                var chunk = new ushort[count];
+                                Array.Copy(w.Values, offset, chunk, 0, count);
+                                ushort blockStart = (ushort)(rawStart + offset);
+                                await RunWithReconnectAsync(svc, cts.Token,
+                                    (s, ct) => s.WriteMultipleRegistersAsync(device.SlaveId, blockStart, chunk, ct),
+                                    $"FC16 {w.ModiconAddress + offset}+{count}");
+                            }
+                        }
+                        anyWriteSucceeded = true;
+                    }
+                    catch (Exception ex) when (anyWriteSucceeded && ex is IOException)
+                    {
+                        // After at least one successful write, an IO failure almost certainly
+                        // means the KS-3000 accepted the write and is now rebooting (~23s boot
+                        // + Wi-Fi rejoin). Stop the batch here and let the caller poll for the
+                        // device to come back. The remaining writes are abandoned silently
+                        // because we have no way to resume after a reboot — caller's Save
+                        // success message should reflect "partial" / "device rebooted".
+                        Debug.WriteLine(
+                            $"[DeviceConfigService] WriteBatch: device dropped socket after partial success — assuming reboot. Skipping remaining writes ({ex.GetType().Name}).");
+                        sendCoilResetAfter = false; // pointless if device is rebooting
+                        break;
                     }
                 }
             }
@@ -242,10 +269,7 @@ public sealed class DeviceConfigService : IDeviceConfigService
                 }
                 catch (IOException)
                 {
-                    Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} — connection closed, treated as success.");
-                }
-                catch (EndOfStreamException)
-                {
+                    // IOException covers EndOfStreamException as well.
                     Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} — connection closed, treated as success.");
                 }
             }
@@ -254,6 +278,45 @@ public sealed class DeviceConfigService : IDeviceConfigService
         {
             try { await svc.DisconnectAsync(); } catch { }
         }
+    }
+
+    public async Task<bool> WaitForDeviceReachableAsync(
+        ModbusDevice device,
+        int maxWaitSeconds = 60,
+        CancellationToken cancellationToken = default)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(maxWaitSeconds);
+        int delayMs = 1000;
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            using var probeSvc = _factory.Create(device);
+            using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            probeCts.CancelAfter(TimeSpan.FromSeconds(3)); // each attempt fails fast
+            try
+            {
+                await probeSvc.ConnectAsync(probeCts.Token);
+                // FC03 1 word from 40001 — every KS-3000 / Konect 120 has this register.
+                _ = await probeSvc.ReadHoldingRegistersAsync(device.SlaveId, 0, 1, probeCts.Token);
+                try { await probeSvc.DisconnectAsync(); } catch { }
+                Debug.WriteLine($"[DeviceConfigService] WaitForDeviceReachable: device is back.");
+                return true;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                try { await probeSvc.DisconnectAsync(); } catch { }
+            }
+
+            await Task.Delay(delayMs, cancellationToken);
+            delayMs = Math.Min(delayMs + 500, 3000); // backoff up to 3s between probes
+        }
+        Debug.WriteLine($"[DeviceConfigService] WaitForDeviceReachable: gave up after {maxWaitSeconds}s.");
+        return false;
     }
 
     // Runs one write op, reconnecting the underlying transport when the device dropped the
