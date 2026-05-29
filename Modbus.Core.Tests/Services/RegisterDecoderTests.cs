@@ -258,6 +258,30 @@ public class RegisterDecoderTests
         // Zero is always zero regardless of SQPF
         yield return new object[] { new ushort[] { 0x0000, 0x0000 }, (ushort)0x3210, 1.0, 0.0 };
         yield return new object[] { new ushort[] { 0x0000, 0x0000 }, (ushort)0x0123, 1.0, 0.0 };
+
+        // ── Non-default SQPF values (KRON convention: nibble HIGH-to-LOW, floatByteIdx = 3-nibble) ──
+        //   Device transmits t[j] = LE_float[ 3 - buffer_prog[j] ] where buffer_prog[j] = nibble(3-j).
+
+        // SQPF=0x1230 ("F0 F1 F2 EXP"):
+        //   buffer_prog=[nibble3,nibble2,nibble1,nibble0]=[1,2,3,0]
+        //   t=[LE[3-1],LE[3-2],LE[3-3],LE[3-0]]=[LE[2],LE[1],LE[0],LE[3]]
+        //   1.0f (LE=[00,00,80,3F]): t=[0x80,0x00,0x00,0x3F] → words=[0x8000,0x003F]
+        yield return new object[] { new ushort[] { 0x8000, 0x003F }, (ushort)0x1230, 1.0, 1.0 };
+
+        // SQPF=0x1230, 220.0f = 0x435C0000 (LE=[00,00,5C,43]):
+        //   t=[0x5C,0x00,0x00,0x43] → words=[0x5C00,0x0043]
+        yield return new object[] { new ushort[] { 0x5C00, 0x0043 }, (ushort)0x1230, 1.0, 220.0 };
+
+        // SQPF=0x1302 ("F0 F2 EXP F1" — confirmed in KRON sw):
+        //   buffer_prog=[1,3,0,2] → t=[LE[2],LE[0],LE[3],LE[1]]
+        //   1.0f: t=[0x80,0x00,0x3F,0x00] → words=[0x8000,0x3F00]
+        yield return new object[] { new ushort[] { 0x8000, 0x3F00 }, (ushort)0x1302, 1.0, 1.0 };
+
+        // SQPF=0x2031 (non-self-inverse under KRON convention):
+        //   buffer_prog=[nibble3,nibble2,nibble1,nibble0]=[2,0,3,1]
+        //   t=[LE[3-2],LE[3-0],LE[3-3],LE[3-1]]=[LE[1],LE[3],LE[0],LE[2]]
+        //   1.0f: t=[0x00,0x3F,0x00,0x80] → words=[0x003F,0x0080]
+        yield return new object[] { new ushort[] { 0x003F, 0x0080 }, (ushort)0x2031, 1.0, 1.0 };
     }
 
     [Theory]

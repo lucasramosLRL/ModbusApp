@@ -123,11 +123,15 @@ Float32 byte order is configurable on the device via holding register **42.901**
 - Holding registers never use SQPF
 - `PollingEngine` reads register 2900 via `ReadHoldingRegistersAsync` once per poll cycle
 - If the read fails (exception), falls back silently to `0x3210` (Padrão KRON = ByteSwapped)
-- `RegisterDecoder.DecodeFloat32WithSqpf(words, sqpfValue, scale)` uses the raw SQPF value
-  as a byte-permutation table: nibble i = IEEE 754 float byte index at transmitted position i
+- SQPF is writable from the configure screen; the device applies the new byte ordering.
+- `RegisterDecoder.DecodeFloat32WithSqpf(words, sqpfValue, scale)` uses the KRON nibble convention (see below)
 
-**SQPF nibble convention (confirmed working):**
-`raw |= t[i] << (floatByteIdx * 8)` where `floatByteIdx = (sqpfValue >> (i*4)) & 0xF`
+**SQPF nibble convention (verified against original KRON C source — `MB_ReadInputRegister`):**
+`buffer_prog[j] = nibble(3-j)` (read nibbles HIGH-to-LOW), `floatByteIdx = 3 - buffer_prog[j]`
+
+In C#: `int nibble = (sqpfValue >> ((3-i)*4)) & 0xF; int floatByteIdx = 3 - nibble; raw |= (uint)t[i] << (floatByteIdx*8);`
+
+**IMPORTANT**: The old (wrong) algorithm was `floatByteIdx = (sqpfValue >> (i*4)) & 0xF` (nibbles LOW-to-HIGH). It happened to produce correct results for 0x3210, 0x2301, and 0x0123 because those values satisfy `3-nibble(3-i) == nibble(i)`, but gives garbage for any other SQPF (e.g. 0x1230).
 
 Known values:
 | SQPF value | Byte order | Description |
@@ -238,7 +242,7 @@ Modbus.Core.Tests/
     DeviceConfigServiceTests.cs     — 9 tests: FC03/FC04 routing, bit-field merge, 32-word chunking, retry, partial failure, WriteAsync
 ```
 
-### What is covered (Phases 1–5 complete — 179 tests passing)
+### What is covered (Phases 1–5 complete — 223 tests passing)
 - **Phase 1 — RegisterDecoder** — all DataType × WordOrder combinations, SQPF byte-permutation with 3 known SQPF values, scale factors, edge cases (invalid enum values)
 - **Phase 2 — Protocol layer** — Crc16, RTU/TCP frame builders (FC03/04/06/16/17), RTU/TCP frame parsers (parse, error responses, CRC, too-short)
 - **Phase 3 — PollingEngine** — lifecycle (AddDevice/Start/Stop), RTU gate semaphore (suspend blocks RTU, resume allows poll), SQPF fallback to 0x3210 when holding read fails, SQPF success uses returned value; `GroupRegisters` unit-tested directly as `internal`
