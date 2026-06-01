@@ -110,6 +110,34 @@ public class ModbusRtuFrameBuilderTests
         Crc16.Validate(frame).Should().BeTrue();
     }
 
+    // ── ConfigureAddress (FC 0x42 — KRON custom) ────────────────────────────
+
+    [Fact]
+    public void ConfigureAddress_KnownVector_MatchesCapturedFrame()
+    {
+        // Ground-truth frame captured from KRON internal software:
+        //   MST: 00 42 00 3D 14 4C 06 ED 48
+        // Serial 4002892 (0x003D14_4C), new address 6.
+        var frame = _builder.ConfigureAddress(4002892u, 6);
+
+        frame.Should().Equal(
+            [0x00, 0x42, 0x00, 0x3D, 0x14, 0x4C, 0x06, 0xED, 0x48],
+            "frame must match the byte sequence captured from KRON software");
+    }
+
+    [Fact]
+    public void ConfigureAddress_BroadcastSlaveAndCorrectFc_CrcValid()
+    {
+        var frame = _builder.ConfigureAddress(1u, 5);
+
+        frame.Should().HaveCount(9, "broadcast(1)+FC(1)+SN(4)+newAddr(1)+CRC(2)");
+        frame[0].Should().Be(0x00, "broadcast slave address");
+        frame[1].Should().Be(0x42, "KRON configAddress function code");
+        BinaryPrimitives.ReadUInt32BigEndian(frame.AsSpan(2)).Should().Be(1u, "serial number big-endian");
+        frame[6].Should().Be(5, "new slave address");
+        Crc16.Validate(frame).Should().BeTrue("CRC must cover all 7 data bytes");
+    }
+
     // ── ReportSlaveId (FC17) ─────────────────────────────────────────────────
 
     [Fact]

@@ -45,6 +45,12 @@ public partial class DeviceItemViewModel : ObservableObject, IDisposable
     public void Dispose() =>
         LocalizationService.Instance.PropertyChanged -= OnLocalizationChanged;
 
+    public void NotifySlaveIdChanged()
+    {
+        OnPropertyChanged(nameof(SlaveId));
+        OnPropertyChanged(nameof(SlaveIdText));
+    }
+
     public int Id => Device.Id;
     public string Name => Device.Name;
     public byte SlaveId => Device.SlaveId;

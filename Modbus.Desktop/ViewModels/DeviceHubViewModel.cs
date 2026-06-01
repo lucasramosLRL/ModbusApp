@@ -13,6 +13,7 @@ public partial class DeviceHubViewModel : ObservableObject
     private readonly IRegisterValueRepository _registerValueRepository;
     private readonly IPollingEngine _pollingEngine;
     private readonly IDeviceConfigService _configService;
+    private readonly IDeviceRepository _deviceRepository;
     private readonly DeviceListViewModel _parent;
 
     public event EventHandler<object>? NavigationRequested;
@@ -24,12 +25,14 @@ public partial class DeviceHubViewModel : ObservableObject
         IRegisterValueRepository registerValueRepository,
         IPollingEngine pollingEngine,
         IDeviceConfigService configService,
+        IDeviceRepository deviceRepository,
         DeviceListViewModel parent)
     {
         Device = device;
         _registerValueRepository = registerValueRepository;
         _pollingEngine = pollingEngine;
         _configService = configService;
+        _deviceRepository = deviceRepository;
         _parent = parent;
     }
 
@@ -64,6 +67,7 @@ public partial class DeviceHubViewModel : ObservableObject
         var configure = new DeviceConfigureViewModel(
             Device,
             _configService,
+            _deviceRepository,
             pausePolling:  isRtu
                 ? () => _pollingEngine.SuspendRtuPollingAsync()
                 : () => _pollingEngine.AcquireDeviceLockAsync(Device.Id),

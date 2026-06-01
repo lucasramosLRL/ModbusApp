@@ -21,11 +21,13 @@ Desktop-first, with mobile (MAUI) coming later. Both share `Modbus.Core`.
 - Background polling engine (`PollingEngine`) polling all active devices every 5s
 - Device list with connection status (Connected / Disconnected + last seen)
 - Add device flow: scan (RTU broadcast or TCP broadcast) → select result → save
+  - RTU: if user edits the slave address before saving, FC 0x42 (configAddress) is sent to write the new address, device reboots, app waits and confirms before adding to DB
 - Real-time electrical readings screen (voltages, currents, power, frequency, power factor)
 - SQLite persistence via EF Core Migrations (`db.Database.Migrate()` on startup, with legacy-DB baselining for clients upgrading from pre-migration builds)
 - Device model seeding (`DeviceModelSeeder`) — idempotent, runs on every startup
 - SQPF (float byte order) read dynamically from device register 42.901 (holding reg, FC03, 0-based address 2900) every poll cycle
 - Hub navigation: device list → device hub → real-time readings (back chain works)
+- Configure screen: slave address editable for RTU — change is applied via FC 0x42 at the end of save, DB updated, screen stays open and re-reads at new address
 
 ### Navigation structure
 ```
@@ -140,6 +142,25 @@ Known values:
 | `0x2301`   | F1,F2,EXP,F0 (CDAB) | Float padrão |
 | `0x0123`   | EXP,F0,F1,F2 (ABCD) | Float inverso (IEEE 754 big-endian) |
 
+### FC 0x42 — KRON configAddress (RTU slave address change)
+KRON devices use a custom function code **0x42** to change the RTU slave address. Frame (9 bytes):
+
+```
+00 42 [SN 4B BE] [new addr] [CRC-16]
+│  │                         └─ Modbus CRC covers 7 data bytes
+│  FC 0x42 (KRON custom)
+Broadcast slave (0x00) — device identified by serial number, not current address
+```
+
+**Captured frame example** (SN=4002892, new addr=6): `00 42 00 3D 14 4C 06 ED 48`
+
+- No response expected — device applies the address and reboots (~20s bootloader)
+- Implemented in `ModbusRtuFrameBuilder.ConfigureAddress(uint serialNumber, byte newSlaveId)`
+- `DeviceConfigService.WriteSlaveAddressAsync(device, newSlaveId)` creates RTU transport directly (FC 0x42 is RTU-only, bypasses `IModbusService`)
+- **Add device flow**: if user changes slave address in the scan results before saving → FC 0x42 → `WaitForDeviceReachableAsync` on new address → add to DB
+- **Configure screen**: `EditableSlaveId` is applied at the end of `SaveAsync` (after all other writes) → FC 0x42 → DB update → post-save re-read at new address (screen stays open)
+- RTU polling suspended during the entire operation in both flows
+
 ### RTU polling gate
 `PollingEngine` has a `SemaphoreSlim _rtuGate` that serializes RTU access.
 During device scan, `DeviceListViewModel.SuspendRtuPollingAsync()` must be called before scanning
@@ -231,7 +252,7 @@ Modbus.Core.Tests/
   Protocol/
     Rtu/
       Crc16Tests.cs                       — 8 tests: Compute/Append/Validate with known Modbus CRC vectors
-      ModbusRtuFrameBuilderTests.cs       — 12 tests: FC03/04/06/16/17, address ranges, CRC validation
+      ModbusRtuFrameBuilderTests.cs       — 14 tests: FC03/04/06/16/17, FC 0x42 configAddress (known-vector + structural), address ranges, CRC validation
       ModbusRtuFrameParserTests.cs        — 12 tests: parse, error responses, ReportSlaveId
     Tcp/
       ModbusTcpFrameBuilderTests.cs       — 11 tests: MBAP header, Transaction ID increment, all FCs
@@ -242,7 +263,7 @@ Modbus.Core.Tests/
     DeviceConfigServiceTests.cs     — 9 tests: FC03/FC04 routing, bit-field merge, 32-word chunking, retry, partial failure, WriteAsync
 ```
 
-### What is covered (Phases 1–5 complete — 223 tests passing)
+### What is covered (Phases 1–5 complete + FC 0x42 frame — 225 tests passing)
 - **Phase 1 — RegisterDecoder** — all DataType × WordOrder combinations, SQPF byte-permutation with 3 known SQPF values, scale factors, edge cases (invalid enum values)
 - **Phase 2 — Protocol layer** — Crc16, RTU/TCP frame builders (FC03/04/06/16/17), RTU/TCP frame parsers (parse, error responses, CRC, too-short)
 - **Phase 3 — PollingEngine** — lifecycle (AddDevice/Start/Stop), RTU gate semaphore (suspend blocks RTU, resume allows poll), SQPF fallback to 0x3210 when holding read fails, SQPF success uses returned value; `GroupRegisters` unit-tested directly as `internal`
@@ -423,7 +444,8 @@ KS-3000 stores the MQTT broker port as a **6-character ASCII string** at registe
 
 ### Pending / future features - Attention! Keep it in the end of the file
 - Investigate if its necessary to prompt the user to reset the software when the language is changed, it seens like some texts won't change until a complete restart
-- Register write / configure screen / SQPF configuration UI (reading is implemented, writing is not). When implementing writes: KS-3000 doc says any string write in 43461+ needs a **Coil Reset** sent afterwards to commit the change.
+- SQPF configuration UI — writing the SQPF sequence via the configure screen (reading already done; Coil Reset not needed for SQPF register 42901).
+- Remaining holding-register writes in configure screen (TP, TC, KE, TI, TL, Timezone, SyncInterval, Wireless/SNTP/IoT fields). String writes (43461+) need a **Coil Reset** (FC05 coil 6) after writing to commit — already handled by `WriteBatchAsync(sendCoilResetAfter: true)`.
 - Konect 120 config profile is fully filled — no `null` fields remaining. Key differences from KS-3000: has Ethernet (DHCP = D11 of 40007, IP/Mask/Gateway = 43101/43103/43105, MAC = 39501); Wi-Fi DHCP is D5 of 40007 (KS-3000 uses D11); Wi-Fi IP/Mask/Gateway = 43111/43123/43125; Wi-Fi MAC = 39504 (KS-3000 = 39501); BT MAC = 39507 (same as KS-3000); DNS server shared between Ethernet and Wi-Fi at 43117; `AddrModuleVersion` = 39511 (same as KS-3000).
 - Verify Wi-Fi register addresses for KS-3000 (43101–43108 block was failing with timeouts during initial wiring — may need address correction once doc is consulted).
 - Mobile app (MAUI) connected to the same core as the desktop version with the same functions and styling

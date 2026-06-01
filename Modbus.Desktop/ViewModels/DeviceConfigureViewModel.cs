@@ -2,6 +2,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Modbus.Core.Domain.Enums;
+using Modbus.Core.Domain.Repositories;
 using Modbus.Core.Services;
 using System;
 using System.Collections.Generic;
@@ -17,6 +18,7 @@ public partial class DeviceConfigureViewModel : ObservableObject
 {
     private readonly Action _onGoBack;
     private readonly IDeviceConfigService _configService;
+    private readonly IDeviceRepository _deviceRepository;
     private readonly Func<Task> _pausePolling;
     private readonly Action _resumePolling;
 
@@ -493,12 +495,14 @@ public partial class DeviceConfigureViewModel : ObservableObject
     public DeviceConfigureViewModel(
         DeviceItemViewModel device,
         IDeviceConfigService configService,
+        IDeviceRepository deviceRepository,
         Func<Task> pausePolling,
         Action resumePolling,
         Action onGoBack)
     {
         Device              = device;
         _configService      = configService;
+        _deviceRepository   = deviceRepository;
         _pausePolling  = pausePolling;
         _resumePolling = resumePolling;
         _onGoBack           = onGoBack;
@@ -695,6 +699,27 @@ public partial class DeviceConfigureViewModel : ObservableObject
 
                 // All ops landed — mark success and try the confirmation re-read.
                 SaveSuccess = loc["CfgSaveSuccess"];
+
+                // RTU slave address change: must be done last because it causes a device reboot.
+                // After the write we update SlaveId in memory and in the DB, then fall through
+                // to the normal WaitForDeviceReachableAsync + post-save re-read below —
+                // which will use the updated SlaveId automatically. No need to navigate back.
+                if (IsRtu
+                    && EditableSlaveId >= 1 && EditableSlaveId <= 247
+                    && EditableSlaveId != Device.Device.SlaveId)
+                {
+                    SaveSuccess = loc["WritingAddress"];
+                    await _configService.WriteSlaveAddressAsync(
+                        Device.Device, (byte)EditableSlaveId, CancellationToken.None);
+
+                    // Update in memory before the reachability probe so that
+                    // WaitForDeviceReachableAsync (and any subsequent reads) target the new address.
+                    Device.Device.SlaveId = (byte)EditableSlaveId;
+                    await _deviceRepository.UpdateAsync(Device.Device, CancellationToken.None);
+                    Device.NotifySlaveIdChanged();
+
+                    SaveSuccess = loc["WaitingForReboot"];
+                }
 
                 // Even after a clean batch, the device may have rebooted on the very last op
                 // (coil reset, certain string writes). Probe before re-reading so the re-read
