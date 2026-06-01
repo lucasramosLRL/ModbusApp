@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using Modbus.Core.Domain.Entities;
+using Modbus.Core.Domain.Enums;
 using Modbus.Core.Protocol.Exceptions;
 
 namespace Modbus.Core.Services;
@@ -239,6 +240,31 @@ public sealed class DeviceConfigService : IDeviceConfigService
                     }
                     completed++;
                 }
+                catch (TimeoutException) when (device.TransportType == TransportType.Rtu)
+                {
+                    // RTU write bytes were sent before ReadExactAsync timed out. The device
+                    // either (a) applied the write silently (non-compliant echo) or (b) rebooted.
+                    // Distinguish the two by pinging with a single register read:
+                    //   alive → silent accept, count as completed and continue the batch
+                    //   dead  → device rebooted, snapshot remaining ops for the caller to retry
+                    bool alive = await TryPingAsync(svc, device, cts.Token);
+                    if (alive)
+                    {
+                        Debug.WriteLine(
+                            $"[DeviceConfigService] WriteBatch: RTU write to {w.ModiconAddress} had no echo but device is responsive — counting as completed.");
+                        completed++;
+                    }
+                    else
+                    {
+                        Debug.WriteLine(
+                            $"[DeviceConfigService] WriteBatch: device went silent after {completed} write(s) — assuming reboot. {writeList.Count - i} op(s) deferred.");
+                        deviceRebooted = true;
+                        var tail = new RegisterWrite[writeList.Count - i];
+                        for (int j = 0; j < tail.Length; j++) tail[j] = writeList[i + j];
+                        remaining = tail;
+                        return new WriteBatchResult(completed, remaining, deviceRebooted, coilResetSent);
+                    }
+                }
                 catch (Exception ex) when (
                     completed > 0
                     && (ex is IOException
@@ -294,6 +320,40 @@ public sealed class DeviceConfigService : IDeviceConfigService
         }
 
         return new WriteBatchResult(completed, remaining, deviceRebooted, coilResetSent);
+    }
+
+    // Polls until the device responds to a single FC04 read or the window expires.
+    // 30s covers the KS-3000 / Konect 120 bootloader reboot (~20s).
+    // Returns true as soon as the device responds, false if it never comes back within the window.
+    // Used after an RTU write timeout to distinguish "silent accept" (fast) from "genuine failure"
+    // (device never responds). A device that rebooted after the write also returns true once it
+    // finishes booting — the write itself was already applied before the reboot.
+    private const int PingWindowSeconds = 30;
+
+    private async Task<bool> TryPingAsync(IModbusService svc, ModbusDevice device, CancellationToken ct)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(PingWindowSeconds);
+        while (DateTime.UtcNow < deadline && !ct.IsCancellationRequested)
+        {
+            try
+            {
+                using var pingCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                pingCts.CancelAfter(TimeSpan.FromSeconds(3));
+                if (!svc.IsConnected) await svc.ConnectAsync(pingCts.Token);
+                _ = await svc.ReadInputRegistersAsync(device.SlaveId, 0, 1, pingCts.Token);
+                return true;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return false;
+            }
+            catch
+            {
+                try { await svc.DisconnectAsync(); } catch { }
+                await Task.Delay(1000, ct).ConfigureAwait(false);
+            }
+        }
+        return false;
     }
 
     public async Task<bool> WaitForDeviceReachableAsync(
