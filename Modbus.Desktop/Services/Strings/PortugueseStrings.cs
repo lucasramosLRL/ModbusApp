@@ -66,6 +66,11 @@ internal static class PortugueseStrings
         ["DuplicateIp"]          = "Já existe um dispositivo com o IP {0}.",
         ["DuplicateRtuAddress"]  = "Já existe um dispositivo no endereço RTU {0}.",
         ["ConnectFailed"]        = "Não foi possível conectar ao dispositivo. Verifique o endereço e as configurações.",
+        ["CheckingAddress"]      = "Verificando disponibilidade do endereço...",
+        ["WritingAddress"]       = "Gravando novo endereço no medidor...",
+        ["WaitingForReboot"]     = "Aguardando reinicialização do medidor (~20 s)...",
+        ["AddressOccupied"]      = "Endereço {0} já está em uso na rede.",
+        ["AddressChangeTimeout"] = "O medidor não respondeu no endereço {0}. Verifique e tente novamente.",
         ["DeviceSaved"]          = "Dispositivo salvo. Selecione outro da lista ou volte.",
 
         // DeviceDetailView

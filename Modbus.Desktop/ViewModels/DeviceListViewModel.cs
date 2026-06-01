@@ -103,7 +103,7 @@ public partial class DeviceListViewModel : ObservableObject
     [RelayCommand]
     private void OpenAddDevice()
     {
-        var vm = new AddDeviceViewModel(_scanService, _deviceRepository, _deviceModelRepository, _serviceFactory, this);
+        var vm = new AddDeviceViewModel(_scanService, _deviceRepository, _deviceModelRepository, _serviceFactory, _configService, this);
         NavigationRequested?.Invoke(this, vm);
     }
 

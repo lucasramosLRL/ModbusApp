@@ -55,4 +55,20 @@ public class ModbusRtuFrameBuilder : IModbusFrameBuilder
         Crc16.Append(frame, 2);
         return frame;
     }
+
+    /// <summary>
+    /// Builds a KRON FC 0x42 (configAddress) broadcast frame.
+    /// ADU: 0x00(broadcast) + 0x42 + SerialNumber(4 BE) + NewSlaveId(1) + CRC(2).
+    /// No response is expected — the device reboots after applying the new address.
+    /// </summary>
+    public byte[] ConfigureAddress(uint serialNumber, byte newSlaveId)
+    {
+        var frame = new byte[9];
+        frame[0] = 0x00; // broadcast
+        frame[1] = 0x42;
+        BinaryPrimitives.WriteUInt32BigEndian(frame.AsSpan(2), serialNumber);
+        frame[6] = newSlaveId;
+        Crc16.Append(frame, 7);
+        return frame;
+    }
 }

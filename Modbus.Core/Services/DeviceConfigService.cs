@@ -3,6 +3,8 @@ using System.IO;
 using Modbus.Core.Domain.Entities;
 using Modbus.Core.Domain.Enums;
 using Modbus.Core.Protocol.Exceptions;
+using Modbus.Core.Protocol.Rtu;
+using Modbus.Core.Transport.Rtu;
 
 namespace Modbus.Core.Services;
 
@@ -320,6 +322,36 @@ public sealed class DeviceConfigService : IDeviceConfigService
         }
 
         return new WriteBatchResult(completed, remaining, deviceRebooted, coilResetSent);
+    }
+
+    public async Task WriteSlaveAddressAsync(
+        ModbusDevice device,
+        byte newSlaveId,
+        CancellationToken cancellationToken = default)
+    {
+        if (device.TransportType != TransportType.Rtu)
+            throw new InvalidOperationException("WriteSlaveAddress is only supported for RTU devices.");
+        if (device.SerialNumber is null)
+            throw new InvalidOperationException("WriteSlaveAddress requires a known device serial number.");
+
+        var builder = new ModbusRtuFrameBuilder();
+        var frame   = builder.ConfigureAddress(device.SerialNumber.Value, newSlaveId);
+
+        using var transport = new RtuModbusTransport(device.Rtu!);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(5));
+        try
+        {
+            await transport.ConnectAsync(cts.Token);
+            // expectedResponseLength = 0: device reboots immediately, no echo expected.
+            await transport.SendAsync(frame, 0, cts.Token);
+        }
+        catch (TimeoutException) { } // silence is expected — device is rebooting
+        finally
+        {
+            try { await transport.DisconnectAsync(); } catch { }
+        }
+        Debug.WriteLine($"[DeviceConfigService] WriteSlaveAddress: FC 0x42 sent (SN={device.SerialNumber}, newAddr={newSlaveId}).");
     }
 
     // Polls until the device responds to a single FC04 read or the window expires.

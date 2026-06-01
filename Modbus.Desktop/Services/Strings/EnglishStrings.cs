@@ -66,6 +66,11 @@ internal static class EnglishStrings
         ["DuplicateIp"]          = "A device with IP {0} already exists.",
         ["DuplicateRtuAddress"]  = "A device with RTU address {0} already exists.",
         ["ConnectFailed"]        = "Could not connect to the device. Check the address and settings.",
+        ["CheckingAddress"]      = "Checking address availability...",
+        ["WritingAddress"]       = "Writing new address to device...",
+        ["WaitingForReboot"]     = "Waiting for device reboot (~20 s)...",
+        ["AddressOccupied"]      = "Address {0} is already in use on the network.",
+        ["AddressChangeTimeout"] = "Device did not respond at address {0}. Please check and try again.",
         ["DeviceSaved"]          = "Device saved. Select another from the list or go back.",
 
         // DeviceDetailView

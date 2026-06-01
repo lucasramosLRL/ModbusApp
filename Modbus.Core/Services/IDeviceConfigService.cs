@@ -105,4 +105,15 @@ public interface IDeviceConfigService
         ModbusDevice device,
         int maxWaitSeconds = 60,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends KRON FC 0x42 (configAddress) as a broadcast frame containing the device serial
+    /// number and the new RTU slave address. The device applies the address and reboots (~20s);
+    /// no response is returned. <paramref name="device"/> must have a valid
+    /// <see cref="ModbusDevice.SerialNumber"/> and RTU config.
+    /// </summary>
+    Task WriteSlaveAddressAsync(
+        ModbusDevice device,
+        byte newSlaveId,
+        CancellationToken cancellationToken = default);
 }

@@ -20,6 +20,7 @@ public partial class AddDeviceViewModel : ObservableObject
     private readonly IDeviceRepository _deviceRepository;
     private readonly IDeviceModelRepository _deviceModelRepository;
     private readonly IModbusServiceFactory _serviceFactory;
+    private readonly IDeviceConfigService _configService;
     private readonly DeviceListViewModel _parent;
     private CancellationTokenSource? _scanCts;
 
@@ -127,8 +128,10 @@ public partial class AddDeviceViewModel : ObservableObject
 
     partial void OnSlaveIdChanged(byte value)
     {
-        if (!_applyingResult && SelectedResult is not null && value != SelectedResult.Result.SlaveId)
-            SelectedResult = null;
+        // Keep SelectedResult associated even when the user edits the address — the scan
+        // result provides the original slave ID and serial number needed to send FC 0x42
+        // (configAddress) before saving. Clearing it here would fall into the manual path,
+        // which tries to probe the NEW address (that doesn't exist yet) and fails.
     }
 
     [ObservableProperty]
@@ -322,6 +325,56 @@ public partial class AddDeviceViewModel : ObservableObject
                     SetFeedback(string.Format(loc["DuplicateIp"], effectiveIp), isError: true);
                     return;
                 }
+
+                // RTU address changed: write FC 0x42 to the device and wait for reboot.
+                if (IsRtu && SlaveId != SelectedResult.Result.SlaveId && serialNumber.HasValue)
+                {
+                    await _parent.SuspendRtuPollingAsync();
+                    try
+                    {
+                        // Verify the target address is free on the RTU bus.
+                        SetFeedback(loc["CheckingAddress"], isError: false);
+                        var occupant = await ProbeSerialNumberAsync("", SlaveId);
+                        if (occupant is not null && occupant != serialNumber)
+                        {
+                            SetFeedback(string.Format(loc["AddressOccupied"], SlaveId), isError: true);
+                            return;
+                        }
+
+                        // Send FC 0x42 to the device at its current (original) address.
+                        SetFeedback(loc["WritingAddress"], isError: false);
+                        var tempDevice = new ModbusDevice
+                        {
+                            Name         = "",
+                            SlaveId      = SelectedResult.Result.SlaveId,
+                            TransportType = TransportType.Rtu,
+                            Rtu          = RtuSettingsService.Instance.ToRtuConfig(),
+                            SerialNumber = serialNumber
+                        };
+                        await _configService.WriteSlaveAddressAsync(tempDevice, SlaveId);
+
+                        // Wait for the device to reboot and respond on the new address.
+                        SetFeedback(loc["WaitingForReboot"], isError: false);
+                        var newDevice = new ModbusDevice
+                        {
+                            Name         = "",
+                            SlaveId      = SlaveId,
+                            TransportType = TransportType.Rtu,
+                            Rtu          = RtuSettingsService.Instance.ToRtuConfig()
+                        };
+                        bool reachable = await _configService.WaitForDeviceReachableAsync(
+                            newDevice, maxWaitSeconds: 60);
+                        if (!reachable)
+                        {
+                            SetFeedback(string.Format(loc["AddressChangeTimeout"], SlaveId), isError: true);
+                            return;
+                        }
+                    }
+                    finally
+                    {
+                        _parent.ResumeRtuPolling();
+                    }
+                }
             }
             else
             {
@@ -337,7 +390,21 @@ public partial class AddDeviceViewModel : ObservableObject
                     return;
                 }
 
-                serialNumber = await ProbeSerialNumberAsync(effectiveIp);
+                bool rtuSuspended = false;
+                try
+                {
+                    if (IsRtu)
+                    {
+                        await _parent.SuspendRtuPollingAsync();
+                        rtuSuspended = true;
+                    }
+                    serialNumber = await ProbeSerialNumberAsync(effectiveIp);
+                }
+                finally
+                {
+                    if (rtuSuspended) _parent.ResumeRtuPolling();
+                }
+
                 if (serialNumber is null)
                 {
                     SetFeedback(loc["ConnectFailed"], isError: true);
@@ -396,27 +463,26 @@ public partial class AddDeviceViewModel : ObservableObject
         }
     }
 
-    /// <summary>Connects to the device, reads the NS register (FC04 addr 0) and returns the serial number, or null on failure.</summary>
-    private async Task<uint?> ProbeSerialNumberAsync(string effectiveIp)
+    /// <summary>
+    /// Connects to the device and reads the NS register (FC04 addr 0), returning the serial
+    /// number or null on failure. Pass <paramref name="overrideSlaveId"/> to probe a specific
+    /// RTU address without changing the observable <see cref="SlaveId"/> property.
+    /// Caller is responsible for suspending/resuming RTU polling when needed.
+    /// </summary>
+    private async Task<uint?> ProbeSerialNumberAsync(string effectiveIp, byte? overrideSlaveId = null)
     {
+        var probeSlaveId = overrideSlaveId ?? SlaveId;
         var tempDevice = SelectedTransport == TransportType.Rtu
-            ? new ModbusDevice { Name = "", SlaveId = SlaveId, TransportType = TransportType.Rtu, Rtu = RtuSettingsService.Instance.ToRtuConfig() }
-            : new ModbusDevice { Name = "", SlaveId = SlaveId, TransportType = TransportType.Tcp, Tcp = new TcpConfig { IpAddress = effectiveIp, Port = TcpPort } };
+            ? new ModbusDevice { Name = "", SlaveId = probeSlaveId, TransportType = TransportType.Rtu, Rtu = RtuSettingsService.Instance.ToRtuConfig() }
+            : new ModbusDevice { Name = "", SlaveId = probeSlaveId, TransportType = TransportType.Tcp, Tcp = new TcpConfig { IpAddress = effectiveIp, Port = TcpPort } };
 
-        bool rtuSuspended = false;
         IModbusService? svc = null;
         try
         {
-            if (IsRtu)
-            {
-                await _parent.SuspendRtuPollingAsync();
-                rtuSuspended = true;
-            }
-
             svc = _serviceFactory.Create(tempDevice);
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await svc.ConnectAsync(cts.Token);
-            var words = await svc.ReadInputRegistersAsync(SlaveId, 0, 2, cts.Token);
+            var words = await svc.ReadInputRegistersAsync(probeSlaveId, 0, 2, cts.Token);
             return (uint)((words[0] << 16) | words[1]);
         }
         catch
@@ -426,7 +492,6 @@ public partial class AddDeviceViewModel : ObservableObject
         finally
         {
             if (svc is not null) { try { await svc.DisconnectAsync(); } catch { } svc.Dispose(); }
-            if (rtuSuspended) _parent.ResumeRtuPolling();
         }
     }
 
@@ -449,12 +514,14 @@ public partial class AddDeviceViewModel : ObservableObject
         IDeviceRepository deviceRepository,
         IDeviceModelRepository deviceModelRepository,
         IModbusServiceFactory serviceFactory,
+        IDeviceConfigService configService,
         DeviceListViewModel parent)
     {
         _scanService           = scanService;
         _deviceRepository      = deviceRepository;
         _deviceModelRepository = deviceModelRepository;
         _serviceFactory        = serviceFactory;
+        _configService         = configService;
         _parent                = parent;
 
         RtuSettingsService.Instance.PropertyChanged += (_, _) =>
