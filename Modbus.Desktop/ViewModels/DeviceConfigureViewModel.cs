@@ -65,6 +65,8 @@ public partial class DeviceConfigureViewModel : ObservableObject
     public bool HasCurrentInvert => Capabilities.HasFlag(DeviceCapabilities.FieldCurrentInvert);
     public bool HasIotGrandezaSelection => Capabilities.HasFlag(DeviceCapabilities.IotGrandezaSelection);
 
+    public bool IsRtu => Device.TransportType == TransportType.Rtu;
+
     // ── Load / Edit / Save state ─────────────────────────────────────────────
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string? _loadError;

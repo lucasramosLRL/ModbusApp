@@ -203,7 +203,8 @@
                                                Foreground="{StaticResource BrushTextPrimary}"
                                                Margin="0,6,0,0" />
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Spacing="4" Margin="24,0,0,0">
+                                <StackPanel Grid.Column="1" Spacing="4" Margin="24,0,0,0"
+                                            IsVisible="{Binding IsRtu}">
                                     <TextBlock Classes="label-small"
                                                Text="{Binding [SlaveAddress], Source={x:Static svc:LocalizationService.Instance}}" />
                                     <NumericUpDown Value="{Binding EditableSlaveId, Mode=TwoWay}"
