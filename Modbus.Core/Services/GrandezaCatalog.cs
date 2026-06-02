@@ -87,9 +87,9 @@ public static class GrandezaCatalog
         new(114, "OUT2S",  "Status da Saída 2",           GrandezaCategory.EntradasSaidas),
 
         // Largura dos pulsos
-        new(130, "EDP-1 Pulso", "Largura do pulso EDP-1", GrandezaCategory.EntradasSaidas),
-        new(131, "EDP-2 Pulso", "Largura do pulso EDP-2", GrandezaCategory.EntradasSaidas),
-        new(132, "EDP-3 Pulso", "Largura do pulso EDP-3", GrandezaCategory.EntradasSaidas),
+        new(130, "EDP1P", "Largura do pulso EDP-1", GrandezaCategory.EntradasSaidas),
+        new(131, "EDP2P", "Largura do pulso EDP-2", GrandezaCategory.EntradasSaidas),
+        new(132, "EDP3P", "Largura do pulso EDP-3", GrandezaCategory.EntradasSaidas),
 
         // Status carga
         new(150, "LSTS",  "Status da carga",              GrandezaCategory.EntradasSaidas),
