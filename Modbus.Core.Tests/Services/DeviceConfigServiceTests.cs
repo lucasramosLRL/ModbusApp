@@ -268,16 +268,17 @@ public sealed class DeviceConfigServiceTests
             Arg.Any<byte>(), Arg.Any<ushort>(), Arg.Any<ushort[]>(), Arg.Any<CancellationToken>());
     }
 
-    // ── SendCoilResetAsync (FC05 coil 6) ──────────────────────────────────────
+    // ── SendCoilResetAsync (FC05 reset coil, wire address 5) ──────────────────
 
     [Fact]
-    public async Task SendCoilResetAsync_WritesCoil6True()
+    public async Task SendCoilResetAsync_WritesResetCoilTrue()
     {
+        // Wire address 5 — matches the captured reset frame (02 05 00 05 FF 00 ...).
         await _service.SendCoilResetAsync(Device);
 
         await _svc.Received(1).WriteSingleCoilAsync(
             Device.SlaveId,
-            (ushort)6,
+            (ushort)5,
             true,
             Arg.Any<CancellationToken>());
     }
@@ -345,7 +346,26 @@ public sealed class DeviceConfigServiceTests
         result.DeviceRebooted.Should().BeFalse();
         result.CoilResetSent.Should().BeTrue();
         await _svc.Received(1).WriteSingleCoilAsync(
-            Device.SlaveId, (ushort)6, true, Arg.Any<CancellationToken>());
+            Device.SlaveId, (ushort)5, true, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WriteBatchAsync_CoilResetTimesOut_StillReportsCoilSent()
+    {
+        // RTU: the meter applies the reset coil and reboots without echoing the FC05 response,
+        // so the transport throws TimeoutException after 1s. That must be treated as success.
+        _svc.IsConnected.Returns(true);
+        _svc.WriteSingleCoilAsync(
+                Arg.Any<byte>(), Arg.Any<ushort>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new TimeoutException("RTU device did not respond"));
+
+        var batch = new List<RegisterWrite> { new(40005, [ (ushort)11 ]) };
+
+        var result = await _service.WriteBatchAsync(Device, batch, sendCoilResetAfter: true);
+
+        result.Completed.Should().Be(1);
+        result.DeviceRebooted.Should().BeFalse();
+        result.CoilResetSent.Should().BeTrue("a TimeoutException on the commit coil means the meter rebooted without echoing");
     }
 
     // ── Empty fields list ─────────────────────────────────────────────────────

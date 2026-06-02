@@ -79,6 +79,30 @@ public class ModbusRtuFrameBuilderTests
         Crc16.Validate(frame).Should().BeTrue();
     }
 
+    // ── WriteSingleCoil (FC05) ───────────────────────────────────────────────
+
+    [Fact]
+    public void WriteSingleCoil_ResetCoil_MatchesCapturedFrame()
+    {
+        // Ground-truth reset frame captured from the reference Modbus client (slave 2):
+        //   02 05 00 05 FF 00 9C 08   (FC05, coil 0x0005, value ON 0xFF00).
+        var frame = _builder.WriteSingleCoil(2, 5, true);
+
+        frame.Should().Equal(0x02, 0x05, 0x00, 0x05, 0xFF, 0x00, 0x9C, 0x08);
+        Crc16.Validate(frame).Should().BeTrue();
+    }
+
+    [Fact]
+    public void WriteSingleCoil_Off_EncodesZeroValue()
+    {
+        var frame = _builder.WriteSingleCoil(1, 5, false);
+
+        frame[1].Should().Be(0x05, "function code FC05");
+        BinaryPrimitives.ReadUInt16BigEndian(frame.AsSpan(2)).Should().Be(5, "coil address");
+        BinaryPrimitives.ReadUInt16BigEndian(frame.AsSpan(4)).Should().Be(0x0000, "OFF value");
+        Crc16.Validate(frame).Should().BeTrue();
+    }
+
     // ── WriteMultipleRegisters (FC16) ────────────────────────────────────────
 
     [Fact]

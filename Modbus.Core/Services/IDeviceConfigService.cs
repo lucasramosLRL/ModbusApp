@@ -78,9 +78,9 @@ public interface IDeviceConfigService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Sends the FC05 "commit/reset" coil (address 6) that KS-3000 / Konect 120 require
-    /// after writing string fields in the 43461+ range. Idempotent — safe to call once
-    /// per Save regardless of how many strings were modified.
+    /// Sends the FC05 "commit/reset" coil (wire address 5) that KS-3000 / Konect 120 require
+    /// after a configuration save; the meter reboots on receiving it. Idempotent — safe to call
+    /// once per Save regardless of how many fields were modified.
     /// </summary>
     Task SendCoilResetAsync(ModbusDevice device, CancellationToken cancellationToken = default);
 

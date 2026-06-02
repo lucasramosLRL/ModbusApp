@@ -437,6 +437,36 @@ Both decode correctly with high-to-low + the `EXP/F0/F1/F2` mapping above. Earli
 ### MQTT Port is ASCII, not numeric
 KS-3000 stores the MQTT broker port as a **6-character ASCII string** at registers 43496–43498 (3 words), not as a 16-bit integer. The VM exposes `MqttPort` as `string?` and the XAML uses a `TextBox` (not `NumericUpDown`). All other MQTT fields (URL, User, Token, Topic, etc.) are also ASCII per the device doc.
 
+### Coil addressing convention — wire address = KRON document number − 1
+The KRON documentation (and the reference Modbus test client UI) numbers coils **1-based / Modicon**.
+The **wire (protocol) address = document number − 1** — the standard Modbus 0-based conversion.
+Confirmed by the user against the device + documentation, and by a captured reset frame (document
+"coil 6" → wire `0x0005`, which the meter echoed/accepted).
+
+**The code stores the WIRE address directly** and `ModbusRtuFrameBuilder.WriteSingleCoil` (and the
+TCP path) transmit it byte-for-byte. So when adding a coil from the KRON doc, put `docNumber - 1`
+in the code. The whole current inventory already follows this (see table) — all values are `doc−1`.
+
+### Reset/commit coil (FC05) — sent after every save, wire address is 5
+At the end of any save with ≥1 write, `DeviceConfigService.WriteBatchAsync(sendCoilResetAfter: true)` issues an **FC05 Write Single Coil** to commit the configuration; the KS-3000 / Konect 120 **reboots** on receiving it (~6s, LEDs blink + screen blanks). `DeviceConfigureViewModel.BuildWriteOperations` sets `needsCoilReset = true` whenever `ops.Count > 0`.
+
+**Verified against a captured frame:** ground-truth reset frame for slave 2 is `02 05 00 05 FF 00 9C 08` (FC05, coil `0x0005`, value ON `0xFF00`), so `CoilResetAddress = 5`. `ModbusRtuFrameBuilderTests.WriteSingleCoil_ResetCoil_MatchesCapturedFrame` locks this byte-for-byte.
+
+**RTU no-echo handling:** the meter applies the coil and reboots **without echoing** the FC05 response, so `RtuModbusTransport.ReadExactAsync` throws `TimeoutException` after 1s. The coil-reset block in `WriteBatchAsync` (and `WriteCoilAsync`) treats `TimeoutException` (alongside `IOException` / `OperationCanceledException`) as **success**. After the coil, `SaveAsync` calls `WaitForDeviceReachableAsync` to wait out the reboot before the confirmation re-read.
+
+### Coil inventory (all FC05 coils) — confirmed correct (wire = doc − 1)
+| Doc (Modicon) | Wire addr | Function | Value | Where |
+|:---:|:---:|----------|:---:|-------|
+| 6  | **5**  | Reset/commit (reboots meter) | ON | `DeviceConfigService.CoilResetAddress` |
+| 62 | **61** | Zero hourmeter | ON | `DeviceDetailViewModel.BuildHourmeterChannel` |
+| 21 | **20** | Reset EDP-1 counter | ON | `DeviceDetailViewModel.BuildIoChannels` |
+| 22 | **21** | Reset EDP-2 counter | ON | `BuildIoChannels` |
+| 23 | **22** | Reset EDP-3 counter | ON | `BuildIoChannels` |
+| 31 | **30** | Digital output SD-1 on/off | ON/OFF | `BuildIoChannels` |
+| 32 | **31** | Digital output SD-2 on/off | ON/OFF | `BuildIoChannels` |
+
+All wire values verified by the user against the documentation — no changes needed.
+
 ### RTU exception-response detection
 `RtuModbusTransport.ReadExactAsync` inspects the second byte of every response: if `(byte[1] & 0x80) != 0`, it's a Modbus exception frame (5 bytes total: slave + FC|0x80 + code + 2 CRC) and the transport stops reading immediately instead of waiting for a normal full-length response. Without this, requesting an unmapped address against a device that returns "Illegal Data Address" would hang for the full 1s read timeout per request, and `DeviceConfigService` would burn through its 30s budget. This matters once we implement writes (FC06/FC16) — devices often respond with exceptions for bad addresses, and the parser already throws `ModbusProtocolException` from those.
 
@@ -445,7 +475,7 @@ KS-3000 stores the MQTT broker port as a **6-character ASCII string** at registe
 ### Pending / future features - Attention! Keep it in the end of the file
 - Investigate if its necessary to prompt the user to reset the software when the language is changed, it seens like some texts won't change until a complete restart
 - SQPF configuration UI — writing the SQPF sequence via the configure screen (reading already done; Coil Reset not needed for SQPF register 42901).
-- Remaining holding-register writes in configure screen (TP, TC, KE, TI, TL, Timezone, SyncInterval, Wireless/SNTP/IoT fields). String writes (43461+) need a **Coil Reset** (FC05 coil 6) after writing to commit — already handled by `WriteBatchAsync(sendCoilResetAfter: true)`.
+- Remaining holding-register writes in configure screen (TP, TC, KE, TI, TL, Timezone, SyncInterval, Wireless/SNTP/IoT fields). Every save with ≥1 write commits via the **reset coil** (FC05, see note below) — already handled by `WriteBatchAsync(sendCoilResetAfter: true)`.
 - Konect 120 config profile is fully filled — no `null` fields remaining. Key differences from KS-3000: has Ethernet (DHCP = D11 of 40007, IP/Mask/Gateway = 43101/43103/43105, MAC = 39501); Wi-Fi DHCP is D5 of 40007 (KS-3000 uses D11); Wi-Fi IP/Mask/Gateway = 43111/43123/43125; Wi-Fi MAC = 39504 (KS-3000 = 39501); BT MAC = 39507 (same as KS-3000); DNS server shared between Ethernet and Wi-Fi at 43117; `AddrModuleVersion` = 39511 (same as KS-3000).
 - Verify Wi-Fi register addresses for KS-3000 (43101–43108 block was failing with timeouts during initial wiring — may need address correction once doc is consulted).
 - Mobile app (MAUI) connected to the same core as the desktop version with the same functions and styling

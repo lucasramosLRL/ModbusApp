@@ -1115,9 +1115,10 @@ public partial class DeviceConfigureViewModel : ObservableObject
         AddGrandezaBlockDirty(p.AddrGrandezasSlots1to20,  startSlot: 0);
         AddGrandezaBlockDirty(p.AddrGrandezasSlots21to50, startSlot: 20);
 
-        // Any op whose start address is in the device's "needs commit" string range
-        // triggers a single FC05 coil-6 at the end of the Save flow.
-        if (ops.Any(o => o.ModiconAddr >= 43461))
+        // O KS-3000 exige o coil 6 (FC05) ao final de QUALQUER gravação para commitar
+        // as configurações — o medidor reinicia ao recebê-lo. Dispara sempre que houver
+        // ao menos uma escrita (uma ou mais configurações).
+        if (ops.Count > 0)
             needsCoilReset = true;
 
         return ops;

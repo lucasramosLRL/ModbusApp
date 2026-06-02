@@ -18,7 +18,12 @@ public sealed class DeviceConfigService : IDeviceConfigService
 {
     private const int MaxBlockSize    = 32;  // FC03/FC04 spec limit per request
     private const int MaxWriteBlockSize = 22; // KS-3000 FC16 limit per request
-    private const ushort CoilResetAddress = 6; // KS-3000 / Konect 120 commit coil for string writes ≥ 43461
+    // KS-3000 / Konect 120 reset/commit coil. The meter reboots when it receives this coil.
+    // Wire address = 5 (the test/reference software calls it "coil 6" using 1-based Modicon
+    // coil numbering, but the captured frame transmits 0x0005). Ground-truth frame for slave 2:
+    //   02 05 00 05 FF 00 9C 08   (FC05, coil 0x0005, value ON 0xFF00). Our builder writes the
+    // address raw on the wire, so this constant must be the literal wire value (5), not 6.
+    private const ushort CoilResetAddress = 5;
     private const int TimeoutSeconds  = 30;
     private const int MaxAttempts    = 3;   // Total attempts per block (1 initial + 2 retries)
     private const int RetryDelayMs   = 150; // Pause between retries to let the device settle
@@ -308,6 +313,13 @@ public sealed class DeviceConfigService : IDeviceConfigService
                     Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} — no echo, treated as success.");
                     coilResetSent = true;
                 }
+                catch (TimeoutException)
+                {
+                    // RTU: o medidor aplica o coil e reinicia sem ecoar a resposta FC05;
+                    // o transporte estoura em 1s. Tratar como sucesso.
+                    Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} — sem eco (RTU), tratado como sucesso.");
+                    coilResetSent = true;
+                }
                 catch (IOException)
                 {
                     // IOException covers EndOfStreamException as well.
@@ -509,6 +521,11 @@ public sealed class DeviceConfigService : IDeviceConfigService
             // the TCP connection after processing without echoing the FC05 response. The coil
             // was almost certainly applied — suppress the exception so the UI doesn't crash.
             Debug.WriteLine($"[DeviceConfigService] WriteCoilAsync: no echo for coil {coilAddress} — treated as success.");
+        }
+        catch (TimeoutException)
+        {
+            // RTU: o medidor aplica o coil e reinicia sem ecoar; o transporte estoura em 1s.
+            Debug.WriteLine($"[DeviceConfigService] WriteCoilAsync: sem eco (RTU) para coil {coilAddress} — tratado como sucesso.");
         }
         catch (IOException)
         {
