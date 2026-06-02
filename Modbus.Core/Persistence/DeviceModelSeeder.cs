@@ -55,21 +55,37 @@ public class DeviceModelSeeder
         await _repository.UpdateAsync(model);
     }
 
+    // Addresses whose Float32 byte order is fixed by the device doc and must NOT be
+    // overridden to UseSqpf. HORIM (160) is always F2,F1,F0,EXP (ByteSwapped).
+    private static readonly HashSet<ushort> FixedByteOrderFloat32Addresses = [160];
+
     private static void ApplySqpfToExistingRegisters(DeviceModel model)
     {
         foreach (var reg in model.Registers)
         {
-            if (reg.DataType == DataType.Float32 && reg.RegisterType == RegisterType.Input)
+            if (reg.DataType == DataType.Float32
+                && reg.RegisterType == RegisterType.Input
+                && !FixedByteOrderFloat32Addresses.Contains(reg.Address))
                 reg.WordOrder = WordOrder.UseSqpf;
         }
     }
 
     private static void MergeRegisters(DeviceModel model, IEnumerable<RegisterDefinition> candidates)
     {
-        var existing = model.Registers.Select(r => r.Address).ToHashSet();
+        var existing = model.Registers.ToDictionary(r => r.Address);
         foreach (var reg in candidates)
-            if (!existing.Contains(reg.Address))
+        {
+            if (existing.TryGetValue(reg.Address, out var current))
+            {
+                // Keep stored entry but re-align WordOrder with the seeder (lets us
+                // correct registers like HORIM that were previously seeded as UseSqpf).
+                current.WordOrder = reg.WordOrder;
+            }
+            else
+            {
                 model.Registers.Add(reg);
+            }
+        }
     }
 
     // Real-time input registers (FC04) shared by KS-3000, Konect 120 and compatible models.
@@ -126,13 +142,13 @@ public class DeviceModelSeeder
     ];
 
     // Digital input/output registers (FC04, Input type).
-    // Counters are Float32 + UseSqpf (same byte order as real-time regs).
     // Status registers are UInt16 BigEndian (standard 0=off, 1=on).
-    // Pulse width registers are UInt16 ByteSwapped (device stores LSB first) with scale 0.1 → seconds.
+    // HORIM has a fixed byte order F2,F1,F0,EXP (= 0x3210 = ByteSwapped) per device doc,
+    // independent of the global SQPF setting — do NOT mark it UseSqpf.
     private static List<RegisterDefinition> HourmeterRegs(DeviceModel model) =>
     [
-        Reg(model, 150, "LSTS",  DataType.UInt16,  null, "Status da Carga",        WordOrder.BigEndian,  1.0),
-        Reg(model, 160, "HORIM", DataType.Float32, "h",  "Horímetro",              WordOrder.UseSqpf,    1.0),
+        Reg(model, 150, "LSTS",  DataType.UInt16,  null, "Status da Carga",        WordOrder.BigEndian,   1.0),
+        Reg(model, 160, "HORIM", DataType.Float32, "h",  "Horímetro",              WordOrder.ByteSwapped, 1.0),
     ];
 
     // Error-status registers (FC04, Input type).

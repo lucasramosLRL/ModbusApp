@@ -86,13 +86,16 @@ public sealed class DeviceModelSeederTests
 
         await _seeder.SeedAsync();
 
+        // HORIM (addr 160) has a fixed byte order F2,F1,F0,EXP per device doc — not subject to SQPF.
         var float32InputRegs = updated!.Registers
-            .Where(r => r.DataType == DataType.Float32 && r.RegisterType == RegisterType.Input)
+            .Where(r => r.DataType == DataType.Float32 && r.RegisterType == RegisterType.Input && r.Address != 160)
             .ToList();
 
         float32InputRegs.Should().NotBeEmpty();
         float32InputRegs.Should().AllSatisfy(r =>
             r.WordOrder.Should().Be(WordOrder.UseSqpf));
+
+        updated.Registers.Single(r => r.Address == 160).WordOrder.Should().Be(WordOrder.ByteSwapped);
     }
 
     [Fact]
