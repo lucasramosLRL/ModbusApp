@@ -1,6 +1,10 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Modbus.Desktop.ViewModels;
+using System.Linq;
 
 namespace Modbus.Desktop.Views;
 
@@ -48,7 +52,22 @@ public partial class DeviceConfigureView : UserControl
     {
         if (DataContext is not DeviceConfigureViewModel vm) return;
         vm.ClearGrandezasCommand.Execute(null);
-        this.FindControl<ListBox>("AvailableList")?.SelectedItems?.Clear();
+
+        var available = this.FindControl<ListBox>("AvailableList");
+        available?.SelectedItems?.Clear();
+
         this.FindControl<ListBox>("SelectedList")?.SelectedItems?.Clear();
+
+        // Defer the scroll reset to after the ListBox layout settles — calling it
+        // inline gets overridden by Avalonia bringing the just-inserted items into view.
+        if (available is not null)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                var sv = available.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+                if (sv is not null)
+                    sv.Offset = new Vector(sv.Offset.X, 0);
+            }, DispatcherPriority.Background);
+        }
     }
 }
