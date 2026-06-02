@@ -300,41 +300,16 @@ public partial class DeviceConfigureViewModel : ObservableObject
 
         [ObservableProperty] private bool _isSelected;
         [ObservableProperty] private int? _order;
-        [ObservableProperty] private bool _isVisible = true;
 
         public GrandezaItemViewModel(Grandeza model) { Model = model; }
-
-        public bool MatchesSearch(string? query)
-        {
-            if (string.IsNullOrWhiteSpace(query)) return true;
-            return Code.Contains(query, StringComparison.OrdinalIgnoreCase)
-                || Description.Contains(query, StringComparison.OrdinalIgnoreCase);
-        }
     }
 
-    public sealed partial class GrandezaCategoryGroup : ObservableObject
-    {
-        public GrandezaCategory Category { get; }
-        public string Label { get; }
-        public IReadOnlyList<GrandezaItemViewModel> Items { get; }
-
-        [ObservableProperty] private bool _isVisible = true;
-
-        public GrandezaCategoryGroup(GrandezaCategory category, string label, IReadOnlyList<GrandezaItemViewModel> items)
-        {
-            Category = category;
-            Label = label;
-            Items = items;
-        }
-
-        public override string ToString() => Label;
-    }
-
-    public ObservableCollection<GrandezaCategoryGroup> AvailableGrouped { get; } = new();
+    // Catalog order is the natural display order on the left list (already grouped by category
+    // within the static catalog, so equivalent grandezas stay near each other without Expanders).
+    public ObservableCollection<GrandezaItemViewModel> AvailableFlat { get; } = new();
     public ObservableCollection<GrandezaItemViewModel> SelectedOrdered { get; } = new();
 
     [ObservableProperty] private int _maxGrandezas = 50;
-    [ObservableProperty] private string _searchText = string.Empty;
 
     public int SelectedCount => SelectedOrdered.Count;
     public string GrandezaCounterText =>
@@ -344,29 +319,16 @@ public partial class DeviceConfigureViewModel : ObservableObject
 
     partial void OnMaxGrandezasChanged(int value) => OnPropertyChanged(nameof(GrandezaCounterText));
 
-    partial void OnSearchTextChanged(string value) => ApplyGrandezaFilter();
-
-    private void ApplyGrandezaFilter()
-    {
-        var query = SearchText;
-        foreach (var group in AvailableGrouped)
-        {
-            int visibleCount = 0;
-            foreach (var item in group.Items)
-            {
-                var matches = item.MatchesSearch(query);
-                item.IsVisible = matches;
-                if (matches) visibleCount++;
-            }
-            group.IsVisible = visibleCount > 0;
-        }
-    }
-
+    // Master list in the canonical catalog order — used to restore items to AvailableFlat
+    // in the original position when removed from the selected panel.
+    private readonly List<GrandezaItemViewModel> _catalogOrder = new();
     private readonly Dictionary<ushort, GrandezaItemViewModel> _grandezaById = new();
 
     private void BuildGrandezaCatalog()
     {
-        AvailableGrouped.Clear();
+        AvailableFlat.Clear();
+        SelectedOrdered.Clear();
+        _catalogOrder.Clear();
         _grandezaById.Clear();
 
         var deviceCode = Device.Device.DeviceModel?.DeviceCode;
@@ -375,40 +337,25 @@ public partial class DeviceConfigureViewModel : ObservableObject
 
         MaxGrandezas = GrandezaCatalog.Limit(deviceCode, Device.Device.FirmwareVersion);
 
-        var loc = Modbus.Desktop.Services.LocalizationService.Instance;
-        foreach (var group in catalog.GroupBy(g => g.Category))
+        foreach (var g in catalog)
         {
-            var items = group
-                .Select(g => { var vm = new GrandezaItemViewModel(g); _grandezaById[g.MqttId] = vm; return vm; })
-                .ToList();
-            AvailableGrouped.Add(new GrandezaCategoryGroup(group.Key, loc[CategoryLocalizationKey(group.Key)], items));
+            var vm = new GrandezaItemViewModel(g);
+            _grandezaById[g.MqttId] = vm;
+            _catalogOrder.Add(vm);
+            AvailableFlat.Add(vm);
         }
     }
 
-    private static string CategoryLocalizationKey(GrandezaCategory c) => c switch
-    {
-        GrandezaCategory.Tensao            => "CfgCatTensao",
-        GrandezaCategory.Corrente          => "CfgCatCorrente",
-        GrandezaCategory.Frequencia        => "CfgCatFrequencia",
-        GrandezaCategory.PotenciaAtiva     => "CfgCatPotenciaAtiva",
-        GrandezaCategory.PotenciaReativa   => "CfgCatPotenciaReativa",
-        GrandezaCategory.PotenciaAparente  => "CfgCatPotenciaAparente",
-        GrandezaCategory.FatorPotencia     => "CfgCatFatorPotencia",
-        GrandezaCategory.EntradasSaidas    => "CfgCatEntradasSaidas",
-        GrandezaCategory.Horimetro         => "CfgCatHorimetro",
-        GrandezaCategory.Energia           => "CfgCatEnergia",
-        GrandezaCategory.DeltaEnergia      => "CfgCatDeltaEnergia",
-        GrandezaCategory.EnergiaPorFase    => "CfgCatEnergiaPorFase",
-        _                                  => "CfgCatOutros",
-    };
-
     private void ApplyGrandezasFromRegs(IReadOnlyDictionary<ushort, ushort> regs, DeviceConfigProfile p)
     {
+        // Rebuild both lists from scratch so the call is idempotent (Save → re-read uses this too).
         SelectedOrdered.Clear();
-        foreach (var item in _grandezaById.Values)
+        AvailableFlat.Clear();
+        foreach (var item in _catalogOrder)
         {
             item.IsSelected = false;
             item.Order = null;
+            AvailableFlat.Add(item);
         }
 
         var slotAddrs = new List<ushort>();
@@ -417,25 +364,154 @@ public partial class DeviceConfigureViewModel : ObservableObject
         if (p.AddrGrandezasSlots21to50 is RegisterField f2)
             for (int i = 0; i < f2.WordCount; i++) slotAddrs.Add((ushort)(f2.Addr + i));
 
-        int order = 0;
+        // Collect first, then sort by MqttId so SelectedOrdered is always kept in ascending
+        // address order (matches what subsequent Add operations enforce).
+        var loaded = new List<GrandezaItemViewModel>();
         foreach (var addr in slotAddrs)
         {
             if (!regs.TryGetValue(addr, out var raw)) continue;
             if (raw == 0xFFFF || raw == 0x0000) continue;
 
             if (_grandezaById.TryGetValue(raw, out var item))
-            {
-                order++;
-                item.IsSelected = true;
-                item.Order = order;
-                SelectedOrdered.Add(item);
-            }
+                loaded.Add(item);
             else
-            {
                 Debug.WriteLine($"[Grandezas] ID {raw} no slot {addr} não encontrado no catálogo do modelo.");
-            }
         }
 
+        foreach (var item in loaded.OrderBy(g => g.MqttId))
+        {
+            item.IsSelected = true;
+            SelectedOrdered.Add(item);
+            AvailableFlat.Remove(item);
+        }
+
+        RecomputeOrders();
+    }
+
+    // ── Grandeza editing commands (used by the two-list panel buttons) ───────
+    // Commands take the ListBox.SelectedItems as parameter (IList) — Avalonia exposes the
+    // multi-selection observably but there's no two-way SelectedItems binding, so passing it
+    // via CommandParameter is the cleanest MVVM approach.
+    // Returns the index in AvailableFlat that the caller (the View) should select next so the
+    // user can keep pressing "→" to add grandezas in sequence without re-clicking the list.
+    // Returns -1 when no further selection is possible (empty list).
+    public int AddGrandezasReturningNextIndex(System.Collections.IList? selectedFromAvailable)
+    {
+        if (selectedFromAvailable is null || selectedFromAvailable.Count == 0) return -1;
+
+        // Snapshot to a typed list — modifying AvailableFlat would invalidate the live SelectedItems.
+        var toAdd = selectedFromAvailable
+            .OfType<GrandezaItemViewModel>()
+            .ToList();
+        if (toAdd.Count == 0) return -1;
+
+        // Remember the smallest index of the items being removed; after the operation, that
+        // slot is occupied by whatever item was immediately after the original selection —
+        // selecting it gives the user a "press → repeatedly" affordance.
+        int nextIndex = toAdd
+            .Select(it => AvailableFlat.IndexOf(it))
+            .Where(i => i >= 0)
+            .DefaultIfEmpty(-1)
+            .Min();
+
+        bool limitHit = false;
+        foreach (var item in toAdd)
+        {
+            if (SelectedOrdered.Count >= MaxGrandezas) { limitHit = true; break; }
+            if (item.IsSelected) continue; // safety: skip if already selected somehow
+            item.IsSelected = true;
+            InsertSelectedByMqttId(item);
+            AvailableFlat.Remove(item);
+        }
+
+        RecomputeOrders();
+        if (limitHit)
+        {
+            var loc = Modbus.Desktop.Services.LocalizationService.Instance;
+            SaveError = string.Format(loc["CfgGrandezaLimitReached"], MaxGrandezas);
+        }
+
+        if (AvailableFlat.Count == 0) return -1;
+        return Math.Clamp(nextIndex, 0, AvailableFlat.Count - 1);
+    }
+
+    // Convenience for binding via CommandParameter — same logic, ignores the next-index hint.
+    [RelayCommand]
+    private void AddGrandezas(System.Collections.IList? selectedFromAvailable)
+        => AddGrandezasReturningNextIndex(selectedFromAvailable);
+
+    // Inserts an item into SelectedOrdered keeping the list sorted by MqttId ascending,
+    // so slots on the device are always written in address order.
+    private void InsertSelectedByMqttId(GrandezaItemViewModel item)
+    {
+        int i = 0;
+        while (i < SelectedOrdered.Count && SelectedOrdered[i].MqttId < item.MqttId) i++;
+        SelectedOrdered.Insert(i, item);
+    }
+
+    // Returns the index in SelectedOrdered that the caller (the View) should select next so
+    // the user can keep pressing "←" to remove grandezas in sequence without re-clicking.
+    // Returns -1 when no further selection is possible (empty list).
+    public int RemoveGrandezasReturningNextIndex(System.Collections.IList? selectedFromSelected)
+    {
+        if (selectedFromSelected is null || selectedFromSelected.Count == 0) return -1;
+        var toRemove = selectedFromSelected
+            .OfType<GrandezaItemViewModel>()
+            .ToList();
+        if (toRemove.Count == 0) return -1;
+
+        int nextIndex = toRemove
+            .Select(it => SelectedOrdered.IndexOf(it))
+            .Where(i => i >= 0)
+            .DefaultIfEmpty(-1)
+            .Min();
+
+        foreach (var item in toRemove)
+            RestoreToAvailable(item);
+        RecomputeOrders();
+
+        if (SelectedOrdered.Count == 0) return -1;
+        return Math.Clamp(nextIndex, 0, SelectedOrdered.Count - 1);
+    }
+
+    // Convenience wrapper for binding (currently unused — the View calls the returning version
+    // via code-behind to also drive focus/selection).
+    [RelayCommand]
+    private void RemoveGrandezas(System.Collections.IList? selectedFromSelected)
+        => RemoveGrandezasReturningNextIndex(selectedFromSelected);
+
+    [RelayCommand]
+    private void ClearGrandezas()
+    {
+        if (SelectedOrdered.Count == 0) return;
+        var snapshot = SelectedOrdered.ToList();
+        foreach (var item in snapshot)
+            RestoreToAvailable(item);
+        RecomputeOrders();
+    }
+
+    private void RestoreToAvailable(GrandezaItemViewModel item)
+    {
+        SelectedOrdered.Remove(item);
+        item.IsSelected = false;
+        item.Order = null;
+
+        // Insert at the position dictated by _catalogOrder so the left list keeps a stable
+        // logical sort even after multiple add/remove cycles.
+        int catalogIdx = _catalogOrder.IndexOf(item);
+        int insertAt = 0;
+        for (int i = 0; i < AvailableFlat.Count; i++)
+        {
+            if (_catalogOrder.IndexOf(AvailableFlat[i]) > catalogIdx) break;
+            insertAt = i + 1;
+        }
+        AvailableFlat.Insert(insertAt, item);
+    }
+
+    private void RecomputeOrders()
+    {
+        for (int i = 0; i < SelectedOrdered.Count; i++)
+            SelectedOrdered[i].Order = i + 1;
         OnPropertyChanged(nameof(SelectedCount));
         OnPropertyChanged(nameof(GrandezaCounterText));
     }
@@ -1032,6 +1108,13 @@ public partial class DeviceConfigureViewModel : ObservableObject
             }
         }
 
+        // ── IoT grandezas slot blocks ────────────────────────────────────────
+        // Build the full 50-slot array from SelectedOrdered (pad empty with 0xFFFF),
+        // then emit one WriteOp per profile field if any word in that field differs
+        // from the baseline. WriteMultipleRegistersAsync handles the FC16 22-word chunking.
+        AddGrandezaBlockDirty(p.AddrGrandezasSlots1to20,  startSlot: 0);
+        AddGrandezaBlockDirty(p.AddrGrandezasSlots21to50, startSlot: 20);
+
         // Any op whose start address is in the device's "needs commit" string range
         // triggers a single FC05 coil-6 at the end of the Save flow.
         if (ops.Any(o => o.ModiconAddr >= 43461))
@@ -1086,6 +1169,35 @@ public partial class DeviceConfigureViewModel : ObservableObject
             var existing = f.ExtractString(baseline) ?? string.Empty;
             if (string.Equals(existing, current, StringComparison.Ordinal)) return;
             ops.Add(new WriteOp(f.Addr, f.EncodeString(current)));
+        }
+
+        // Build the desired words for the slice [startSlot .. startSlot + f.WordCount) from
+        // SelectedOrdered (one ushort MqttId per slot, 0xFFFF for empty), then emit one
+        // WriteOp covering the whole field if any word differs from the baseline.
+        void AddGrandezaBlockDirty(RegisterField? field, int startSlot)
+        {
+            if (field is not RegisterField f) return;
+
+            var desired = new ushort[f.WordCount];
+            for (int i = 0; i < f.WordCount; i++)
+            {
+                int slotIdx = startSlot + i;
+                desired[i] = slotIdx < SelectedOrdered.Count
+                    ? SelectedOrdered[slotIdx].MqttId
+                    : (ushort)0xFFFF;
+            }
+
+            bool dirty = false;
+            for (int i = 0; i < f.WordCount; i++)
+            {
+                if (!baseline.TryGetValue((ushort)(f.Addr + i), out var baseWord) || baseWord != desired[i])
+                {
+                    dirty = true;
+                    break;
+                }
+            }
+            if (dirty)
+                ops.Add(new WriteOp(f.Addr, desired));
         }
 
         ushort EncodeSeqPf()
