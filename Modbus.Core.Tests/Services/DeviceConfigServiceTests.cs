@@ -350,6 +350,45 @@ public sealed class DeviceConfigServiceTests
     }
 
     [Fact]
+    public async Task WriteBatchAsync_IotBufferCoil_SentBeforeResetCoil()
+    {
+        // When IoT grandezas / send interval change, the model-specific IoT buffer reset coil
+        // (here wire 90 = KS-3000) must be pulsed BEFORE the commit/reset coil (wire 5).
+        _svc.IsConnected.Returns(true);
+        _service.IotBufferResetSettleMs = 0; // skip the multi-second settle wait in tests
+
+        var coilCalls = new List<ushort>();
+        _svc.When(s => s.WriteSingleCoilAsync(
+                Arg.Any<byte>(), Arg.Any<ushort>(), Arg.Any<bool>(), Arg.Any<CancellationToken>()))
+            .Do(ci => coilCalls.Add(ci.ArgAt<ushort>(1)));
+
+        var batch = new List<RegisterWrite> { new(42101, [ (ushort)5 ]) }; // send interval
+
+        var result = await _service.WriteBatchAsync(
+            Device, batch, sendCoilResetAfter: true, iotBufferResetCoil: 90);
+
+        result.Completed.Should().Be(1);
+        result.CoilResetSent.Should().BeTrue();
+        coilCalls.Should().Equal((ushort)90, (ushort)5); // buffer coil first, then reset coil
+    }
+
+    [Fact]
+    public async Task WriteBatchAsync_NoIotBufferCoil_OnlySendsResetCoil()
+    {
+        _svc.IsConnected.Returns(true);
+        var coilCalls = new List<ushort>();
+        _svc.When(s => s.WriteSingleCoilAsync(
+                Arg.Any<byte>(), Arg.Any<ushort>(), Arg.Any<bool>(), Arg.Any<CancellationToken>()))
+            .Do(ci => coilCalls.Add(ci.ArgAt<ushort>(1)));
+
+        var batch = new List<RegisterWrite> { new(40005, [ (ushort)11 ]) };
+
+        await _service.WriteBatchAsync(Device, batch, sendCoilResetAfter: true); // iotBufferResetCoil null
+
+        coilCalls.Should().Equal((ushort)5); // only the reset coil
+    }
+
+    [Fact]
     public async Task WriteBatchAsync_CoilResetTimesOut_StillReportsCoilSent()
     {
         // RTU: the meter applies the reset coil and reboots without echoing the FC05 response,

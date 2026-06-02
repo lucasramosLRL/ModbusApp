@@ -452,7 +452,35 @@ At the end of any save with ≥1 write, `DeviceConfigService.WriteBatchAsync(sen
 
 **Verified against a captured frame:** ground-truth reset frame for slave 2 is `02 05 00 05 FF 00 9C 08` (FC05, coil `0x0005`, value ON `0xFF00`), so `CoilResetAddress = 5`. `ModbusRtuFrameBuilderTests.WriteSingleCoil_ResetCoil_MatchesCapturedFrame` locks this byte-for-byte.
 
-**RTU no-echo handling:** the meter applies the coil and reboots **without echoing** the FC05 response, so `RtuModbusTransport.ReadExactAsync` throws `TimeoutException` after 1s. The coil-reset block in `WriteBatchAsync` (and `WriteCoilAsync`) treats `TimeoutException` (alongside `IOException` / `OperationCanceledException`) as **success**. After the coil, `SaveAsync` calls `WaitForDeviceReachableAsync` to wait out the reboot before the confirmation re-read.
+**RTU no-echo handling:** the meter applies the coil and reboots **without echoing** the FC05 response, so `RtuModbusTransport.ReadExactAsync` throws `TimeoutException` after 1s. `DeviceConfigService.SendCoilTolerantAsync` (used for both the reset coil and the IoT buffer coil) treats `TimeoutException` (alongside `IOException` / `OperationCanceledException` / `ModbusProtocolException`) as **success**. After the coil, `SaveAsync` calls `WaitForDeviceReachableAsync` to wait out the reboot before the confirmation re-read.
+
+### IoT buffer / mass-memory reset coil — before the commit coil when IoT changes
+When the user changes the **IoT grandezas selection and/or the send interval**, an extra coil must
+be pulsed to clear the IoT buffer / reset mass memory **before** the commit/reset coil. The meter
+then needs ~6s to settle; firing the reset coil sooner pushes it into a mass-memory self-test.
+
+Sequence in `WriteBatchAsync` when `iotBufferResetCoil` is set + `sendCoilResetAfter`:
+**writes → IoT buffer coil → wait `IotBufferResetSettleMs` (7s) → reset coil (5)**.
+
+Per-model buffer coil (wire = doc − 1), in `DeviceConfigProfile.IotBufferResetCoil`:
+- **KS-3000**: doc coil 91 → **wire 90**
+- **Konect 120**: doc coil 80 → **wire 79**
+
+`DeviceConfigureViewModel.BuildWriteOperations` sets `needsIotBufferReset` when any write op targets
+`AddrGrandezasSlots1to20` / `AddrGrandezasSlots21to50` / `AddrSendInterval`; `SaveAsync` then passes
+`_profile.IotBufferResetCoil` to `WriteBatchAsync`. `IotBufferResetSettleMs` is an `internal`
+property so tests zero it to skip the wait.
+
+**User confirmation (blocking, on Save):** because this erases logged mass-memory data, `SaveAsync`
+awaits `ConfirmMassMemoryReset` (a `Func<Task<bool>>?` the VM exposes) right before pausing polling
+— only when a buffer reset will actually fire. The View (`DeviceConfigureView` code-behind) wires
+this to a confirmation `Window` on `DataContextChanged`, mirroring the delete-confirm pattern in
+`DeviceListView`. Strings: `CfgMemResetTitle/Msg/Confirm`. When the callback is null (e.g. unit
+context) the save proceeds without asking.
+
+**Declining:** `RevertIotMemoryFields()` reverts only the reset-triggering fields (grandezas +
+send interval) to the baseline and aborts the save (no device writes). Unrelated edits are kept,
+and a later save won't re-trigger the reset since those fields now match the baseline.
 
 ### Coil inventory (all FC05 coils) — confirmed correct (wire = doc − 1)
 | Doc (Modicon) | Wire addr | Function | Value | Where |
@@ -464,6 +492,8 @@ At the end of any save with ≥1 write, `DeviceConfigService.WriteBatchAsync(sen
 | 23 | **22** | Reset EDP-3 counter | ON | `BuildIoChannels` |
 | 31 | **30** | Digital output SD-1 on/off | ON/OFF | `BuildIoChannels` |
 | 32 | **31** | Digital output SD-2 on/off | ON/OFF | `BuildIoChannels` |
+| 91 | **90** | IoT buffer / mass-memory reset — **KS-3000** | ON | `DeviceConfigProfileRegistry.Ks3000.IotBufferResetCoil` |
+| 80 | **79** | IoT buffer / mass-memory reset — **Konect 120** | ON | `DeviceConfigProfileRegistry.Konect120.IotBufferResetCoil` |
 
 All wire values verified by the user against the documentation — no changes needed.
 

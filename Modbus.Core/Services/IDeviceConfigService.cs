@@ -88,11 +88,18 @@ public interface IDeviceConfigService
     /// Executes a batch of writes against a single persistent connection (and, optionally,
     /// the commit coil at the end). Greatly faster than calling WriteAsync/WriteMultipleRegistersAsync
     /// in a loop because each of those reopens the TCP socket from scratch.
+    /// <para>
+    /// When <paramref name="iotBufferResetCoil"/> is set AND <paramref name="sendCoilResetAfter"/>
+    /// is true, that coil (the IoT buffer / mass-memory reset) is pulsed first, followed by a
+    /// settle delay, and only then the commit/reset coil — required after IoT grandezas / send
+    /// interval changes so the meter doesn't fall into a mass-memory self-test.
+    /// </para>
     /// </summary>
     Task<WriteBatchResult> WriteBatchAsync(
         ModbusDevice device,
         IReadOnlyList<RegisterWrite> writes,
         bool sendCoilResetAfter,
+        ushort? iotBufferResetCoil = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

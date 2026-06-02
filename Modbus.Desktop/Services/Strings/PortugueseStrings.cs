@@ -27,6 +27,11 @@ internal static class PortugueseStrings
         ["ConfirmDeleteMsg"]     = "Excluir \"{0}\"? Esta ação não pode ser desfeita.",
         ["Cancel"]               = "Cancelar",
 
+        // Mass-memory reset confirmation (IoT grandezas / send interval change)
+        ["CfgMemResetTitle"]     = "Reiniciar memória de massa",
+        ["CfgMemResetMsg"]       = "Alterar as grandezas e/ou o intervalo de envio reinicia a memória de massa do medidor, apagando os dados já registrados. Deseja continuar?",
+        ["CfgMemResetConfirm"]   = "Continuar",
+
         // AddDeviceView
         ["Back"]                 = "← Voltar",
         ["AddDeviceTitle"]       = "Adicionar Dispositivo",

@@ -187,10 +187,17 @@ public sealed class DeviceConfigService : IDeviceConfigService
     public Task SendCoilResetAsync(ModbusDevice device, CancellationToken cancellationToken = default) =>
         WriteCoilAsync(device, CoilResetAddress, true, cancellationToken);
 
+    // After pulsing the IoT buffer / mass-memory reset coil, the meter needs a few seconds to
+    // finish that reset. Firing the commit/reset coil sooner than ~6s pushes it into a
+    // mass-memory self-test, so we wait a little longer than 6s for margin.
+    // Instance property (not const) so tests (InternalsVisibleTo) can zero it and skip the wait.
+    internal int IotBufferResetSettleMs { get; set; } = 7000;
+
     public async Task<WriteBatchResult> WriteBatchAsync(
         ModbusDevice device,
         IReadOnlyList<RegisterWrite> writes,
         bool sendCoilResetAfter,
+        ushort? iotBufferResetCoil = null,
         CancellationToken cancellationToken = default)
     {
         var writeList = writes ?? Array.Empty<RegisterWrite>();
@@ -203,6 +210,8 @@ public sealed class DeviceConfigService : IDeviceConfigService
         // 30s timeout overhead of WriteAsync/WriteMultipleRegistersAsync without assuming
         // the device keeps the socket alive across the whole batch.
         int totalSeconds = Math.Max(TimeoutSeconds, writeList.Count * 5 + 15);
+        if (iotBufferResetCoil is not null)
+            totalSeconds += IotBufferResetSettleMs / 1000 + 10; // settle delay + the extra coil round-trip
         using var svc = _factory.Create(device);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(TimeSpan.FromSeconds(totalSeconds));
@@ -295,37 +304,25 @@ public sealed class DeviceConfigService : IDeviceConfigService
 
             if (sendCoilResetAfter)
             {
+                // IoT grandezas / send-interval changes require clearing the IoT buffer (mass-memory
+                // reset) via this coil BEFORE the commit/reset coil. The meter needs a few seconds to
+                // finish; firing the reset coil too soon pushes it into a mass-memory self-test.
+                if (iotBufferResetCoil is ushort bufCoil)
+                {
+                    await SendCoilTolerantAsync(svc, device, bufCoil, cancellationToken, cts.Token,
+                        $"IoT buffer reset coil {bufCoil}");
+                    try { await Task.Delay(IotBufferResetSettleMs, cts.Token); }
+                    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                    {
+                        // Batch budget exhausted during the settle wait — proceed to the reset coil anyway.
+                    }
+                }
+
                 // KS-3000 closes the socket after applying the commit coil and never echoes
                 // FC05 — treat timeout / IO / EndOfStream as success here.
-                try
-                {
-                    if (!svc.IsConnected) await svc.ConnectAsync(cts.Token);
-                    await svc.WriteSingleCoilAsync(device.SlaveId, CoilResetAddress, true, cts.Token);
-                    coilResetSent = true;
-                }
-                catch (ModbusProtocolException ex)
-                {
-                    Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} rejected — {ex.Message}");
-                    coilResetSent = true; // device deliberately refused — don't retry
-                }
-                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-                {
-                    Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} — no echo, treated as success.");
-                    coilResetSent = true;
-                }
-                catch (TimeoutException)
-                {
-                    // RTU: o medidor aplica o coil e reinicia sem ecoar a resposta FC05;
-                    // o transporte estoura em 1s. Tratar como sucesso.
-                    Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} — sem eco (RTU), tratado como sucesso.");
-                    coilResetSent = true;
-                }
-                catch (IOException)
-                {
-                    // IOException covers EndOfStreamException as well.
-                    Debug.WriteLine($"[DeviceConfigService] Coil reset {CoilResetAddress} — connection closed, treated as success.");
-                    coilResetSent = true;
-                }
+                coilResetSent = await SendCoilTolerantAsync(
+                    svc, device, CoilResetAddress, cancellationToken, cts.Token,
+                    $"Coil reset {CoilResetAddress}");
             }
         }
         finally
@@ -492,6 +489,45 @@ public sealed class DeviceConfigService : IDeviceConfigService
             }
         }
         throw lastError ?? new IOException($"{label}: unknown write failure after {MaxAttempts} attempts.");
+    }
+
+    // Sends a single coil (ON) on an already-open service, tolerating the meter's habit of
+    // applying it and going briefly unresponsive — or rebooting, for the reset coil — without
+    // echoing the FC05 response. Treats Modbus reject / our-own-timeout cancellation / RTU
+    // TimeoutException / IO (incl. EndOfStream) as "applied". <paramref name="outerCt"/> is the
+    // caller's original token (used to tell a real cancellation apart from our internal timeout).
+    private static async Task<bool> SendCoilTolerantAsync(
+        IModbusService svc, ModbusDevice device, ushort coilAddress,
+        CancellationToken outerCt, CancellationToken ct, string label)
+    {
+        try
+        {
+            if (!svc.IsConnected) await svc.ConnectAsync(ct);
+            await svc.WriteSingleCoilAsync(device.SlaveId, coilAddress, true, ct);
+            return true;
+        }
+        catch (ModbusProtocolException ex)
+        {
+            Debug.WriteLine($"[DeviceConfigService] {label} rejected — {ex.Message}");
+            return true; // device deliberately refused — don't retry
+        }
+        catch (OperationCanceledException) when (!outerCt.IsCancellationRequested)
+        {
+            Debug.WriteLine($"[DeviceConfigService] {label} — no echo / internal timeout, treated as success.");
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            // RTU: the meter applies the coil and goes silent; the transport times out at 1s.
+            Debug.WriteLine($"[DeviceConfigService] {label} — sem eco (RTU), tratado como sucesso.");
+            return true;
+        }
+        catch (IOException)
+        {
+            // IOException covers EndOfStreamException as well.
+            Debug.WriteLine($"[DeviceConfigService] {label} — connection closed, treated as success.");
+            return true;
+        }
     }
 
     public async Task WriteCoilAsync(

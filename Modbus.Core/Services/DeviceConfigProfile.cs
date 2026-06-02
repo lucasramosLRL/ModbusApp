@@ -86,6 +86,14 @@ public sealed class DeviceConfigProfile
     // ── Entradas e Saídas ─────────────────────────────────────────────────────
     public RegisterField? AddrDebounceEdp    { get; init; }
 
+    // ── IoT buffer / mass-memory reset coil (FC05) ────────────────────────────
+    // WIRE address (= KRON document coil number − 1). When the user changes the IoT
+    // grandezas selection and/or the send interval, this coil must be pulsed BEFORE the
+    // commit/reset coil to clear the IoT buffer / reset mass memory. The meter then needs
+    // a few seconds to settle before the reset coil (see DeviceConfigService).
+    // Not an "Addr*" RegisterField, so it is excluded from AllFields/AllAddresses reads.
+    public ushort? IotBufferResetCoil { get; init; }
+
     /// <summary>
     /// All unique Modicon register addresses needed for a bulk read, sorted ascending.
     /// Bit-fields sharing the same register appear only once.

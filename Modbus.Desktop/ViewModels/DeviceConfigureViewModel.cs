@@ -22,6 +22,13 @@ public partial class DeviceConfigureViewModel : ObservableObject
     private readonly Func<Task> _pausePolling;
     private readonly Action _resumePolling;
 
+    /// <summary>
+    /// Set by the View. Asked (blocking) right before a save that will reset the meter's mass
+    /// memory — i.e. when the IoT grandezas selection and/or send interval changed. Returns
+    /// true to proceed, false to cancel the save. When null, the save proceeds without asking.
+    /// </summary>
+    public Func<Task<bool>>? ConfirmMassMemoryReset { get; set; }
+
     public DeviceItemViewModel Device { get; }
 
     // ── Section navigation ───────────────────────────────────────────────────
@@ -675,6 +682,18 @@ public partial class DeviceConfigureViewModel : ObservableObject
         SaveError = null;
     }
 
+    // Reverts only the fields that would trigger a mass-memory reset (IoT grandezas +
+    // send interval) back to the last read values, leaving unrelated edits untouched.
+    // Called when the user declines the mass-memory-reset confirmation on Save.
+    private void RevertIotMemoryFields()
+    {
+        if (_baseline is null || _profile is null) return;
+        if (HasIotGrandezaSelection)
+            ApplyGrandezasFromRegs(_baseline, _profile);
+        if (_profile.AddrSendInterval?.ExtractValue(_baseline) is uint si)
+            SendInterval = si;
+    }
+
     [RelayCommand]
     private void UseNow()
     {
@@ -692,12 +711,31 @@ public partial class DeviceConfigureViewModel : ObservableObject
         SaveSuccess = null;
         try
         {
-            var ops = BuildWriteOperations(_baseline, _profile, out bool needsCoilReset);
+            var ops = BuildWriteOperations(_baseline, _profile, out bool needsCoilReset, out bool needsIotBufferReset);
 
             if (ops.Count == 0 && !needsCoilReset)
             {
                 // Nothing changed — exit silently without hitting the device.
                 return;
+            }
+
+            // When IoT grandezas / send interval changed, the model-specific IoT buffer
+            // reset coil must be pulsed (then a settle wait) before the commit/reset coil.
+            ushort? iotBufferCoil = needsIotBufferReset ? _profile.IotBufferResetCoil : null;
+
+            // That coil reinitializes the meter's mass memory (logged data is lost), so ask the
+            // user to confirm before touching the device. Declining reverts the IoT fields that
+            // would trigger the reset (grandezas + send interval) back to the last read values —
+            // so the screen returns to a consistent state and a later save won't reset memory —
+            // while keeping any unrelated edits. The save itself is aborted (no device writes).
+            if (iotBufferCoil is not null && ConfirmMassMemoryReset is not null)
+            {
+                bool proceed = await ConfirmMassMemoryReset();
+                if (!proceed)
+                {
+                    RevertIotMemoryFields();
+                    return;
+                }
             }
 
             // Build a single batch so the service can run every write (and the optional
@@ -731,7 +769,7 @@ public partial class DeviceConfigureViewModel : ObservableObject
                 for (int attempt = 0; attempt <= MaxRebootRetries; attempt++)
                 {
                     var result = await _configService.WriteBatchAsync(
-                        Device.Device, pending, stillNeedsCoilReset, CancellationToken.None);
+                        Device.Device, pending, stillNeedsCoilReset, iotBufferCoil, CancellationToken.None);
 
                     totalCompleted += result.Completed;
                     // If the coil reset was deferred (reboot interrupted before it ran),
@@ -991,10 +1029,12 @@ public partial class DeviceConfigureViewModel : ObservableObject
     private List<WriteOp> BuildWriteOperations(
         IReadOnlyDictionary<ushort, ushort> baseline,
         DeviceConfigProfile p,
-        out bool needsCoilReset)
+        out bool needsCoilReset,
+        out bool needsIotBufferReset)
     {
         var ops = new List<WriteOp>();
         needsCoilReset = false;
+        needsIotBufferReset = false;
 
         // ── Bit-fields and single-register bytes that share a holding register ──
         // Collect every dirty bit-field by its parent register; then for each register,
@@ -1120,6 +1160,15 @@ public partial class DeviceConfigureViewModel : ObservableObject
         // ao menos uma escrita (uma ou mais configurações).
         if (ops.Count > 0)
             needsCoilReset = true;
+
+        // Alterar as grandezas IoT e/ou o intervalo de envio exige limpar o buffer IoT /
+        // resetar a memória de massa (coil específico por modelo) ANTES do coil de reset.
+        bool TargetsField(RegisterField? f) =>
+            f is RegisterField rf && ops.Any(o => o.ModiconAddr == rf.Addr);
+        if (TargetsField(p.AddrGrandezasSlots1to20)
+            || TargetsField(p.AddrGrandezasSlots21to50)
+            || TargetsField(p.AddrSendInterval))
+            needsIotBufferReset = true;
 
         return ops;
 

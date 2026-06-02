@@ -100,6 +100,9 @@ public static class DeviceConfigProfileRegistry
 
         // ── Entradas e Saídas ─────────────────────────────────────────────────
         AddrDebounceEdp   = 40171,
+
+        // IoT buffer / mass-memory reset coil — KS-3000 doc coil 91 → wire 90.
+        IotBufferResetCoil = 90,
     };
 
     // ── Konect 120 (0xF3) ────────────────────────────────────────────────────
@@ -178,6 +181,9 @@ public static class DeviceConfigProfileRegistry
 
         // ── Entradas e Saídas ─────────────────────────────────────────────────
         AddrDebounceEdp   = 40171,
+
+        // IoT buffer / mass-memory reset coil — Konect 120 doc coil 80 → wire 79.
+        IotBufferResetCoil = 79,
     };
 
     private static readonly Dictionary<byte, DeviceConfigProfile> _map = new()

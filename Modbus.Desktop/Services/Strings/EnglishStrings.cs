@@ -27,6 +27,11 @@ internal static class EnglishStrings
         ["ConfirmDeleteMsg"]     = "Delete \"{0}\"? This action cannot be undone.",
         ["Cancel"]               = "Cancel",
 
+        // Mass-memory reset confirmation (IoT grandezas / send interval change)
+        ["CfgMemResetTitle"]     = "Reset mass memory",
+        ["CfgMemResetMsg"]       = "Changing the quantities and/or the send interval resets the meter's mass memory, erasing the data already logged. Continue?",
+        ["CfgMemResetConfirm"]   = "Continue",
+
         // AddDeviceView
         ["Back"]                 = "← Back",
         ["AddDeviceTitle"]       = "Add Device",

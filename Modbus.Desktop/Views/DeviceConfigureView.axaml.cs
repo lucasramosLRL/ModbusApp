@@ -1,10 +1,14 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Modbus.Desktop.Services;
 using Modbus.Desktop.ViewModels;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Modbus.Desktop.Views;
 
@@ -13,6 +17,77 @@ public partial class DeviceConfigureView : UserControl
     public DeviceConfigureView()
     {
         InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    // Wire the VM's mass-memory-reset confirmation to a real dialog. The VM stays UI-agnostic
+    // and just awaits a Func<Task<bool>>; the View owns the actual window.
+    private void OnDataContextChanged(object? sender, System.EventArgs e)
+    {
+        if (DataContext is DeviceConfigureViewModel vm)
+            vm.ConfirmMassMemoryReset = ShowMassMemoryResetConfirmAsync;
+    }
+
+    private async Task<bool> ShowMassMemoryResetConfirmAsync()
+    {
+        var result = false;
+        var loc = LocalizationService.Instance;
+
+        var dialog = new Window
+        {
+            Title = loc["CfgMemResetTitle"],
+            Width = 420,
+            Height = 180,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ShowInTaskbar = false
+        };
+
+        var confirmBtn = new Button
+        {
+            Content = loc["CfgMemResetConfirm"],
+            Padding = new Thickness(16, 8),
+            Background = new SolidColorBrush(Color.Parse("#C0392B")),
+            Foreground = Brushes.White
+        };
+        confirmBtn.Click += (_, _) => { result = true; dialog.Close(); };
+
+        var cancelBtn = new Button
+        {
+            Content = loc["Cancel"],
+            Padding = new Thickness(16, 8)
+        };
+        cancelBtn.Click += (_, _) => dialog.Close();
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(24),
+            Spacing = 20,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = loc["CfgMemResetMsg"],
+                    TextWrapping = TextWrapping.Wrap,
+                    FontSize = 14
+                },
+                new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Spacing = 8,
+                    Children = { cancelBtn, confirmBtn }
+                }
+            }
+        };
+
+        var owner = TopLevel.GetTopLevel(this) as Window;
+        if (owner is not null)
+            await dialog.ShowDialog(owner);
+        else
+            dialog.Show();
+
+        return result;
     }
 
     // Handled in code-behind (not via CommandParameter) so that after the add we can
