@@ -5,8 +5,8 @@
         x:Class="Modbus.Desktop.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="ModbusApp"
-        Width="1100" Height="810"
-        MinWidth="900" MinHeight="700"
+        Width="1300" Height="810"
+        MinWidth="1300" MinHeight="810"
         WindowStartupLocation="CenterScreen"
         Icon="/Assets/app.ico">
 
