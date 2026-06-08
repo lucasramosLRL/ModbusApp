@@ -17,7 +17,6 @@ public sealed class GrandezaCatalogTests
     {
         var u0 = GrandezaCatalog.ForDeviceCode(0xF2).Single(g => g.Code == "U0");
         u0.MqttId.Should().Be(2);
-        u0.Category.Should().Be(GrandezaCategory.Tensao);
     }
 
     [Fact]

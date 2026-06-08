@@ -303,7 +303,6 @@ public partial class DeviceConfigureViewModel : ObservableObject
         public ushort MqttId => Model.MqttId;
         public string Code => Model.Code;
         public string Description => Model.Description;
-        public GrandezaCategory Category => Model.Category;
 
         [ObservableProperty] private bool _isSelected;
         [ObservableProperty] private int? _order;
