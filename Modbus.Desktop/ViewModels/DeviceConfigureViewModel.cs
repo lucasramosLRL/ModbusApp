@@ -330,6 +330,20 @@ public partial class DeviceConfigureViewModel : ObservableObject
     private readonly List<GrandezaItemViewModel> _catalogOrder = new();
     private readonly Dictionary<ushort, GrandezaItemViewModel> _grandezaById = new();
 
+    // InOutCfg bitmask received from the hub (read via FC 0x79 for models with configurable I/O,
+    // or a hardcoded constant for fixed-I/O models like KS-3000).
+    private readonly ushort _inOutCfg;
+
+    // Maps MqttId → required InOutCfg bit. Grandezas not in this dict are always shown.
+    private static readonly Dictionary<ushort, ushort> _ioGrandezaBits = new()
+    {
+        [94]  = 0x01, [110] = 0x01, [130] = 0x01,  // EDP1
+        [96]  = 0x02, [111] = 0x02, [131] = 0x02,  // EDP2
+        [98]  = 0x04, [112] = 0x04, [132] = 0x04,  // EDP3
+        [113] = 0x08,                               // SD1
+        [114] = 0x10,                               // SD2
+    };
+
     private void BuildGrandezaCatalog()
     {
         AvailableFlat.Clear();
@@ -345,6 +359,11 @@ public partial class DeviceConfigureViewModel : ObservableObject
 
         foreach (var g in catalog)
         {
+            // Skip I/O grandezas whose hardware channel is not present on this unit.
+            if (_ioGrandezaBits.TryGetValue(g.MqttId, out ushort requiredBit) &&
+                (_inOutCfg & requiredBit) == 0)
+                continue;
+
             var vm = new GrandezaItemViewModel(g);
             _grandezaById[g.MqttId] = vm;
             _catalogOrder.Add(vm);
@@ -580,7 +599,8 @@ public partial class DeviceConfigureViewModel : ObservableObject
         IDeviceRepository deviceRepository,
         Func<Task> pausePolling,
         Action resumePolling,
-        Action onGoBack)
+        Action onGoBack,
+        ushort inOutCfg = 0x001F)
     {
         Device              = device;
         _configService      = configService;
@@ -588,6 +608,7 @@ public partial class DeviceConfigureViewModel : ObservableObject
         _pausePolling  = pausePolling;
         _resumePolling = resumePolling;
         _onGoBack           = onGoBack;
+        _inOutCfg           = inOutCfg;
         _editableSlaveId    = device.SlaveId;
         _description        = device.Name;
 

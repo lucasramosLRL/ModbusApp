@@ -13,4 +13,5 @@ public enum DeviceCapabilities
     FieldKe            = 1 << 6,
     FieldCurrentInvert = 1 << 7,
     IotGrandezaSelection = 1 << 8,
+    ConfigurableIo       = 1 << 9,
 }

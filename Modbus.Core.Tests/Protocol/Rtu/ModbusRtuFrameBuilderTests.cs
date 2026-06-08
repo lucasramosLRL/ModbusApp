@@ -185,4 +185,33 @@ public class ModbusRtuFrameBuilderTests
         // CRC should also differ
         frame1[2..].Should().NotEqual(frame2[2..]);
     }
+
+    // ── ReadConfigDisp (FC 0x79) ─────────────────────────────────────────────
+
+    [Fact]
+    public void ReadConfigDisp_BuildsCorrect10ByteFrame()
+    {
+        var frame = _builder.ReadConfigDisp(serialNumber: 4002892u, startReg: 72, count: 2);
+
+        // Expected layout: 00 79 [SN 4B BE] [startReg] [count] [CRC 2B]
+        frame.Should().HaveCount(10, "broadcast(1)+FC(1)+SN(4)+startReg(1)+count(1)+CRC(2)");
+        frame[0].Should().Be(0x00, "broadcast slave address");
+        frame[1].Should().Be(0x79, "KRON ReadConfigDisp function code");
+        BinaryPrimitives.ReadUInt32BigEndian(frame.AsSpan(2)).Should().Be(4002892u, "serial number big-endian");
+        frame[6].Should().Be(72,   "start register");
+        frame[7].Should().Be(2,    "byte count");
+        Crc16.Validate(frame).Should().BeTrue("CRC must cover all 8 data bytes");
+    }
+
+    [Fact]
+    public void ReadConfigDisp_DifferentSerialNumbers_ProduceDifferentFrames()
+    {
+        var frame1 = _builder.ReadConfigDisp(1u, 72, 2);
+        var frame2 = _builder.ReadConfigDisp(2u, 72, 2);
+
+        BinaryPrimitives.ReadUInt32BigEndian(frame1.AsSpan(2))
+            .Should().NotBe(BinaryPrimitives.ReadUInt32BigEndian(frame2.AsSpan(2)));
+        Crc16.Validate(frame1).Should().BeTrue();
+        Crc16.Validate(frame2).Should().BeTrue();
+    }
 }

@@ -17,7 +17,7 @@ public static class DeviceCapabilityRegistry
                  DeviceCapabilities.FieldCurrentInvert |
                  DeviceCapabilities.IotGrandezaSelection,
 
-        // Konect 120 — Ethernet por cabo + Wi-Fi
+        // Konect 120 — Ethernet por cabo + Wi-Fi; I/O configurável na fábrica
         [0xF3] = DeviceCapabilities.Ethernet       |
                  DeviceCapabilities.Wireless        |
                  DeviceCapabilities.Sntp            |
@@ -26,7 +26,8 @@ public static class DeviceCapabilityRegistry
                  DeviceCapabilities.InputsOutputs   |
                  DeviceCapabilities.FieldKe         |
                  DeviceCapabilities.FieldCurrentInvert |
-                 DeviceCapabilities.IotGrandezaSelection,
+                 DeviceCapabilities.IotGrandezaSelection |
+                 DeviceCapabilities.ConfigurableIo,
     };
 
     public static DeviceCapabilities Get(byte? deviceCode) =>

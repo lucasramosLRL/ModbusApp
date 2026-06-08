@@ -49,7 +49,8 @@ public partial class DeviceDetailViewModel : ObservableObject, IDisposable
         IDeviceConfigService configService,
         Func<Task>? pausePolling,
         Action? resumePolling,
-        Action onGoBack)
+        Action onGoBack,
+        ushort inOutCfg = 0x001F)
     {
         Device = device;
         _registerValueRepository = registerValueRepository;
@@ -61,7 +62,7 @@ public partial class DeviceDetailViewModel : ObservableObject, IDisposable
 
         BuildReadingGroups();
         BuildHourmeterChannel();
-        BuildIoChannels();
+        BuildIoChannels(inOutCfg);
         BuildStatusChannel();
 
         _pollingEngine.RegisterValuesUpdated += OnRegisterValuesUpdated;
@@ -138,30 +139,56 @@ public partial class DeviceDetailViewModel : ObservableObject, IDisposable
         _ioUpdatesByAddress[160] = v => hm.UpdateHour(v);
     }
 
-    private void BuildIoChannels()
+    // InOutCfg bitmask constants (wire address in parentheses for coil writes):
+    // bit0=EDP1(coil 20), bit1=EDP2(coil 21), bit2=EDP3(coil 22), bit3=SD1(coil 30), bit4=SD2(coil 31)
+    private void BuildIoChannels(ushort inOutCfg)
     {
-        // Coil addresses (0-based): 20-22 = reset EDP1/2/3, 30-31 = SD1/2 on/off
-        var edp1 = new DigitalInputViewModel("EDP-1", () => WriteCoilSafeAsync(20, true));
-        var edp2 = new DigitalInputViewModel("EDP-2", () => WriteCoilSafeAsync(21, true));
-        var edp3 = new DigitalInputViewModel("EDP-3", () => WriteCoilSafeAsync(22, true));
-        var sd1  = new DigitalOutputViewModel("SD-1", v => WriteCoilSafeAsync(30, v));
-        var sd2  = new DigitalOutputViewModel("SD-2", v => WriteCoilSafeAsync(31, v));
+        var inputs  = new List<DigitalInputViewModel>();
+        var outputs = new List<DigitalOutputViewModel>();
 
-        DigitalInputs  = [edp1, edp2, edp3];
-        DigitalOutputs = [sd1, sd2];
+        if ((inOutCfg & 0x01) != 0)
+        {
+            var edp1 = new DigitalInputViewModel("EDP-1", () => WriteCoilSafeAsync(20, true));
+            inputs.Add(edp1);
+            _ioUpdatesByAddress[94]  = v => edp1.UpdateCounter(v);
+            _ioUpdatesByAddress[110] = v => edp1.UpdateStatus(v);
+            _ioUpdatesByAddress[130] = v => edp1.UpdatePulse(v);
+        }
 
-        // Map polling addresses to update callbacks
-        _ioUpdatesByAddress[94]  = v => edp1.UpdateCounter(v);
-        _ioUpdatesByAddress[96]  = v => edp2.UpdateCounter(v);
-        _ioUpdatesByAddress[98]  = v => edp3.UpdateCounter(v);
-        _ioUpdatesByAddress[110] = v => edp1.UpdateStatus(v);
-        _ioUpdatesByAddress[111] = v => edp2.UpdateStatus(v);
-        _ioUpdatesByAddress[112] = v => edp3.UpdateStatus(v);
-        _ioUpdatesByAddress[113] = v => sd1.UpdateStatus(v);
-        _ioUpdatesByAddress[114] = v => sd2.UpdateStatus(v);
-        _ioUpdatesByAddress[130] = v => edp1.UpdatePulse(v);
-        _ioUpdatesByAddress[131] = v => edp2.UpdatePulse(v);
-        _ioUpdatesByAddress[132] = v => edp3.UpdatePulse(v);
+        if ((inOutCfg & 0x02) != 0)
+        {
+            var edp2 = new DigitalInputViewModel("EDP-2", () => WriteCoilSafeAsync(21, true));
+            inputs.Add(edp2);
+            _ioUpdatesByAddress[96]  = v => edp2.UpdateCounter(v);
+            _ioUpdatesByAddress[111] = v => edp2.UpdateStatus(v);
+            _ioUpdatesByAddress[131] = v => edp2.UpdatePulse(v);
+        }
+
+        if ((inOutCfg & 0x04) != 0)
+        {
+            var edp3 = new DigitalInputViewModel("EDP-3", () => WriteCoilSafeAsync(22, true));
+            inputs.Add(edp3);
+            _ioUpdatesByAddress[98]  = v => edp3.UpdateCounter(v);
+            _ioUpdatesByAddress[112] = v => edp3.UpdateStatus(v);
+            _ioUpdatesByAddress[132] = v => edp3.UpdatePulse(v);
+        }
+
+        if ((inOutCfg & 0x08) != 0)
+        {
+            var sd1 = new DigitalOutputViewModel("SD-1", v => WriteCoilSafeAsync(30, v));
+            outputs.Add(sd1);
+            _ioUpdatesByAddress[113] = v => sd1.UpdateStatus(v);
+        }
+
+        if ((inOutCfg & 0x10) != 0)
+        {
+            var sd2 = new DigitalOutputViewModel("SD-2", v => WriteCoilSafeAsync(31, v));
+            outputs.Add(sd2);
+            _ioUpdatesByAddress[114] = v => sd2.UpdateStatus(v);
+        }
+
+        DigitalInputs  = inputs;
+        DigitalOutputs = outputs;
     }
 
     private void BuildStatusChannel()

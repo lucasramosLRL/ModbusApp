@@ -363,6 +363,54 @@ public sealed class DeviceConfigService : IDeviceConfigService
         Debug.WriteLine($"[DeviceConfigService] WriteSlaveAddress: FC 0x42 sent (SN={device.SerialNumber}, newAddr={newSlaveId}).");
     }
 
+    public async Task<ushort?> ReadInOutCfgAsync(
+        ModbusDevice device,
+        CancellationToken cancellationToken = default)
+    {
+        if (device.TransportType != TransportType.Rtu || device.Rtu is null)
+            return null; // FC 0x79 is RTU-only
+
+        try
+        {
+            var builder = new ModbusRtuFrameBuilder();
+            var parser  = new ModbusRtuFrameParser();
+
+            using var transport = new RtuModbusTransport(device.Rtu);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+
+            await transport.ConnectAsync(cts.Token);
+
+            // Read NS (serial number) via FC04, address 0, 2 words (UInt32 ByteSwapped)
+            uint serialNumber;
+            {
+                var nsRequest  = builder.ReadRegisters(device.SlaveId, Protocol.Enums.FunctionCode.ReadInputRegisters, 0, 2);
+                var nsResponse = await transport.SendAsync(nsRequest, 9, cts.Token); // 1+1+1+4+2
+                var nsWords    = parser.ParseReadRegisters(nsResponse);
+                // ByteSwapped: low word first on wire → combine as [1]<<16 | [0]
+                serialNumber = ((uint)nsWords[1] << 16) | nsWords[0];
+            }
+
+            // Send FC 0x79 ReadConfigDisp — read 2 bytes starting at register 72 (InOutCfg)
+            const byte StartReg = 72;
+            const byte Count    = 2;
+            const int  ResponseLength = 10 + Count; // 10 header + data bytes
+            var frame    = builder.ReadConfigDisp(serialNumber, StartReg, Count);
+            var response = await transport.SendAsync(frame, ResponseLength, cts.Token);
+            var data     = parser.ParseReadConfigDisp(response, Count);
+
+            // InOutCfg is a 16-bit value stored MSB-first across 2 bytes
+            ushort inOutCfg = (ushort)((data[0] << 8) | data[1]);
+            Debug.WriteLine($"[DeviceConfigService] ReadInOutCfg: SN={serialNumber}, InOutCfg=0x{inOutCfg:X4}");
+            return inOutCfg;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DeviceConfigService] ReadInOutCfg failed: {ex.Message} — fallback to all-enabled.");
+            return null;
+        }
+    }
+
     // Polls until the device responds to a single FC04 read or the window expires.
     // 30s covers the KS-3000 / Konect 120 bootloader reboot (~20s).
     // Returns true as soon as the device responds, false if it never comes back within the window.

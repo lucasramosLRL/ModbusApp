@@ -57,6 +57,23 @@ public class ModbusRtuFrameBuilder : IModbusFrameBuilder
     }
 
     /// <summary>
+    /// Builds a KRON FC 0x79 (ReadConfigDisp) broadcast frame.
+    /// ADU: 0x00(broadcast) + 0x79 + SerialNumber(4 BE) + StartReg(1) + Count(1) + CRC(2).
+    /// Device responds with its slave address, echoes the SN, and returns Count data bytes.
+    /// </summary>
+    public byte[] ReadConfigDisp(uint serialNumber, byte startReg, byte count)
+    {
+        var frame = new byte[10];
+        frame[0] = 0x00; // broadcast
+        frame[1] = 0x79;
+        BinaryPrimitives.WriteUInt32BigEndian(frame.AsSpan(2), serialNumber);
+        frame[6] = startReg;
+        frame[7] = count;
+        Crc16.Append(frame, 8);
+        return frame;
+    }
+
+    /// <summary>
     /// Builds a KRON FC 0x42 (configAddress) broadcast frame.
     /// ADU: 0x00(broadcast) + 0x42 + SerialNumber(4 BE) + NewSlaveId(1) + CRC(2).
     /// No response is expected — the device reboots after applying the new address.

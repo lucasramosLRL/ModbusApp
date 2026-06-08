@@ -188,4 +188,79 @@ public class ModbusRtuFrameParserTests
         result.RawData.Should().Equal(payload);
         result.RunIndicatorStatus.Should().Be(0x00);
     }
+
+    // ── ParseReadConfigDisp (FC 0x79) ────────────────────────────────────────
+
+    // Builds a valid FC 0x79 response frame.
+    // Layout: SlaveAddr(1) + 0x79(1) + SN(4) + ?(1) + Count(1) + Data(Count) + CRC(2)
+    private static byte[] BuildReadConfigDispResponse(byte slaveAddr, uint sn, byte[] data)
+    {
+        byte count = (byte)data.Length;
+        int messageLen = 8 + count; // without CRC
+        var frame = new byte[messageLen + 2];
+        frame[0] = slaveAddr;
+        frame[1] = 0x79;
+        BinaryPrimitives.WriteUInt32BigEndian(frame.AsSpan(2), sn);
+        frame[6] = 0x00; // reserved byte
+        frame[7] = count;
+        Array.Copy(data, 0, frame, 8, count);
+        Crc16.Append(frame, messageLen);
+        return frame;
+    }
+
+    [Fact]
+    public void ParseReadConfigDisp_ValidResponse_ReturnsDataBytes()
+    {
+        byte[] data   = [0x00, 0x0B]; // InOutCfg = 0x000B (EDP1+EDP2+SD1)
+        var    frame  = BuildReadConfigDispResponse(slaveAddr: 2, sn: 4002892u, data: data);
+
+        var result = _parser.ParseReadConfigDisp(frame, expectedCount: 2);
+
+        result.Should().Equal(data);
+    }
+
+    [Fact]
+    public void ParseReadConfigDisp_AllChannelsEnabled_ReturnsBitmask001F()
+    {
+        byte[] data  = [0x00, 0x1F]; // InOutCfg = 0x001F — all five channels
+        var    frame = BuildReadConfigDispResponse(slaveAddr: 3, sn: 1u, data: data);
+
+        var result = _parser.ParseReadConfigDisp(frame, expectedCount: 2);
+
+        ushort inOutCfg = (ushort)((result[0] << 8) | result[1]);
+        inOutCfg.Should().Be(0x001F);
+    }
+
+    [Fact]
+    public void ParseReadConfigDisp_BadCrc_ThrowsInvalidDataException()
+    {
+        byte[] data  = [0x00, 0x0B];
+        var    frame = BuildReadConfigDispResponse(slaveAddr: 2, sn: 4002892u, data: data);
+        frame[^1] ^= 0xFF; // corrupt CRC
+
+        var act = () => _parser.ParseReadConfigDisp(frame, expectedCount: 2);
+
+        act.Should().Throw<InvalidDataException>().WithMessage("*CRC*");
+    }
+
+    [Fact]
+    public void ParseReadConfigDisp_TooShortResponse_ThrowsInvalidDataException()
+    {
+        var frame = new byte[3]; // way too short
+
+        var act = () => _parser.ParseReadConfigDisp(frame, expectedCount: 2);
+
+        act.Should().Throw<InvalidDataException>().WithMessage("*too short*");
+    }
+
+    [Fact]
+    public void ParseReadConfigDisp_ErrorResponse_ThrowsModbusProtocolException()
+    {
+        // FC 0x79 | 0x80 = 0xF9 exception frame
+        var frame = BuildErrorResponse(slaveId: 2, fc: 0x79, exceptionCode: (byte)ModbusExceptionCode.IllegalFunction);
+
+        var act = () => _parser.ParseReadConfigDisp(frame, expectedCount: 2);
+
+        act.Should().Throw<ModbusProtocolException>();
+    }
 }

@@ -47,6 +47,37 @@ public class ModbusRtuFrameParser : IModbusFrameParser
     public void ValidateWriteMultipleRegisters(byte[] response) =>
         ValidateCrcAndErrors(response);
 
+    /// <summary>
+    /// Parses a KRON FC 0x79 (ReadConfigDisp) response.
+    /// Response layout: SlaveAddr(1) + 0x79(1) + SN(4) + ?(1) + Count(1) + Data(Count) + CRC(2).
+    /// Verifies CRC and FC byte; returns the raw data bytes.
+    /// </summary>
+    public byte[] ParseReadConfigDisp(byte[] response, byte expectedCount)
+    {
+        // Check for a Modbus exception frame first (5 bytes: slave+FC|0x80+code+CRC).
+        // RtuModbusTransport shrinks the read buffer to 5 bytes when it detects bit7 set,
+        // so an exception response arrives as a 5-byte frame, not a full-length response.
+        if (response.Length >= 5 && (response[1] & 0x80) != 0 && Crc16.Validate(response))
+            throw new ModbusProtocolException(
+                (FunctionCode)(response[1] & 0x7F),
+                (ModbusExceptionCode)response[2]);
+
+        int minLength = 10 + expectedCount;
+        if (response.Length < minLength)
+            throw new InvalidDataException(
+                $"FC 0x79 response too short: {response.Length} bytes (expected {minLength}).");
+
+        if (!Crc16.Validate(response))
+            throw new InvalidDataException("FC 0x79 CRC validation failed.");
+
+        if (response[1] != 0x79)
+            throw new InvalidDataException(
+                $"FC 0x79 response has unexpected function code: 0x{response[1]:X2}.");
+
+        byte count = response[7];
+        return response[8..(8 + count)];
+    }
+
     public ReportSlaveIdData ParseReportSlaveId(byte[] response)
     {
         ValidateCrcAndErrors(response);

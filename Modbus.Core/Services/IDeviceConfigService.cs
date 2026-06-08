@@ -123,4 +123,12 @@ public interface IDeviceConfigService
         ModbusDevice device,
         byte newSlaveId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads the InOutCfg calibration byte from the device using KRON FC 0x79 (ReadConfigDisp).
+    /// Returns a bitmask where bit 0=EDP1, 1=EDP2, 2=EDP3, 3=SD1, 4=SD2.
+    /// Returns <c>null</c> for TCP devices (FC 0x79 is RTU-only) or if the read fails —
+    /// callers must fall back to showing all I/O channels when null.
+    /// </summary>
+    Task<ushort?> ReadInOutCfgAsync(ModbusDevice device, CancellationToken cancellationToken = default);
 }
