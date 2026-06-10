@@ -20,11 +20,29 @@ public sealed class GrandezaCatalogTests
     }
 
     [Fact]
-    public void ForDeviceCode_Konect120_MirrorsKs3000()
+    public void ForDeviceCode_Konect120_HasMoreGrandezasThanKs3000()
     {
-        var ks  = GrandezaCatalog.ForDeviceCode(0xF2);
+        var ks   = GrandezaCatalog.ForDeviceCode(0xF2);
         var k120 = GrandezaCatalog.ForDeviceCode(0xF3);
-        k120.Should().BeEquivalentTo(ks);
+        k120.Should().HaveCountGreaterThan(ks.Count);
+    }
+
+    [Fact]
+    public void ForDeviceCode_Ks3000_DoesNotContainEDP3OrSD2()
+    {
+        var list = GrandezaCatalog.ForDeviceCode(0xF2);
+        ushort[] absent = [98, 112, 114, 132]; // EDP-3, EDP3S, OUT2S, EDP3P
+        list.Select(g => g.MqttId).Should().NotIntersectWith(absent);
+    }
+
+    [Fact]
+    public void ForDeviceCode_Konect120_ContainsEDP3AndSD2()
+    {
+        var list = GrandezaCatalog.ForDeviceCode(0xF3);
+        list.Should().Contain(g => g.MqttId == 98,  "EDP-3");
+        list.Should().Contain(g => g.MqttId == 112, "EDP3S");
+        list.Should().Contain(g => g.MqttId == 132, "EDP3P");
+        list.Should().Contain(g => g.MqttId == 114, "OUT2S");
     }
 
     [Fact]

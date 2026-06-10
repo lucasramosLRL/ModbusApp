@@ -12,7 +12,8 @@ public sealed record Grandeza(
 /// </summary>
 public static class GrandezaCatalog
 {
-    private static readonly IReadOnlyList<Grandeza> _ks3000 =
+    // Full set — Konect 120 supports all five I/O channels (EDP1-3, SD1-2).
+    private static readonly IReadOnlyList<Grandeza> _konect120 =
     [
         // Tensão (V)
         new(2,  "U0",  "Tensão Trifásica (V)"),
@@ -134,11 +135,14 @@ public static class GrandezaCatalog
         new(1228, "ES3",  "Energia Aparente Fase 3 (kVAh)"),
     ];
 
-    // KS-3000 and Konect 120 share the same measurement set.
+    // KS-3000 has fixed I/O: EDP1, EDP2, SD1 only — no EDP3 (98,112,132) or SD2 (114).
+    private static readonly IReadOnlyList<Grandeza> _ks3000 =
+        [.. _konect120.Where(g => g.MqttId is not (98 or 112 or 114 or 132))];
+
     private static readonly Dictionary<byte, IReadOnlyList<Grandeza>> _byDeviceCode = new()
     {
         [0xF2] = _ks3000,
-        [0xF3] = _ks3000,
+        [0xF3] = _konect120,
     };
 
     public static IReadOnlyList<Grandeza> ForDeviceCode(byte? deviceCode) =>
