@@ -7,7 +7,7 @@
 
     <StackPanel Margin="{StaticResource MarginView}" Spacing="24">
 
-        <TextBlock Text="{Binding [SettingsTitle], Source={x:Static svc:LocalizationService.Instance}}"
+        <TextBlock Text="{Binding SettingsTitle}"
                    Classes="main-title" />
 
         <!-- Language selection -->
@@ -15,7 +15,7 @@
                 Width="320"
                 HorizontalAlignment="Left">
             <StackPanel Spacing="10">
-                <TextBlock Text="{Binding [Language], Source={x:Static svc:LocalizationService.Instance}}"
+                <TextBlock Text="{Binding LanguageLabel}"
                            Classes="section-title" />
                 <ComboBox ItemsSource="{Binding AvailableLanguages}"
                           SelectedItem="{Binding SelectedLanguage}"
@@ -32,25 +32,25 @@
         <!-- COM port settings -->
         <Border Classes="card" HorizontalAlignment="Left">
             <StackPanel Spacing="12">
-                <TextBlock Text="{Binding [SerialPortSettings], Source={x:Static svc:LocalizationService.Instance}}"
+                <TextBlock Text="{Binding SerialPortSettings}"
                            Classes="section-title" />
                 <Grid ColumnDefinitions="160,160,130,130,130" RowDefinitions="Auto,Auto">
 
                     <!-- Row 0: labels -->
                     <TextBlock Grid.Row="0" Grid.Column="0"
-                               Text="{Binding [ComPort], Source={x:Static svc:LocalizationService.Instance}}"
+                               Text="{Binding ComPortLabel}"
                                Classes="label-small" />
                     <TextBlock Grid.Row="0" Grid.Column="1"
-                               Text="{Binding [BaudRate], Source={x:Static svc:LocalizationService.Instance}}"
+                               Text="{Binding BaudRateLabel}"
                                Classes="label-small" Margin="12,0,0,0" />
                     <TextBlock Grid.Row="0" Grid.Column="2"
-                               Text="{Binding [DataBits], Source={x:Static svc:LocalizationService.Instance}}"
+                               Text="{Binding DataBitsLabel}"
                                Classes="label-small" Margin="12,0,0,0" />
                     <TextBlock Grid.Row="0" Grid.Column="3"
-                               Text="{Binding [Parity], Source={x:Static svc:LocalizationService.Instance}}"
+                               Text="{Binding ParityLabel}"
                                Classes="label-small" Margin="12,0,0,0" />
                     <TextBlock Grid.Row="0" Grid.Column="4"
-                               Text="{Binding [StopBits], Source={x:Static svc:LocalizationService.Instance}}"
+                               Text="{Binding StopBitsLabel}"
                                Classes="label-small" Margin="12,0,0,0" />
 
                     <!-- Row 1: controls -->
@@ -64,7 +64,7 @@
                                 Command="{Binding RefreshPortsCommand}"
                                 Padding="8,4"
                                 Margin="4,0,0,0"
-                                ToolTip.Tip="{Binding [RefreshPortList], Source={x:Static svc:LocalizationService.Instance}}"
+                                ToolTip.Tip="{Binding RefreshPortListLabel}"
                                 VerticalAlignment="Center" />
                     </Grid>
                     <ComboBox Grid.Row="1" Grid.Column="1"
@@ -89,7 +89,7 @@
                               HorizontalAlignment="Stretch"
                               Margin="12,4,0,0" />
                 </Grid>
-                <TextBlock Text="{Binding [PortUnavailable], Source={x:Static svc:LocalizationService.Instance}}"
+                <TextBlock Text="{Binding PortUnavailableLabel}"
                            FontSize="{StaticResource FontSizeMeta}"
                            Foreground="{StaticResource BrushWarningOrange}"
                            IsVisible="{Binding IsPortUnavailable}"

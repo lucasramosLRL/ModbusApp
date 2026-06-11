@@ -223,9 +223,21 @@ SQPF config: Holding register 42.901 → FC03, 0-based address **2900**
 ---
 
 ## Localization
-`LocalizationService` — singleton, dictionary-based.
+`LocalizationService` — singleton, dictionary-based, extends `ObservableObject`.
 String files: `Modbus.Desktop/Services/Strings/PortugueseStrings.cs` and `EnglishStrings.cs`.
-Usage in XAML: `{Binding [KeyName], Source={x:Static svc:LocalizationService.Instance}}`
+When `CurrentLanguage` changes, fires `OnPropertyChanged("Item[]")` to invalidate all indexer bindings.
+
+**Hot-reload works without restart.** No restart prompt needed when the user changes language.
+
+**Compiled-binding caveat:** Files with `x:DataType` use compiled bindings for all bindings, including those with an explicit `Source`. Compiled bindings with `Source={x:Static svc:LocalizationService.Instance}` + indexer (`[Key]`) do **not** respond to `"Item[]"` notifications — strings only refresh when the view is recreated.
+
+**The correct pattern for any ViewModel whose View has `x:DataType`:**
+1. Expose each label as an `[ObservableProperty]` string in the VM.
+2. Add `UpdateLabels()` that reads from `LocalizationService.Instance`.
+3. Subscribe to `LocalizationService.Instance.PropertyChanged` in the constructor and call `UpdateLabels()` when `e.PropertyName == "Item[]"`.
+4. In XAML use `{Binding LabelProp}` — no `Source` needed.
+
+`MainViewModel` and `SettingsViewModel` already follow this pattern. Apply it to any new ViewModel whose view has `x:DataType`.
 
 ---
 
@@ -503,10 +515,5 @@ All wire values verified by the user against the documentation — no changes ne
 ---
 
 ### Pending / future features - Attention! Keep it in the end of the file
-- Investigate if its necessary to prompt the user to reset the software when the language is changed, it seens like some texts won't change until a complete restart
-- SQPF configuration UI — writing the SQPF sequence via the configure screen (reading already done; Coil Reset not needed for SQPF register 42901).
-- Remaining holding-register writes in configure screen (TP, TC, KE, TI, TL, Timezone, SyncInterval, Wireless/SNTP/IoT fields). Every save with ≥1 write commits via the **reset coil** (FC05, see note below) — already handled by `WriteBatchAsync(sendCoilResetAfter: true)`.
-- Konect 120 config profile is fully filled — no `null` fields remaining. Key differences from KS-3000: has Ethernet (DHCP = D11 of 40007, IP/Mask/Gateway = 43101/43103/43105, MAC = 39501); Wi-Fi DHCP is D5 of 40007 (KS-3000 uses D11); Wi-Fi IP/Mask/Gateway = 43111/43123/43125; Wi-Fi MAC = 39504 (KS-3000 = 39501); BT MAC = 39507 (same as KS-3000); DNS server shared between Ethernet and Wi-Fi at 43117; `AddrModuleVersion` = 39511 (same as KS-3000).
-- Verify Wi-Fi register addresses for KS-3000 (43101–43108 block was failing with timeouts during initial wiring — may need address correction once doc is consulted).
 - Mobile app (MAUI) connected to the same core as the desktop version with the same functions and styling
 - Mass memory readings

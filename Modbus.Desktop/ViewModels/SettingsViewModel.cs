@@ -13,6 +13,34 @@ public partial class SettingsViewModel : ObservableObject
     private readonly LocalizationService _loc;
     private readonly RtuSettingsService  _rtu;
 
+    // ── Localized labels ──────────────────────────────────────────────────────
+
+    [ObservableProperty] private string _settingsTitle        = string.Empty;
+    [ObservableProperty] private string _languageLabel        = string.Empty;
+    [ObservableProperty] private string _serialPortSettings   = string.Empty;
+    [ObservableProperty] private string _comPortLabel         = string.Empty;
+    [ObservableProperty] private string _baudRateLabel        = string.Empty;
+    [ObservableProperty] private string _dataBitsLabel        = string.Empty;
+    [ObservableProperty] private string _parityLabel          = string.Empty;
+    [ObservableProperty] private string _stopBitsLabel        = string.Empty;
+    [ObservableProperty] private string _refreshPortListLabel = string.Empty;
+    [ObservableProperty] private string _portUnavailableLabel = string.Empty;
+
+    private void UpdateLabels()
+    {
+        var loc = LocalizationService.Instance;
+        SettingsTitle        = loc["SettingsTitle"];
+        LanguageLabel        = loc["Language"];
+        SerialPortSettings   = loc["SerialPortSettings"];
+        ComPortLabel         = loc["ComPort"];
+        BaudRateLabel        = loc["BaudRate"];
+        DataBitsLabel        = loc["DataBits"];
+        ParityLabel          = loc["Parity"];
+        StopBitsLabel        = loc["StopBits"];
+        RefreshPortListLabel = loc["RefreshPortList"];
+        PortUnavailableLabel = loc["PortUnavailable"];
+    }
+
     // ── Language ──────────────────────────────────────────────────────────────
 
     public AppLanguage[] AvailableLanguages { get; } = Enum.GetValues<AppLanguage>();
@@ -100,6 +128,12 @@ public partial class SettingsViewModel : ObservableObject
         AvailablePorts = new ObservableCollection<string>(ports);
         if (!string.IsNullOrEmpty(_rtu.PortName) && !AvailablePorts.Contains(_rtu.PortName))
             AvailablePorts.Insert(0, _rtu.PortName);
+
+        UpdateLabels();
+        LocalizationService.Instance.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == "Item[]") UpdateLabels();
+        };
 
         // Keep SettingsViewModel in sync when the service changes externally
         _rtu.PropertyChanged += (_, _) =>

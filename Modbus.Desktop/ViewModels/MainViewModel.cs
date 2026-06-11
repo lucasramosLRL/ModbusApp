@@ -16,6 +16,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private NavItem? _selectedNavItem;
 
+    [ObservableProperty]
+    private string _appSubtitle = string.Empty;
+
     public ObservableCollection<NavItem> NavItems { get; }
 
     public MainViewModel(DeviceListViewModel deviceList, SettingsViewModel settings)
@@ -63,5 +66,6 @@ public partial class MainViewModel : ObservableObject
     {
         foreach (var item in NavItems)
             item.Title = LocalizationService.Instance[item.Key];
+        AppSubtitle = LocalizationService.Instance["AppSubtitle"];
     }
 }
