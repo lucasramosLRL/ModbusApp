@@ -123,7 +123,7 @@ public sealed class MassMemoryService : IMassMemoryService
         return new MassMemoryControlBlock(qsf, gp, bgs, ini, ca);
     }
 
-    private static MassMemoryBlock ParseBlock(byte[] data, byte gp, int blockIndex, int iterationIndex)
+    internal static MassMemoryBlock ParseBlock(byte[] data, byte gp, int blockIndex, int iterationIndex)
     {
         // DataHora: 5 bytes (b0..b4) packed BCD
         byte b0 = data[0], b1 = data[1], b2 = data[2], b3 = data[3], b4 = data[4];
@@ -151,6 +151,22 @@ public sealed class MassMemoryService : IMassMemoryService
         bool checksumOk = computed == data[checksumOffset];
 
         return new MassMemoryBlock(ts, values, checksumOk, blockIndex, iterationIndex);
+    }
+
+    /// <summary>
+    /// Computes the (sector, block) start position for a given loop iteration index,
+    /// fast-forwarding through the circular sector/block structure.
+    /// </summary>
+    internal static (int sector, int block) ComputeStartPosition(
+        int ini, int ca, int qsf, int startFrom)
+    {
+        int sector = ini;
+        int block  = 0;
+        for (int k = 0; k < startFrom; k++)
+        {
+            if (++block >= ca) { block = 0; sector = (sector + 1) % qsf; }
+        }
+        return (sector, block);
     }
 
     private static int Bcd(int v) => ((v >> 4) & 0xF) * 10 + (v & 0xF);

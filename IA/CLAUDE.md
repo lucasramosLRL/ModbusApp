@@ -28,21 +28,21 @@ Desktop-first, with mobile (MAUI) coming later. Both share `Modbus.Core`.
 - SQPF (float byte order) read dynamically from device register 42.901 (holding reg, FC03, 0-based address 2900) every poll cycle
 - Hub navigation: device list → device hub → real-time readings (back chain works)
 - Configure screen: slave address editable for RTU — change is applied via FC 0x42 at the end of save, DB updated, screen stays open and re-reads at new address
+- **Mass memory screen**: reads all blocks via FC 0x14 (ReadFileRecord), shows timestamp + grandeza values + checksum per block; resume/restart dialog when paused or on error; TXT export in legacy-software format
 
 ### Navigation structure
 ```
-DeviceListView → [Open] → DeviceHubView → [Leitura] → DeviceDetailView
-                                         → [Memória de Massa] (disabled, future)
-                                         → [Configurar] (disabled, future)
+DeviceListView → [Open] → DeviceHubView → [Leitura]         → DeviceDetailView
+                                         → [Memória de Massa] → MassMemoryView
+                                         → [Configurar]       → DeviceConfigureView
 ```
 Navigation is driven by `MainViewModel.CurrentPage`. All VMs fire `NavigationRequested` events
 that bubble up through `DeviceListViewModel` to `MainViewModel`.
 
-### Test coverage (Phases 1-2 complete)
+### Test coverage (Phases 1-6 complete)
 - `Modbus.Core.Tests` project — xUnit + FluentAssertions + NSubstitute
-- 97 tests passing — covers RegisterDecoder, Crc16, RTU/TCP frame builders and parsers
 - `InternalsVisibleTo("Modbus.Core.Tests")` configured in `Modbus.Core.csproj`
-- Phase 3 (PollingEngine + DeviceModelSeeder with mocks) and Phase 4 (EF Core repos with in-memory SQLite) — not yet implemented
+- See the Testing section below for the full breakdown (242+ tests passing)
 
 ---
 
@@ -83,21 +83,25 @@ Persistence/
 ### Modbus.Desktop layers
 ```
 ViewModels/
-  MainViewModel         — root, owns CurrentPage, wires NavigationRequested from children
-  DeviceListViewModel   — device list, polling status updates, navigation hub
-  DeviceHubViewModel    — per-device hub (new screen, launched from device list)
-  DeviceDetailViewModel — real-time readings; parent is Action onGoBack (not DeviceListViewModel)
-  AddDeviceViewModel    — add device wizard (scan + manual form)
-  SettingsViewModel     — RTU port settings
-  DeviceItemViewModel   — device row; exposes IsConnected, StatusText, LastSeenText, ErrorMessage
+  MainViewModel            — root, owns CurrentPage, wires NavigationRequested from children
+  DeviceListViewModel      — device list, polling status updates, navigation hub
+  DeviceHubViewModel       — per-device hub (new screen, launched from device list)
+  DeviceDetailViewModel    — real-time readings; parent is Action onGoBack (not DeviceListViewModel)
+  AddDeviceViewModel       — add device wizard (scan + manual form)
+  SettingsViewModel        — RTU port settings
+  DeviceItemViewModel      — device row; exposes IsConnected, StatusText, LastSeenText, ErrorMessage
+  MassMemoryViewModel      — mass memory: header info, block reading loop, resume/restart, TXT export
+  DeviceConfigureViewModel — configure screen; reads/writes registers via IDeviceConfigService
 
 Views/
-  MainWindow       — sidebar (220px) + ContentControl bound to CurrentPage
-  DeviceListView   — list of DeviceItemViewModels
-  DeviceHubView    — 3 feature cards (readings active, others disabled)
-  DeviceDetailView — tabs: real-time readings grid + raw registers DataGrid
-  AddDeviceView    — scan + form
-  SettingsView     — COM port, baud rate, etc.
+  MainWindow            — sidebar (220px) + ContentControl bound to CurrentPage
+  DeviceListView        — list of DeviceItemViewModels
+  DeviceHubView         — 3 feature cards (all active)
+  DeviceDetailView      — tabs: real-time readings grid + raw registers DataGrid
+  AddDeviceView         — scan + form
+  SettingsView          — COM port, baud rate, etc.
+  MassMemoryView        — header strip + DataGrid with dynamic columns; code-behind handles resume dialog + file picker
+  DeviceConfigureView   — sidebar + section panels; code-behind handles mass-memory reset dialog
 
 Services/
   LocalizationService   — string dictionary; keys in PortugueseStrings.cs + EnglishStrings.cs
@@ -273,15 +277,17 @@ Modbus.Core.Tests/
     RegisterDecoderTests.cs         — 46 tests: all DataType × WordOrder combos, SQPF permutations, scale factors
     RegisterFieldTests.cs           — 25 tests: ExtractValue (whole/multi-word/bit-field), ExtractString, ApplyBits, BCD, ExtractTime/Date
     DeviceConfigServiceTests.cs     — 9 tests: FC03/FC04 routing, bit-field merge, 32-word chunking, retry, partial failure, WriteAsync
+    MassMemoryServiceTests.cs       — 17 tests: ParseBlock (timestamp BCD, LE float decode, checksum, index passthrough), ComputeStartPosition (6 variants), ParseReadFileRecord TCP (correct data, truncated, error response), ParseReadFileRecord RTU (correct, truncated)
 ```
 
-### What is covered (Phases 1–5 complete + FC 0x42 frame — 225 tests passing)
+### What is covered (Phases 1–6 complete + FC 0x42 frame — 242 tests passing)
 - **Phase 1 — RegisterDecoder** — all DataType × WordOrder combinations, SQPF byte-permutation with 3 known SQPF values, scale factors, edge cases (invalid enum values)
 - **Phase 2 — Protocol layer** — Crc16, RTU/TCP frame builders (FC03/04/06/16/17), RTU/TCP frame parsers (parse, error responses, CRC, too-short)
 - **Phase 3 — PollingEngine** — lifecycle (AddDevice/Start/Stop), RTU gate semaphore (suspend blocks RTU, resume allows poll), SQPF fallback to 0x3210 when holding read fails, SQPF success uses returned value; `GroupRegisters` unit-tested directly as `internal`
 - **Phase 3 — DeviceModelSeeder** — creates models when absent, skips AddAsync when already exists, seeds 29 registers, Float32 Input → UseSqpf, NS UInt32 → ByteSwapped, SqpfRegisterAddress = 2900, both KS-3000 and Konect 120 seeded
 - **Phase 4 — EF Core integration** — `TestDbContextFactory` with SQLite `:memory:`, `DeviceModelRepository` (CRUD, GetByNameAsync, Registers navigation), `DeviceRepository` (TCP/RTU config, ExistsByTcpIp/RtuSlaveId, Delete), `RegisterValueRepository` (UpsertAsync insert/update/mixed, device isolation)
 - **Phase 5 — Config screen** — `RegisterField` (whole/multi-word/bit-field extraction, ExtractString with null truncation, ApplyBits, BCD helpers, ExtractTime/Date), `DeviceConfigService` (FC03/FC04 routing, bit-fields merged to one read, 32-word chunking for large strings, transient retry up to 3×, ModbusProtocolException no retry, partial failure returns available data)
+- **Phase 6 — Mass memory** — `MassMemoryService.ParseBlock` (BCD timestamp decode, LE float decode, checksum), `MassMemoryService.ComputeStartPosition` (sector/block fast-forward), `ParseReadFileRecord` TCP and RTU (correct data extraction with `rdl-2` fix, truncated frame, error response)
 
 ### Conventions and directives for future sessions
 
@@ -514,6 +520,76 @@ All wire values verified by the user against the documentation — no changes ne
 
 ---
 
+---
+
+## Mass Memory Architecture
+
+### Overview
+```
+MassMemoryService         — Core service: reads control block (FC04) + blocks (FC14)
+MassMemoryControlBlock    — QSF, GP, BGS, INI, CA
+MassMemoryBlock           — Timestamp, Values[], ChecksumOk, BlockIndex, IterationIndex
+MassMemoryViewModel       — Drives MassMemoryView; resume/restart state; TXT export
+```
+
+### FC 0x14 (ReadFileRecord) frame structure
+
+**Request** (RTU 12 bytes): `[slaveId][0x14][BC=0x07][RT=0x06][SET(2)][BLC(2)][QTD(2)][CRC(2)]`
+- `SET` = sector number, `BLC` = block number, `QTD = 3 + 2 * GP` (registers needed for `5 + 4*GP + 1` data bytes)
+
+**Response RTU**: `[slaveId][0x14][RDL][FRL][RT=0x06][data: QTD×2][CRC(2)]`  Total = `QTD×2 + 7`
+**Response TCP**: `[MBAP(7)][0x14][RDL][FRL][RT=0x06][data: QTD×2]`  Total = `QTD×2 + 11`
+
+**CRITICAL — `rdl - 2` fix**: `RDL = FRL(1) + RT(1) + data(QTD×2) = QTD×2+2`. Actual data bytes = `rdl - 2` (NOT `rdl - 1`). The off-by-one caused "truncated: N bytes, expected N+1" errors. Fixed in both `ModbusTcpFrameParser.ParseReadFileRecord` and `ModbusRtuFrameParser.ParseReadFileRecord`.
+
+### Block data layout (bytes after RT=0x06)
+- Bytes 0–4: **DataHora** BCD (see below)
+- Bytes 5 to `4+4×GP`: GP × **Float32** (4 bytes each, **little-endian IEEE 754** — NOT SQPF-permuted)
+- Byte `5+4×GP`: **Checksum** — `(byte)sum(bytes[0..5+4*GP-1])`
+
+**CRITICAL — mass memory float encoding**: floats are stored as plain little-endian IEEE 754. Use `BinaryPrimitives.ReadSingleLittleEndian`, NOT `RegisterDecoder.DecodeFloat32WithSqpf`. Confirmed from original KRON C++ source code (`val.c[0]=buff[0]` on x86 = little-endian).
+
+### BCD DataHora decode (5 bytes b0..b4)
+```
+SEG  = BCD(b0 & 0x7F)
+MIN  = BCD(b1 & 0x7F)
+HORA = BCD(((b1 & 0x80) >> 2) | (b2 & 0x1F))
+DIA  = BCD(((b2 & 0xE0) >> 2) | (b3 & 0x07))
+MES  = BCD((b3 >> 3) & 0x1F)
+ANO  = BCD(b4) + 2000
+where BCD(v) = ((v >> 4) & 0xF) * 10 + (v & 0xF)
+```
+Verified: `43 24 54 84 22` → 14/10/2022 14:24:43.
+
+### Control block (FC04, Modicon 33931, raw address 3930, 5 registers)
+10 bytes: `QSF(2)`, `GP(1)`, `BGS(3)`, `INI(2)`, `CA(2)`.
+
+### Sector/block iteration
+```
+sector = ctrl.INI; block = 0
+for i in 0..BGS-1:
+    read block (sector, block)
+    if ++block >= ctrl.CA: { block = 0; sector = (sector + 1) % ctrl.QSF }
+```
+`ComputeStartPosition(ini, ca, qsf, startFrom)` — `internal static` pure function that fast-forwards to the correct (sector, block) for any `startFrom` iteration index. Used by `ReadBlocksAsync` for the resume feature.
+
+### Resume / restart feature
+- `MassMemoryBlock.IterationIndex` — the loop counter `i` for that block (0-based). Preserved even when some blocks fail (non-yielded). Used to track `_resumeFromIndex = blk.IterationIndex + 1`.
+- `MassMemoryViewModel._hasPartialData` — set `true` on cancel or error when `Records.Count > 0`.
+- `MassMemoryViewModel.AskResumeOrRestart` — `Func<Task<bool?>>?` set by `MassMemoryView` code-behind. Returns `true` = continue, `false` = start over, `null` = cancel.
+- When "Start" pressed and `_hasPartialData` is true: shows resume dialog; if restarting, clears `Records` and resets `_resumeFromIndex = 0`.
+- `ToggleReadingCommand` is `async Task` (`[RelayCommand]` + `AsyncRelayCommand` via CommunityToolkit.Mvvm).
+
+### TXT export format
+Matches legacy KRON software output exactly:
+- Encoding: **Latin-1** (`Encoding.Latin1`)
+- Metadata header: `Série: / Endereço: / Descrição: / IA:` lines, then blank line
+- Grandeza descriptions: `{col.Code}: {col.Description}` per line, then blank line
+- Columns: `%-15s` fixed-width fields, `;` separator, `CS` as last column (no trailing `;`)
+- Values: 3 decimal places, **comma** as decimal separator (`F3` + `.Replace('.', ',')`), also `%-15s`
+- `C(s) = s.PadRight(15)`, `Fmt(v) = v.ToString("F3", InvariantCulture).Replace('.', ',')`
+
+---
+
 ### Pending / future features - Attention! Keep it in the end of the file
 - Mobile app (MAUI) connected to the same core as the desktop version with the same functions and styling
-- Mass memory readings
