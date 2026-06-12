@@ -287,6 +287,10 @@ internal static class EnglishStrings
         ["MmReadError"]          = "Reading error: {0}",
         ["MmEmpty"]              = "No records stored in memory.",
         ["MmControlBlockFailed"]  = "Failed to read control block. Check the connection and try again.",
+        ["MmResumeTitle"]         = "Resume Reading",
+        ["MmResumeMsg"]           = "Do you want to continue where you left off or start over?",
+        ["MmResumeContinue"]      = "Continue",
+        ["MmResumeRestart"]       = "Start over",
 
         // SettingsView
         ["SettingsTitle"]        = "Settings",

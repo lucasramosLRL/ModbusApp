@@ -19,5 +19,6 @@ public interface IMassMemoryService
     IAsyncEnumerable<MassMemoryBlock> ReadBlocksAsync(
         ModbusDevice device,
         MassMemoryControlBlock ctrl,
+        int startFrom = 0,
         CancellationToken ct = default);
 }

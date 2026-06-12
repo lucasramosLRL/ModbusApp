@@ -7,4 +7,5 @@ public sealed record MassMemoryBlock(
     DateTime Timestamp,
     double[] Values,
     bool     ChecksumOk,
-    int      BlockIndex);
+    int      BlockIndex,
+    int      IterationIndex);

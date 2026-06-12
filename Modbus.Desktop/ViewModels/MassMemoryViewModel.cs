@@ -40,7 +40,12 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
 
     private IReadOnlyList<GrandezaColumn> _columns = [];
     private ushort _storageIntervalRaw;
+    private int  _resumeFromIndex;
+    private bool _hasPartialData;
     private CancellationTokenSource? _readCts;
+
+    // Code-behind sets this. Returns true=resume, false=restart, null=cancel.
+    public Func<Task<bool?>>? AskResumeOrRestart { get; set; }
 
     // ── Header ──────────────────────────────────────────────────────────────
     [ObservableProperty] private string _serialNumber    = "—";
@@ -200,27 +205,41 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private void ToggleReading()
+    private async Task ToggleReading()
     {
         if (IsRunning)
         {
             _readCts?.Cancel();
+            return;
         }
-        else
+
+        bool clearRecords = true;
+
+        if (_hasPartialData && AskResumeOrRestart is not null)
         {
-            IsRunning = true;
-            _readCts?.Dispose();
-            _readCts = new CancellationTokenSource();
-            _ = ReadAllBlocksAsync(_readCts.Token);
+            var choice = await AskResumeOrRestart.Invoke();
+            if (choice is null) return;     // user dismissed — do nothing
+            clearRecords = choice == false; // false = restart
         }
+
+        if (clearRecords)
+        {
+            Records.Clear();
+            _resumeFromIndex = 0;
+            _hasPartialData  = false;
+        }
+
+        IsRunning = true;
+        _readCts?.Dispose();
+        _readCts = new CancellationTokenSource();
+        _ = ReadAllBlocksAsync(_resumeFromIndex, _readCts.Token);
     }
 
-    private async Task ReadAllBlocksAsync(CancellationToken ct)
+    private async Task ReadAllBlocksAsync(int startFrom, CancellationToken ct)
     {
         var loc = LocalizationService.Instance;
 
         await _pausePolling();
-        Records.Clear();
 
         try
         {
@@ -228,7 +247,8 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
 
             if (ctrl is null)
             {
-                StatusMessage = loc["MmControlBlockFailed"];
+                StatusMessage   = loc["MmControlBlockFailed"];
+                _hasPartialData = Records.Count > 0;
                 return;
             }
 
@@ -238,7 +258,7 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            await foreach (var blk in _massMemoryService.ReadBlocksAsync(_device.Device, ctrl, ct))
+            await foreach (var blk in _massMemoryService.ReadBlocksAsync(_device.Device, ctrl, startFrom, ct))
             {
                 StatusMessage = string.Format(loc["MmReading"], blk.BlockIndex, ctrl.BGS);
                 Records.Add(new MassMemoryRecordViewModel
@@ -250,18 +270,23 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
                     RawValues  = blk.Values,
                     ChecksumOk = blk.ChecksumOk
                 });
+                _resumeFromIndex = blk.IterationIndex + 1;
             }
 
-            StatusMessage = ct.IsCancellationRequested
+            bool cancelled  = ct.IsCancellationRequested;
+            _hasPartialData = cancelled && Records.Count > 0;
+            StatusMessage   = cancelled
                 ? string.Format(loc["MmReadCancelled"], Records.Count)
-                : string.Format(loc["MmReadComplete"], Records.Count);
+                : string.Format(loc["MmReadComplete"],  Records.Count);
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = string.Format(loc["MmReadCancelled"], Records.Count);
+            _hasPartialData = Records.Count > 0;
+            StatusMessage   = string.Format(loc["MmReadCancelled"], Records.Count);
         }
         catch (Exception ex)
         {
+            _hasPartialData = Records.Count > 0;
             Debug.WriteLine($"[MassMemory] ReadAllBlocks failed: {ex.Message}");
             StatusMessage = string.Format(loc["MmReadError"], ex.Message);
         }

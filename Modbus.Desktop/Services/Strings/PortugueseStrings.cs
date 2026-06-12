@@ -287,6 +287,10 @@ internal static class PortugueseStrings
         ["MmReadError"]          = "Erro na leitura: {0}",
         ["MmEmpty"]              = "Memória sem registros gravados.",
         ["MmControlBlockFailed"]  = "Falha ao ler o bloco de controle. Verifique a conexão e tente novamente.",
+        ["MmResumeTitle"]         = "Retomar leitura",
+        ["MmResumeMsg"]           = "Deseja continuar de onde parou ou começar do zero?",
+        ["MmResumeContinue"]      = "Continuar",
+        ["MmResumeRestart"]       = "Começar do zero",
 
         // SettingsView
         ["SettingsTitle"]        = "Configurações",

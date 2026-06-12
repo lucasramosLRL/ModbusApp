@@ -52,6 +52,7 @@ public sealed class MassMemoryService : IMassMemoryService
     public async IAsyncEnumerable<MassMemoryBlock> ReadBlocksAsync(
         ModbusDevice device,
         MassMemoryControlBlock ctrl,
+        int startFrom = 0,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         ushort qtd = (ushort)(3 + 2 * ctrl.GP);
@@ -65,10 +66,15 @@ public sealed class MassMemoryService : IMassMemoryService
         {
             await transport.ConnectAsync(cts.Token);
 
+            // Fast-forward sector/block to the resume position.
             int sector = ctrl.INI;
             int block  = 0;
+            for (int k = 0; k < startFrom; k++)
+            {
+                if (++block >= ctrl.CA) { block = 0; sector = (sector + 1) % ctrl.QSF; }
+            }
 
-            for (int i = 0; i < ctrl.BGS; i++)
+            for (int i = startFrom; i < ctrl.BGS; i++)
             {
                 cts.Token.ThrowIfCancellationRequested();
 
@@ -78,7 +84,7 @@ public sealed class MassMemoryService : IMassMemoryService
                     var request  = buildFc14((ushort)sector, (ushort)block, qtd);
                     var response = await transport.SendAsync(request, expectedLength, cts.Token);
                     var data     = parseFc14(response);
-                    mmBlock = ParseBlock(data, ctrl.GP, i + 1);
+                    mmBlock = ParseBlock(data, ctrl.GP, i + 1, i);
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
@@ -89,11 +95,7 @@ public sealed class MassMemoryService : IMassMemoryService
                 if (mmBlock is not null)
                     yield return mmBlock;
 
-                if (++block >= ctrl.CA)
-                {
-                    block  = 0;
-                    sector = (sector + 1) % ctrl.QSF;
-                }
+                if (++block >= ctrl.CA) { block = 0; sector = (sector + 1) % ctrl.QSF; }
             }
 
             try { await transport.DisconnectAsync(); } catch { }
@@ -121,7 +123,7 @@ public sealed class MassMemoryService : IMassMemoryService
         return new MassMemoryControlBlock(qsf, gp, bgs, ini, ca);
     }
 
-    private static MassMemoryBlock ParseBlock(byte[] data, byte gp, int blockIndex)
+    private static MassMemoryBlock ParseBlock(byte[] data, byte gp, int blockIndex, int iterationIndex)
     {
         // DataHora: 5 bytes (b0..b4) packed BCD
         byte b0 = data[0], b1 = data[1], b2 = data[2], b3 = data[3], b4 = data[4];
@@ -148,7 +150,7 @@ public sealed class MassMemoryService : IMassMemoryService
             computed += data[k];
         bool checksumOk = computed == data[checksumOffset];
 
-        return new MassMemoryBlock(ts, values, checksumOk, blockIndex);
+        return new MassMemoryBlock(ts, values, checksumOk, blockIndex, iterationIndex);
     }
 
     private static int Bcd(int v) => ((v >> 4) & 0xF) * 10 + (v & 0xF);
