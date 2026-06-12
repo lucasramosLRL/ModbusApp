@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Modbus.Desktop.ViewModels"
+             xmlns:svc="using:Modbus.Desktop.Services"
+             xmlns:controls="using:Avalonia.Controls"
+             x:Class="Modbus.Desktop.Views.MassMemoryView"
+             x:DataType="vm:MassMemoryViewModel">
+
+    <DockPanel Margin="{StaticResource MarginView}">
+
+        <!-- Toolbar -->
+        <StackPanel DockPanel.Dock="Top"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Margin="0,0,0,16">
+            <Button Content="{Binding [Back], Source={x:Static svc:LocalizationService.Instance}}"
+                    Command="{Binding GoBackCommand}"
+                    Padding="{StaticResource PaddingButtonSmall}"
+                    VerticalAlignment="Center" />
+            <Button Content="{Binding ToggleReadingLabel}"
+                    Command="{Binding ToggleReadingCommand}"
+                    Padding="{StaticResource PaddingButton}"
+                    VerticalAlignment="Center" />
+            <Button Content="{Binding [MmExportTxt], Source={x:Static svc:LocalizationService.Instance}}"
+                    Command="{Binding ExportTxtCommand}"
+                    Padding="{StaticResource PaddingButton}"
+                    VerticalAlignment="Center"
+                    IsEnabled="{Binding Records.Count}" />
+        </StackPanel>
+
+        <!-- Loading bar -->
+        <ProgressBar DockPanel.Dock="Top"
+                     IsIndeterminate="True"
+                     IsVisible="{Binding IsLoading}"
+                     Height="3"
+                     Margin="0,0,0,10" />
+
+        <!-- Header card: metadados do dispositivo -->
+        <Border DockPanel.Dock="Top" Classes="card" Margin="0,0,0,12">
+            <Grid ColumnDefinitions="*,*,*,*,*" RowDefinitions="Auto">
+                <!-- Série -->
+                <StackPanel Grid.Column="0" Spacing="4">
+                    <TextBlock Text="{Binding [MmSerial], Source={x:Static svc:LocalizationService.Instance}}"
+                               Classes="label-small" />
+                    <TextBlock Text="{Binding SerialNumber}"
+                               FontWeight="Medium"
+                               Foreground="{StaticResource BrushTextPrimary}" />
+                </StackPanel>
+                <!-- Endereço -->
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Text="{Binding [MmAddress], Source={x:Static svc:LocalizationService.Instance}}"
+                               Classes="label-small" />
+                    <TextBlock Text="{Binding Address}"
+                               FontWeight="Medium"
+                               Foreground="{StaticResource BrushTextPrimary}" />
+                </StackPanel>
+                <!-- Descrição -->
+                <StackPanel Grid.Column="2" Spacing="4">
+                    <TextBlock Text="{Binding [MmDescription], Source={x:Static svc:LocalizationService.Instance}}"
+                               Classes="label-small" />
+                    <TextBlock Text="{Binding Description}"
+                               FontWeight="Medium"
+                               Foreground="{StaticResource BrushTextPrimary}" />
+                </StackPanel>
+                <!-- IA — Intervalo de Armazenamento -->
+                <StackPanel Grid.Column="3" Spacing="4">
+                    <TextBlock Text="{Binding [MmInterval], Source={x:Static svc:LocalizationService.Instance}}"
+                               Classes="label-small" />
+                    <TextBlock Text="{Binding StorageInterval}"
+                               FontWeight="Medium"
+                               Foreground="{StaticResource BrushTextPrimary}" />
+                </StackPanel>
+                <!-- MA — Modo de Armazenamento -->
+                <StackPanel Grid.Column="4" Spacing="4">
+                    <TextBlock Text="{Binding [MmMode], Source={x:Static svc:LocalizationService.Instance}}"
+                               Classes="label-small" />
+                    <TextBlock Text="{Binding StorageMode}"
+                               FontWeight="Medium"
+                               Foreground="{StaticResource BrushTextPrimary}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Mensagem de status (sem grandezas / erro) -->
+        <TextBlock DockPanel.Dock="Top"
+                   Text="{Binding StatusMessage}"
+                   IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   Opacity="0.65"
+                   Margin="0,0,0,12" />
+
+        <!-- DataGrid — colunas construídas dinamicamente no code-behind -->
+        <DataGrid x:Name="RecordsGrid"
+                  ItemsSource="{Binding Records}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  CanUserSortColumns="False"
+                  GridLinesVisibility="All"
+                  HorizontalScrollBarVisibility="Auto"
+                  VerticalScrollBarVisibility="Auto" />
+
+    </DockPanel>
+</UserControl>

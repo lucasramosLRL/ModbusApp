@@ -268,6 +268,21 @@ internal static class EnglishStrings
         // DeviceConfigureView — Inputs & Outputs
         ["CfgDebounceEdp"]       = "Debounce EDPs",
 
+        // MassMemoryView
+        ["MmSerial"]             = "Serial",
+        ["MmAddress"]            = "Address",
+        ["MmDescription"]        = "Description",
+        ["MmInterval"]           = "IA",
+        ["MmMode"]               = "MA",
+        ["MmMinutes"]            = "Minutes",
+        ["MmModeCircular"]       = "Circular",
+        ["MmModeLinear"]         = "Linear",
+        ["MmStartReading"]       = "Start Reading",
+        ["MmPauseReading"]       = "Pause Reading",
+        ["MmExportTxt"]          = "Export TXT",
+        ["MmNoGrandezas"]        = "No quantities configured for mass memory.",
+        ["MmReadingStub"]        = "Reading in development.",
+
         // SettingsView
         ["SettingsTitle"]        = "Settings",
         ["Language"]             = "Language",

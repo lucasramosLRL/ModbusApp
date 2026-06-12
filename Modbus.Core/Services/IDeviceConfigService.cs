@@ -131,4 +131,11 @@ public interface IDeviceConfigService
     /// callers must fall back to showing all I/O channels when null.
     /// </summary>
     Task<ushort?> ReadInOutCfgAsync(ModbusDevice device, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads the calibration configuration register (byte positions 56-57) via KRON FC 0x79.
+    /// Bit D3 = 0 → mass memory enabled; D6 = 0 → digital I/O enabled.
+    /// Returns <c>null</c> for TCP devices or if the read fails — callers should assume enabled.
+    /// </summary>
+    Task<ushort?> ReadCalibCfgAsync(ModbusDevice device, CancellationToken cancellationToken = default);
 }

@@ -65,7 +65,7 @@
                 <Border Classes="card-hub"
                         Width="260" Height="160"
                         Margin="0,0,16,16"
-                        Opacity="0.45">
+                        Opacity="{Binding MassMemoryCardOpacity}">
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Top"
                                    Text="{Binding [HubMassMemory], Source={x:Static svc:LocalizationService.Instance}}"
@@ -80,7 +80,8 @@
                                    Foreground="{StaticResource BrushTextPrimary}" />
                         <Button DockPanel.Dock="Bottom"
                                 Content="{Binding [Open], Source={x:Static svc:LocalizationService.Instance}}"
-                                IsEnabled="False"
+                                Command="{Binding OpenMassMemoryCommand}"
+                                IsEnabled="{Binding IsMassMemoryEnabled}"
                                 Padding="{StaticResource PaddingButton}"
                                 HorizontalAlignment="Left" />
                     </DockPanel>

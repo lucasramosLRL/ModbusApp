@@ -21,6 +21,15 @@ public partial class DeviceHubViewModel : ObservableObject
     private ushort? _inOutCfg;
     private bool _inOutCfgLoaded;
 
+    private ushort? _calibCfg;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(OpenMassMemoryCommand))]
+    [NotifyPropertyChangedFor(nameof(MassMemoryCardOpacity))]
+    private bool _isMassMemoryEnabled;
+
+    public double MassMemoryCardOpacity => IsMassMemoryEnabled ? 1.0 : 0.45;
+
     public event EventHandler<object>? NavigationRequested;
 
     public DeviceItemViewModel Device { get; }
@@ -39,6 +48,8 @@ public partial class DeviceHubViewModel : ObservableObject
         _configService = configService;
         _deviceRepository = deviceRepository;
         _parent = parent;
+
+        _ = LoadCapabilitiesAsync();
     }
 
     [RelayCommand]
@@ -93,6 +104,53 @@ public partial class DeviceHubViewModel : ObservableObject
 
         _ = configure.LoadAsync();
         NavigationRequested?.Invoke(this, configure);
+    }
+
+    [RelayCommand(CanExecute = nameof(IsMassMemoryEnabled))]
+    private void OpenMassMemory()
+    {
+        bool isRtu = Device.Device.TransportType == TransportType.Rtu;
+
+        var massMemory = new MassMemoryViewModel(
+            Device,
+            _configService,
+            pausePolling:  isRtu
+                ? () => _pollingEngine.SuspendRtuPollingAsync()
+                : () => _pollingEngine.AcquireDeviceLockAsync(Device.Id),
+            resumePolling: isRtu
+                ? () => _pollingEngine.ResumeRtuPolling()
+                : () => _pollingEngine.ReleaseDeviceLock(Device.Id),
+            onGoBack: () => NavigationRequested?.Invoke(this, this));
+
+        NavigationRequested?.Invoke(this, massMemory);
+        _ = massMemory.LoadAsync();
+    }
+
+    /// <summary>
+    /// Reads CalibCfg (byte positions 56-57) via FC 0x79 to determine device capabilities.
+    /// D3=0 → mass memory enabled; null (TCP or failure) → assume enabled.
+    /// Fires once at hub construction; IsMassMemoryEnabled is set when the read completes.
+    /// </summary>
+    private async Task LoadCapabilitiesAsync()
+    {
+        bool isRtu = Device.Device.TransportType == TransportType.Rtu;
+
+        if (isRtu) await _pollingEngine.SuspendRtuPollingAsync();
+        try
+        {
+            _calibCfg = await _configService.ReadCalibCfgAsync(Device.Device);
+        }
+        catch
+        {
+            _calibCfg = null;
+        }
+        finally
+        {
+            if (isRtu) _pollingEngine.ResumeRtuPolling();
+        }
+
+        // D3 = 0 → MM habilitada; null (TCP ou falha) → assume habilitada
+        IsMassMemoryEnabled = _calibCfg == null || (_calibCfg.Value & (1 << 3)) == 0;
     }
 
     /// <summary>

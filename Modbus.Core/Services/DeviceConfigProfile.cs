@@ -77,6 +77,8 @@ public sealed class DeviceConfigProfile
     // 0xFFFF marca slot vazio.
     public RegisterField? AddrGrandezasSlots1to20  { get; init; }
     public RegisterField? AddrGrandezasSlots21to50 { get; init; }
+    // D9 of reg 40007 — Konect 120 only: 0 = circular, 1 = linear. KS-3000 is always circular.
+    public RegisterField? AddrStorageMode          { get; init; }
 
     // ── Relógio ───────────────────────────────────────────────────────────────
     public RegisterField? AddrClockDate      { get; init; }

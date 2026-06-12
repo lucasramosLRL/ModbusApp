@@ -89,6 +89,7 @@ public static class DeviceConfigProfileRegistry
         // Grandezas selecionadas para envio MQTT/LoRa
         AddrGrandezasSlots1to20  = new RegisterField(42102, WordCount: 20),
         AddrGrandezasSlots21to50 = new RegisterField(42201, WordCount: 30),
+        AddrStorageMode          = null, // KS-3000 is always circular — no register needed
 
         // ── Relógio ───────────────────────────────────────────────────────────
         // [42001] high=centésimo BCD, low=segundo BCD
@@ -170,6 +171,8 @@ public static class DeviceConfigProfileRegistry
         // Grandezas selecionadas para envio MQTT/LoRa
         AddrGrandezasSlots1to20  = new RegisterField(42102, WordCount: 20),
         AddrGrandezasSlots21to50 = new RegisterField(42201, WordCount: 30),
+        // D9 of reg 40007: 0 = circular, 1 = linear
+        AddrStorageMode          = new RegisterField(40007, BitOffset: 9, BitWidth: 1),
 
         // ── Relógio ───────────────────────────────────────────────────────────
         // [42001] high=centésimo BCD, low=segundo BCD

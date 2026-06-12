@@ -411,6 +411,53 @@ public sealed class DeviceConfigService : IDeviceConfigService
         }
     }
 
+    public async Task<ushort?> ReadCalibCfgAsync(
+        ModbusDevice device,
+        CancellationToken cancellationToken = default)
+    {
+        if (device.TransportType != TransportType.Rtu || device.Rtu is null)
+            return null; // FC 0x79 is RTU-only
+
+        try
+        {
+            var builder = new ModbusRtuFrameBuilder();
+            var parser  = new ModbusRtuFrameParser();
+
+            using var transport = new RtuModbusTransport(device.Rtu);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+
+            await transport.ConnectAsync(cts.Token);
+
+            // Read NS (serial number) via FC04, address 0, 2 words (UInt32 ByteSwapped)
+            uint serialNumber;
+            {
+                var nsRequest  = builder.ReadRegisters(device.SlaveId, Protocol.Enums.FunctionCode.ReadInputRegisters, 0, 2);
+                var nsResponse = await transport.SendAsync(nsRequest, 9, cts.Token);
+                var nsWords    = parser.ParseReadRegisters(nsResponse);
+                serialNumber = ((uint)nsWords[1] << 16) | nsWords[0];
+            }
+
+            // Send FC 0x79 ReadConfigDisp — read 2 bytes at positions 56-57 (CalibCfg)
+            // D3=0 → mass memory enabled, D6=0 → digital I/O enabled
+            const byte StartReg = 56;
+            const byte Count    = 2;
+            const int  ResponseLength = 10 + Count;
+            var frame    = builder.ReadConfigDisp(serialNumber, StartReg, Count);
+            var response = await transport.SendAsync(frame, ResponseLength, cts.Token);
+            var data     = parser.ParseReadConfigDisp(response, Count);
+
+            ushort calibCfg = (ushort)((data[0] << 8) | data[1]);
+            Debug.WriteLine($"[DeviceConfigService] ReadCalibCfg: SN={serialNumber}, CalibCfg=0x{calibCfg:X4}");
+            return calibCfg;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DeviceConfigService] ReadCalibCfg failed: {ex.Message} — fallback to all-enabled.");
+            return null;
+        }
+    }
+
     // Polls until the device responds to a single FC04 read or the window expires.
     // 30s covers the KS-3000 / Konect 120 bootloader reboot (~20s).
     // Returns true as soon as the device responds, false if it never comes back within the window.
