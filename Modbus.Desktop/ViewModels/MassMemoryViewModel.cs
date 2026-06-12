@@ -7,14 +7,16 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Modbus.Desktop.ViewModels;
 
-public sealed record GrandezaColumn(ushort MqttId, string Code);
+public sealed record GrandezaColumn(ushort MqttId, string Code, string Description);
 
 public sealed class MassMemoryRecordViewModel
 {
@@ -22,6 +24,7 @@ public sealed class MassMemoryRecordViewModel
     public string   Date           { get; init; } = "";
     public string   Time           { get; init; } = "";
     public string[] Values         { get; init; } = [];
+    public double[] RawValues      { get; init; } = [];
     public bool     ChecksumOk     { get; init; }
     public string   ChecksumOkText => ChecksumOk ? "OK" : "Erro";
 }
@@ -35,8 +38,8 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
     private readonly Action _resumePolling;
     private readonly Action _onGoBack;
 
-    private ushort _sqpf = 0x3210;
     private IReadOnlyList<GrandezaColumn> _columns = [];
+    private ushort _storageIntervalRaw;
     private CancellationTokenSource? _readCts;
 
     // ── Header ──────────────────────────────────────────────────────────────
@@ -140,6 +143,7 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
             if (profile.AddrSendInterval is RegisterField siField
                 && regs.TryGetValue(siField.Addr, out var interval))
             {
+                _storageIntervalRaw = interval;
                 StorageInterval = $"{interval} {loc["MmMinutes"]}";
             }
 
@@ -152,13 +156,6 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
             else
             {
                 StorageMode = loc["MmModeCircular"];
-            }
-
-            // ── SQPF ─────────────────────────────────────────────────────────
-            if (profile.AddrSeqPf is RegisterField sqpfField
-                && regs.TryGetValue(sqpfField.Addr, out var sqpfVal))
-            {
-                _sqpf = sqpfVal;
             }
 
             // ── Grandezas configuradas → colunas ────────────────────────────
@@ -176,7 +173,7 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
                     if (!regs.TryGetValue(addr, out var raw)) continue;
                     if (raw == 0xFFFF || raw == 0x0000) continue;
                     if (grandezaById.TryGetValue(raw, out var g))
-                        columns.Add(new GrandezaColumn(g.MqttId, g.Code));
+                        columns.Add(new GrandezaColumn(g.MqttId, g.Code, g.Description));
                     else
                         Debug.WriteLine($"[MassMemory] MqttId {raw} no slot {addr} não encontrado no catálogo.");
                 }
@@ -250,6 +247,7 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
                     Date       = blk.Timestamp.ToString("dd/MM/yy"),
                     Time       = blk.Timestamp.ToString("HH:mm:ss"),
                     Values     = blk.Values.Select(v => v.ToString("G6")).ToArray(),
+                    RawValues  = blk.Values,
                     ChecksumOk = blk.ChecksumOk
                 });
             }
@@ -284,21 +282,41 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
 
         try
         {
-            await using var writer = new StreamWriter(stream);
+            await using var writer = new StreamWriter(stream, Encoding.Latin1);
 
-            // Header row
-            var headers = new List<string> { "Bloco", "Data", "Hora" };
-            headers.AddRange(_columns.Select(c => c.Code));
-            headers.Add("CS");
-            await writer.WriteLineAsync(string.Join("\t", headers));
+            // Metadata header
+            await writer.WriteAsync($"Série: {SerialNumber}\r\n");
+            await writer.WriteAsync($"Endereço: {Address}\r\n");
+            await writer.WriteAsync($"Descrição: {Description}\r\n");
+            await writer.WriteAsync($"IA: {_storageIntervalRaw}\r\n");
+            await writer.WriteAsync("\r\n");
+
+            // Grandeza descriptions
+            foreach (var col in _columns)
+                await writer.WriteAsync($"{col.Code}: {col.Description}\r\n");
+            await writer.WriteAsync("\r\n");
+
+            // Column header row
+            var sb = new StringBuilder();
+            sb.Append(C("Bloco")).Append(';');
+            sb.Append(C("Data")).Append(';');
+            sb.Append(C("Hora")).Append(';');
+            foreach (var col in _columns)
+                sb.Append(C(col.Code)).Append(';');
+            sb.Append("CS   \r\n");
+            await writer.WriteAsync(sb.ToString());
 
             // Data rows
             foreach (var r in Records)
             {
-                var row = new List<string> { r.Block.ToString(), r.Date, r.Time };
-                row.AddRange(r.Values);
-                row.Add(r.ChecksumOkText);
-                await writer.WriteLineAsync(string.Join("\t", row));
+                sb.Clear();
+                sb.Append(C(r.Block.ToString())).Append(';');
+                sb.Append(C(r.Date)).Append(';');
+                sb.Append(C(r.Time)).Append(';');
+                foreach (var v in r.RawValues)
+                    sb.Append(C(Fmt(v))).Append(';');
+                sb.Append(r.ChecksumOkText.PadRight(5)).Append("\r\n");
+                await writer.WriteAsync(sb.ToString());
             }
         }
         catch (Exception ex)
@@ -306,6 +324,13 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
             Debug.WriteLine($"[MassMemory] ExportTxt failed: {ex.Message}");
         }
     }
+
+    // Left-justify in 15-char fixed-width field (matches old software %-15s format).
+    private static string C(string s) => s.PadRight(15);
+
+    // 3 decimal places, comma as decimal separator (pt-BR convention).
+    private static string Fmt(double v) =>
+        v.ToString("F3", CultureInfo.InvariantCulture).Replace('.', ',');
 
     [RelayCommand]
     private void GoBack() => _onGoBack();
