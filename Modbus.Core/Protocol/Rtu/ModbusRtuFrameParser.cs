@@ -78,6 +78,47 @@ public class ModbusRtuFrameParser : IModbusFrameParser
         return response[8..(8 + count)];
     }
 
+    /// <summary>
+    /// Parses an FC 0x07 (ReadExceptionStatus) RTU response.
+    /// Response: SlaveAddr(1) + 0x07(1) + StatusByte(1) + CRC(2) = 5 bytes.
+    /// Bit 7 of StatusByte (0x80) = memory module fault (non-fatal for reading).
+    /// </summary>
+    public byte ParseReadExceptionStatus(byte[] response)
+    {
+        ValidateCrcAndErrors(response);
+        if (response.Length < 5)
+            throw new InvalidDataException(
+                $"FC 0x07 response too short: {response.Length} bytes (expected 5).");
+        if (response[1] != 0x07)
+            throw new InvalidDataException(
+                $"FC 0x07 response has unexpected function code: 0x{response[1]:X2}.");
+        return response[2];
+    }
+
+    /// <summary>
+    /// Parses an FC 0x14 (ReadFileRecord) RTU response.
+    /// Response: SlaveAddr(1) + 0x14(1) + RDL(1) + FRL(1) + RT=0x06(1) + Data(QTD×2) + CRC(2).
+    /// Returns the raw data bytes (QTD×2 bytes after RT=0x06).
+    /// </summary>
+    public byte[] ParseReadFileRecord(byte[] response)
+    {
+        ValidateCrcAndErrors(response);
+        // Minimum: slave+fc+RDL+FRL+RT+CRC = 7 bytes
+        if (response.Length < 7)
+            throw new InvalidDataException(
+                $"FC 0x14 response too short: {response.Length} bytes (minimum 7).");
+        if (response[1] != 0x14)
+            throw new InvalidDataException(
+                $"FC 0x14 response has unexpected function code: 0x{response[1]:X2}.");
+        // RDL = FRL(1) + RT(1) + data(QTD*2) = QTD*2+2, so actual data = RDL-2.
+        int rdl = response[2];
+        int dataLength = rdl - 2;
+        if (response.Length < 5 + dataLength + 2)
+            throw new InvalidDataException(
+                $"FC 0x14 response truncated: {response.Length} bytes, expected {5 + dataLength + 2}.");
+        return response[5..(5 + dataLength)];
+    }
+
     public ReportSlaveIdData ParseReportSlaveId(byte[] response)
     {
         ValidateCrcAndErrors(response);

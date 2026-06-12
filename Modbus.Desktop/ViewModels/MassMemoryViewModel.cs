@@ -7,7 +7,9 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Modbus.Desktop.ViewModels;
@@ -28,9 +30,14 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
 {
     private readonly DeviceItemViewModel _device;
     private readonly IDeviceConfigService _configService;
+    private readonly IMassMemoryService _massMemoryService;
     private readonly Func<Task> _pausePolling;
     private readonly Action _resumePolling;
     private readonly Action _onGoBack;
+
+    private ushort _sqpf = 0x3210;
+    private IReadOnlyList<GrandezaColumn> _columns = [];
+    private CancellationTokenSource? _readCts;
 
     // ── Header ──────────────────────────────────────────────────────────────
     [ObservableProperty] private string _serialNumber    = "—";
@@ -51,25 +58,34 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
     // Disparado após LoadAsync definir as colunas; o code-behind constrói o DataGrid.
     public event Action<IReadOnlyList<GrandezaColumn>>? ColumnsReady;
 
+    // Disparado pelo ExportTxtCommand; o code-behind abre o file picker e retorna o stream.
+    public event Func<Task<Stream?>>? SaveFileRequested;
+
     public MassMemoryViewModel(
         DeviceItemViewModel device,
         IDeviceConfigService configService,
+        IMassMemoryService massMemoryService,
         Func<Task> pausePolling,
         Action resumePolling,
         Action onGoBack)
     {
-        _device        = device;
-        _configService = configService;
-        _pausePolling  = pausePolling;
-        _resumePolling = resumePolling;
-        _onGoBack      = onGoBack;
+        _device             = device;
+        _configService      = configService;
+        _massMemoryService  = massMemoryService;
+        _pausePolling       = pausePolling;
+        _resumePolling      = resumePolling;
+        _onGoBack           = onGoBack;
 
         LocalizationService.Instance.PropertyChanged += OnLocalizationChanged;
         UpdateToggleLabel();
     }
 
-    public void Dispose() =>
+    public void Dispose()
+    {
         LocalizationService.Instance.PropertyChanged -= OnLocalizationChanged;
+        _readCts?.Cancel();
+        _readCts?.Dispose();
+    }
 
     private void OnLocalizationChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -113,6 +129,7 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
             var fields = new List<RegisterField>();
             if (profile.AddrSendInterval.HasValue)         fields.Add(profile.AddrSendInterval.Value);
             if (profile.AddrStorageMode.HasValue)          fields.Add(profile.AddrStorageMode.Value);
+            if (profile.AddrSeqPf.HasValue)                fields.Add(profile.AddrSeqPf.Value);
             if (profile.AddrGrandezasSlots1to20.HasValue)  fields.Add(profile.AddrGrandezasSlots1to20.Value);
             if (profile.AddrGrandezasSlots21to50.HasValue) fields.Add(profile.AddrGrandezasSlots21to50.Value);
 
@@ -137,6 +154,13 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
                 StorageMode = loc["MmModeCircular"];
             }
 
+            // ── SQPF ─────────────────────────────────────────────────────────
+            if (profile.AddrSeqPf is RegisterField sqpfField
+                && regs.TryGetValue(sqpfField.Addr, out var sqpfVal))
+            {
+                _sqpf = sqpfVal;
+            }
+
             // ── Grandezas configuradas → colunas ────────────────────────────
             var grandezaById = GrandezaCatalog
                 .ForDeviceCode(_device.Device.DeviceModel?.DeviceCode)
@@ -157,6 +181,8 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
                         Debug.WriteLine($"[MassMemory] MqttId {raw} no slot {addr} não encontrado no catálogo.");
                 }
             }
+
+            _columns = columns;
 
             if (columns.Count == 0)
                 StatusMessage = loc["MmNoGrandezas"];
@@ -179,15 +205,106 @@ public partial class MassMemoryViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ToggleReading()
     {
-        IsRunning = !IsRunning;
-        if (!IsRunning)
-            StatusMessage = null;
+        if (IsRunning)
+        {
+            _readCts?.Cancel();
+        }
+        else
+        {
+            IsRunning = true;
+            _readCts?.Dispose();
+            _readCts = new CancellationTokenSource();
+            _ = ReadAllBlocksAsync(_readCts.Token);
+        }
+    }
+
+    private async Task ReadAllBlocksAsync(CancellationToken ct)
+    {
+        var loc = LocalizationService.Instance;
+
+        await _pausePolling();
+        Records.Clear();
+
+        try
+        {
+            var ctrl = await _massMemoryService.ReadControlBlockAsync(_device.Device, ct);
+
+            if (ctrl is null)
+            {
+                StatusMessage = loc["MmControlBlockFailed"];
+                return;
+            }
+
+            if (ctrl.BGS == 0)
+            {
+                StatusMessage = loc["MmEmpty"];
+                return;
+            }
+
+            await foreach (var blk in _massMemoryService.ReadBlocksAsync(_device.Device, ctrl, ct))
+            {
+                StatusMessage = string.Format(loc["MmReading"], blk.BlockIndex, ctrl.BGS);
+                Records.Add(new MassMemoryRecordViewModel
+                {
+                    Block      = blk.BlockIndex,
+                    Date       = blk.Timestamp.ToString("dd/MM/yy"),
+                    Time       = blk.Timestamp.ToString("HH:mm:ss"),
+                    Values     = blk.Values.Select(v => v.ToString("G6")).ToArray(),
+                    ChecksumOk = blk.ChecksumOk
+                });
+            }
+
+            StatusMessage = ct.IsCancellationRequested
+                ? string.Format(loc["MmReadCancelled"], Records.Count)
+                : string.Format(loc["MmReadComplete"], Records.Count);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = string.Format(loc["MmReadCancelled"], Records.Count);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MassMemory] ReadAllBlocks failed: {ex.Message}");
+            StatusMessage = string.Format(loc["MmReadError"], ex.Message);
+        }
+        finally
+        {
+            _resumePolling();
+            IsRunning = false;
+        }
     }
 
     [RelayCommand]
-    private void ExportTxt()
+    private async Task ExportTxt()
     {
-        // Stub — exportação será implementada junto da leitura real da memória de massa.
+        if (Records.Count == 0 || SaveFileRequested is null) return;
+
+        var stream = await SaveFileRequested.Invoke();
+        if (stream is null) return;
+
+        try
+        {
+            await using var writer = new StreamWriter(stream);
+
+            // Header row
+            var headers = new List<string> { "Bloco", "Data", "Hora" };
+            headers.AddRange(_columns.Select(c => c.Code));
+            headers.Add("CS");
+            await writer.WriteLineAsync(string.Join("\t", headers));
+
+            // Data rows
+            foreach (var r in Records)
+            {
+                var row = new List<string> { r.Block.ToString(), r.Date, r.Time };
+                row.AddRange(r.Values);
+                row.Add(r.ChecksumOkText);
+                await writer.WriteLineAsync(string.Join("\t", row));
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MassMemory] ExportTxt failed: {ex.Message}");
+        }
     }
 
     [RelayCommand]

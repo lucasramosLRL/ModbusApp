@@ -74,6 +74,38 @@ public class ModbusRtuFrameBuilder : IModbusFrameBuilder
     }
 
     /// <summary>
+    /// Builds an FC 0x07 (ReadExceptionStatus) RTU frame.
+    /// ADU: SlaveAddr(1) + 0x07(1) + CRC(2) = 4 bytes.
+    /// </summary>
+    public byte[] ReadExceptionStatus(byte slaveId)
+    {
+        var frame = new byte[4];
+        frame[0] = slaveId;
+        frame[1] = 0x07;
+        Crc16.Append(frame, 2);
+        return frame;
+    }
+
+    /// <summary>
+    /// Builds an FC 0x14 (ReadFileRecord) RTU frame for KRON mass memory blocks.
+    /// ADU: SlaveAddr(1) + 0x14(1) + BC=0x07(1) + RT=0x06(1) + SET(2) + BLC(2) + QTD(2) + CRC(2) = 12 bytes.
+    /// QTD = 3 + 2*GP where GP = number of grandezas programmed.
+    /// </summary>
+    public byte[] ReadFileRecord(byte slaveId, ushort sector, ushort block, ushort qtd)
+    {
+        var frame = new byte[12];
+        frame[0] = slaveId;
+        frame[1] = 0x14;
+        frame[2] = 0x07; // byte count of request sub-data
+        frame[3] = 0x06; // reference type
+        BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(4), sector);
+        BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(6), block);
+        BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(8), qtd);
+        Crc16.Append(frame, 10);
+        return frame;
+    }
+
+    /// <summary>
     /// Builds a KRON FC 0x42 (configAddress) broadcast frame.
     /// ADU: 0x00(broadcast) + 0x42 + SerialNumber(4 BE) + NewSlaveId(1) + CRC(2).
     /// No response is expected — the device reboots after applying the new address.

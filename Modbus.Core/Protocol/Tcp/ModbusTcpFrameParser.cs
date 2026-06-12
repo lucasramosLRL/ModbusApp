@@ -49,6 +49,49 @@ public class ModbusTcpFrameParser : IModbusFrameParser
     public void ValidateWriteMultipleRegisters(byte[] response) =>
         CheckForError(response);
 
+    /// <summary>
+    /// Parses an FC 0x07 (ReadExceptionStatus) TCP response.
+    /// PDU: FC(1) + StatusByte(1). Total with MBAP = 9 bytes.
+    /// Bit 7 of StatusByte (0x80) = memory module fault (non-fatal for reading).
+    /// </summary>
+    public static byte ParseReadExceptionStatus(byte[] response)
+    {
+        CheckForError(response);
+        if (response.Length < MbapLength + 2)
+            throw new InvalidDataException(
+                $"FC 0x07 TCP response too short: {response.Length} bytes (expected {MbapLength + 2}).");
+        if (response[MbapLength] != 0x07)
+            throw new InvalidDataException(
+                $"FC 0x07 TCP response has unexpected function code: 0x{response[MbapLength]:X2}.");
+        return response[MbapLength + 1];
+    }
+
+    /// <summary>
+    /// Parses an FC 0x14 (ReadFileRecord) TCP response.
+    /// PDU: FC(1) + RDL(1) + FRL(1) + RT=0x06(1) + Data(QTD×2).
+    /// Returns the raw data bytes (QTD×2 bytes after RT=0x06).
+    /// </summary>
+    public static byte[] ParseReadFileRecord(byte[] response)
+    {
+        CheckForError(response);
+        // Minimum: MBAP(7) + FC + RDL + FRL + RT = 11 bytes
+        if (response.Length < MbapLength + 4)
+            throw new InvalidDataException(
+                $"FC 0x14 TCP response too short: {response.Length} bytes (minimum {MbapLength + 4}).");
+        if (response[MbapLength] != 0x14)
+            throw new InvalidDataException(
+                $"FC 0x14 TCP response has unexpected function code: 0x{response[MbapLength]:X2}.");
+        // RDL at MbapLength+1; data starts at MbapLength+4 (after FC, RDL, FRL, RT)
+        // RDL = FRL(1) + RT(1) + data(QTD*2) = QTD*2+2, so actual data = RDL-2.
+        int rdl = response[MbapLength + 1];
+        int dataLength = rdl - 2;
+        int dataStart = MbapLength + 4;
+        if (response.Length < dataStart + dataLength)
+            throw new InvalidDataException(
+                $"FC 0x14 TCP response truncated: {response.Length} bytes, expected {dataStart + dataLength}.");
+        return response[dataStart..(dataStart + dataLength)];
+    }
+
     public ReportSlaveIdData ParseReportSlaveId(byte[] response)
     {
         CheckForError(response);

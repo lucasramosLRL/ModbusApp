@@ -67,4 +67,40 @@ public class ModbusTcpFrameBuilder : IModbusFrameBuilder
         frame[7] = (byte)FunctionCode.ReportSlaveId;
         return frame;
     }
+
+    /// <summary>
+    /// Builds an FC 0x07 (ReadExceptionStatus) TCP frame.
+    /// MBAP(7) + FC(1) = 8 bytes; Length = UnitId(1) + FC(1) = 2.
+    /// </summary>
+    public byte[] ReadExceptionStatus(byte slaveId)
+    {
+        var frame = new byte[8];
+        BinaryPrimitives.WriteUInt16BigEndian(frame,            NextTransactionId());
+        BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(2), 0x0000);
+        BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(4), 0x0002);
+        frame[6] = slaveId;
+        frame[7] = 0x07;
+        return frame;
+    }
+
+    /// <summary>
+    /// Builds an FC 0x14 (ReadFileRecord) TCP frame for KRON mass memory blocks.
+    /// MBAP(7) + FC(1) + BC=0x07(1) + RT=0x06(1) + SET(2) + BLC(2) + QTD(2) = 16 bytes.
+    /// Length = UnitId(1) + PDU(9) = 10.
+    /// </summary>
+    public byte[] ReadFileRecord(byte slaveId, ushort sector, ushort block, ushort qtd)
+    {
+        var frame = new byte[16];
+        BinaryPrimitives.WriteUInt16BigEndian(frame,             NextTransactionId());
+        BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(2),  0x0000);
+        BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(4),  0x000A); // Length = 10
+        frame[6]  = slaveId;
+        frame[7]  = 0x14;
+        frame[8]  = 0x07; // byte count of request sub-data
+        frame[9]  = 0x06; // reference type
+        BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(10), sector);
+        BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(12), block);
+        BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(14), qtd);
+        return frame;
+    }
 }

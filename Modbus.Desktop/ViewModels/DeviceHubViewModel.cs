@@ -14,6 +14,7 @@ public partial class DeviceHubViewModel : ObservableObject
     private readonly IRegisterValueRepository _registerValueRepository;
     private readonly IPollingEngine _pollingEngine;
     private readonly IDeviceConfigService _configService;
+    private readonly IMassMemoryService _massMemoryService;
     private readonly IDeviceRepository _deviceRepository;
     private readonly DeviceListViewModel _parent;
 
@@ -39,6 +40,7 @@ public partial class DeviceHubViewModel : ObservableObject
         IRegisterValueRepository registerValueRepository,
         IPollingEngine pollingEngine,
         IDeviceConfigService configService,
+        IMassMemoryService massMemoryService,
         IDeviceRepository deviceRepository,
         DeviceListViewModel parent)
     {
@@ -46,6 +48,7 @@ public partial class DeviceHubViewModel : ObservableObject
         _registerValueRepository = registerValueRepository;
         _pollingEngine = pollingEngine;
         _configService = configService;
+        _massMemoryService = massMemoryService;
         _deviceRepository = deviceRepository;
         _parent = parent;
 
@@ -114,6 +117,7 @@ public partial class DeviceHubViewModel : ObservableObject
         var massMemory = new MassMemoryViewModel(
             Device,
             _configService,
+            _massMemoryService,
             pausePolling:  isRtu
                 ? () => _pollingEngine.SuspendRtuPollingAsync()
                 : () => _pollingEngine.AcquireDeviceLockAsync(Device.Id),

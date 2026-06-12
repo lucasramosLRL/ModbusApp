@@ -281,7 +281,12 @@ internal static class EnglishStrings
         ["MmPauseReading"]       = "Pause Reading",
         ["MmExportTxt"]          = "Export TXT",
         ["MmNoGrandezas"]        = "No quantities configured for mass memory.",
-        ["MmReadingStub"]        = "Reading in development.",
+        ["MmReading"]            = "Reading block {0} of {1}...",
+        ["MmReadComplete"]       = "Complete — {0} blocks read.",
+        ["MmReadCancelled"]      = "Cancelled — {0} blocks read.",
+        ["MmReadError"]          = "Reading error: {0}",
+        ["MmEmpty"]              = "No records stored in memory.",
+        ["MmControlBlockFailed"]  = "Failed to read control block. Check the connection and try again.",
 
         // SettingsView
         ["SettingsTitle"]        = "Settings",

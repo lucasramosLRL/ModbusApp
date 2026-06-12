@@ -71,6 +71,7 @@ public partial class App : Application
 
         services.AddTransient<IDeviceScanService, DeviceScanService>();
         services.AddTransient<IDeviceConfigService, DeviceConfigService>();
+        services.AddTransient<IMassMemoryService, MassMemoryService>();
         services.AddSingleton<IModbusServiceFactory, ModbusServiceFactory>();
         services.AddSingleton<IPollingEngine>(sp =>
             new PollingEngine(

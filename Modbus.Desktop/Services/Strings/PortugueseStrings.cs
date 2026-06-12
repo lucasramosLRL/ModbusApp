@@ -281,7 +281,12 @@ internal static class PortugueseStrings
         ["MmPauseReading"]       = "Pausar Leitura",
         ["MmExportTxt"]          = "Exportar TXT",
         ["MmNoGrandezas"]        = "Nenhuma grandeza configurada para memória de massa.",
-        ["MmReadingStub"]        = "Leitura em desenvolvimento.",
+        ["MmReading"]            = "Lendo bloco {0} de {1}...",
+        ["MmReadComplete"]       = "Concluído — {0} blocos lidos.",
+        ["MmReadCancelled"]      = "Interrompido — {0} blocos lidos.",
+        ["MmReadError"]          = "Erro na leitura: {0}",
+        ["MmEmpty"]              = "Memória sem registros gravados.",
+        ["MmControlBlockFailed"]  = "Falha ao ler o bloco de controle. Verifique a conexão e tente novamente.",
 
         // SettingsView
         ["SettingsTitle"]        = "Configurações",
