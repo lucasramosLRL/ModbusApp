@@ -741,7 +741,12 @@ public partial class DeviceConfigureViewModel : ObservableObject
 
             // When IoT grandezas / send interval changed, the model-specific IoT buffer
             // reset coil must be pulsed (then a settle wait) before the commit/reset coil.
-            ushort? iotBufferCoil = needsIotBufferReset ? _profile.IotBufferResetCoil : null;
+            // The KS-3000 buffer coil depends on firmware (mass memory was added in v6.0),
+            // so resolve it from the device's firmware rather than the static profile value.
+            ushort? iotBufferCoil = needsIotBufferReset
+                ? DeviceConfigProfileRegistry.GetIotBufferResetCoil(
+                    Device.Device.DeviceModel?.DeviceCode, Device.Device.FirmwareVersion)
+                : null;
 
             // That coil reinitializes the meter's mass memory (logged data is lost), so ask the
             // user to confirm before touching the device. Declining reverts the IoT fields that

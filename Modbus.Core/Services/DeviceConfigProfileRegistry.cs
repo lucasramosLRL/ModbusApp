@@ -102,7 +102,9 @@ public static class DeviceConfigProfileRegistry
         // ── Entradas e Saídas ─────────────────────────────────────────────────
         AddrDebounceEdp   = 40171,
 
-        // IoT buffer / mass-memory reset coil — KS-3000 doc coil 91 → wire 90.
+        // IoT buffer / mass-memory reset coil — KS-3000 legacy default (firmware < 6.0,
+        // no mass memory): doc coil 91 → wire 90. Firmware >= 6.0 has mass memory and uses
+        // wire 79 instead; the firmware split is resolved in GetIotBufferResetCoil.
         IotBufferResetCoil = 90,
     };
 
@@ -197,4 +199,22 @@ public static class DeviceConfigProfileRegistry
 
     public static DeviceConfigProfile? Get(byte? deviceCode) =>
         deviceCode.HasValue && _map.TryGetValue(deviceCode.Value, out var p) ? p : null;
+
+    // KS-3000 (0xF2) firmware that introduced mass memory. FirmwareVersion is the byte
+    // form of "vX.Y" encoded as X*10 + Y, so v6.0 → 60.
+    public const byte Ks3000MassMemoryMinFirmware = 60;
+
+    /// <summary>
+    /// Resolves the IoT buffer / mass-memory reset coil (FC05 wire address) for a device.
+    /// For the KS-3000 this depends on firmware: builds &lt; 6.0 have no mass memory and use
+    /// doc coil 91 (wire 90); builds &gt;= 6.0 have mass memory and use doc coil 80 (wire 79)
+    /// like the other models. Unknown firmware falls back to the legacy coil (90).
+    /// Every other model uses the profile's fixed <see cref="DeviceConfigProfile.IotBufferResetCoil"/>.
+    /// </summary>
+    public static ushort? GetIotBufferResetCoil(byte? deviceCode, byte? firmwareVersion)
+    {
+        if (deviceCode == 0xF2)
+            return firmwareVersion >= Ks3000MassMemoryMinFirmware ? (ushort)79 : (ushort)90;
+        return Get(deviceCode)?.IotBufferResetCoil;
+    }
 }
