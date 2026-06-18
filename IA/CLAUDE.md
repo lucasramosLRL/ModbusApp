@@ -682,6 +682,22 @@ No RTU/UDP scan in this mode.
 COIL, 999-999 config, timeout), `CloudPollingTests` (telemetry → `RegisterValuesUpdated`, no factory call).
 Total suite **284 tests passing**.
 
+### Where I left off (resume here) — feature is WIP, not field-validated
+Done: Core layer + both cloud UI screens implemented; `dotnet build` compiles; 284 Core tests pass.
+Next session, in order:
+1. **Clean build + run** on the dev machine (last session the app was running, so the Desktop DLL
+   couldn't be copied — only the copy step failed, compilation was clean). DB auto-migrates on startup
+   (`Migrate()` applies `AddMqttCloudConfig`), no manual DB reset needed.
+2. **End-to-end with the real meter** (not yet done): Add device → "Nuvem (MQTT)" → broker host/port/TLS,
+   serial, **data topic** (the capture used just `ks`), model KS-3000. Publish telemetry → confirm the
+   readings screen updates. Then send a config command (e.g. IA, or an action coil) and **observe which
+   topic the response lands on**.
+3. **Confirm with firmware** and adjust if needed: the command RESPONSE topic (code currently assumes the
+   same configurable data topic as telemetry → `MqttConfig.ReplyTopic`) and that single-flight correlation
+   is acceptable (replies omit the request `id`).
+4. Known rough edges to revisit: telemetry `time` is parsed as wall-clock (no timezone); G1..G20 have no
+   read-back/confirmation UI yet; config writes are fire-and-forget (no success feedback from the meter).
+
 ---
 
 ### Pending / future features - Attention! Keep it in the end of the file
