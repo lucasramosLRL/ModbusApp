@@ -61,10 +61,11 @@
                     </DockPanel>
                 </Border>
 
-                <!-- Memória de Massa -->
+                <!-- Memória de Massa (não disponível para devices de nuvem) -->
                 <Border Classes="card-hub"
                         Width="260" Height="160"
                         Margin="0,0,16,16"
+                        IsVisible="{Binding IsMassMemoryVisible}"
                         Opacity="{Binding MassMemoryCardOpacity}">
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Top"

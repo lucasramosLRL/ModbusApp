@@ -591,5 +591,98 @@ Matches legacy KRON software output exactly:
 
 ---
 
+## Cloud (MQTT) Architecture — field meters via broker
+
+### Why
+Field-installed KS meters (poles / remote sites) have their own connectivity (4G/Wi-Fi/LoRa) and
+already publish decoded JSON telemetry to a KRON MQTT broker, and accept a limited set of commands on a
+reply topic. The app reaches these meters **through the broker** instead of local TCP/RTU.
+
+**Key principle: the `IModbusService` abstraction holds at the DATA plane, but the PRESENTATION diverges.**
+Cloud devices are NOT polled and do NOT reuse the standard screens — see UI divergence below.
+
+### Domain + persistence
+- `TransportType.MqttCloud` (third enum value).
+- `Domain/ValueObjects/MqttConfig.cs` — owned entity on `ModbusDevice` (`Mqtt`): `BrokerHost`, `Port` (8883),
+  `UseTls`, `ClientId/Username/Password`, and topic templates. Mapped via `OwnsOne` (columns `Mqtt*`),
+  migration `AddMqttCloudConfig`. Additive — RTU/TCP untouched.
+
+### Cloud layer (`Modbus.Core/Cloud/`)
+- `IMqttBrokerClient` / `MqttBrokerClient` — **MQTTnet 5** wrapper (NuGet on Modbus.Core). One connection per
+  broker (keyed host/port/user), multiplexes topic subscriptions + publishes, auto-reconnect + re-subscribe.
+- `ITelemetryPayloadMapper` / `JsonTelemetryPayloadMapper` — telemetry JSON → `RegisterValue[]` (see format).
+- `ICloudCommandService` / `CloudCommandService` — the KS MQTT command protocol (HRR/HRW/COIL/999-999).
+- `CloudModbusService : IModbusService` — adapts the service contract to the command channel (read=HRR,
+  write=HRW, coil=COIL); input-register reads → `NotSupportedException` (those arrive via telemetry).
+  Returned by `ModbusServiceFactory` for `MqttCloud` (factory takes an optional `ICloudCommandService`).
+- `MqttTopics.Resolve(template, device)` — substitutes `{serial}` with the **7-digit zero-padded** serial.
+
+### Reads = event-driven (no polling)
+`PollingEngine` takes optional `IMqttBrokerClient` + `ITelemetryPayloadMapper`. Cloud devices are kept in a
+separate `_cloudDevices` map (NOT the 5s timer set): on `AddDevice` it subscribes to the telemetry topic and,
+per message, maps JSON → values and raises the **same** `RegisterValuesUpdated`. Empty maps (log lines) are
+skipped. So the reading pipeline/event surface is unchanged; only the source differs.
+
+### KS MQTT command protocol (from firmware doc)
+App PUBLISHES commands to the meter's subscribe topic `MqttConfig.CommandTopic` = `ks-01/{serial}/reply`:
+- Holding read:  `{ "999-123": { "id":"<6 digits>", "HRR": ["40001","7"] } }`
+- Holding write: `{ "999-123": { "id":"…", "HRW": ["42101","00050002…"] } }`
+- Coil action:   `{ "999-999": { "id":"…", "COIL":"006" } }`
+- Named config:  `{ "999-999": { "id":"…", "TP":"1.00","IA":"1","G1":"30003" } }`
+
+- **Addressing**: Modicon — holding = `raw + 40001`, input = `raw + 30001` (same as `DeviceConfigService`).
+- **Register values**: 4 hex digits each, big-endian, concatenated (`EncodeRegistersHex`/`DecodeRegistersHex`).
+- **Coils**: KS `COIL` is 1-based → `COIL = wireAddress + 1` formatted `D3` (reset coil wire 5 → `"006"`).
+  Coil/config commands are **fire-and-forget** (the reset reboots the meter; reply not guaranteed).
+- **Responses** arrive UNwrapped on the data topic: `{ "HRR":"…hex…" }` (reads) /
+  `{ "Message":"HRW Success", … }` (writes). The meter does **NOT echo the request `id`**, so
+  `CloudCommandService` correlates by **single-flight** (one outstanding command per response topic);
+  telemetry on the same topic is ignored (only `HRR`/`Message` objects complete a pending request).
+
+### Telemetry format (confirmed from a real meter capture)
+Data payload is a JSON **array** wrapping one object; values live under `metadata`, timestamp under `time`:
+```json
+[{ "variable":"data", "time":"2026-04-06 14:45:00",
+   "metadata":{ "U0":201.80, "I0":0.00, "F1":59.99, "P0":0.00, "FP0":0.00, "EA":0.00, "CE":1 } }]
+```
+- `JsonTelemetryPayloadMapper` unwraps array→`metadata`, parses `time` (`yyyy-MM-dd HH:mm:ss`), and matches
+  fields to register-definition names. Log lines (`{"param":"log",…}`) and unknown fields are ignored.
+- **Field aliases** (telemetry name → register name, the rest match directly):
+  `F1→Freq`, `EA→EA+`, `ER→ER+`, `EAN→EA-`, `ERN→ER-`.
+- The **data topic is installation-configurable** (a capture used just `ks`) — entered in the Add-device UI
+  and stored in both `MqttConfig.TelemetryTopic` and `ReplyTopic`; the command topic stays serial-based.
+
+### UI divergence (decided with the user — cloud is NOT the same as RTU/TCP)
+`DeviceHubViewModel.IsCloud` branches the per-device hub:
+- **Mass-memory card hidden** (no FC14 equivalent); hub **skips the FC 0x79 capability probe** for cloud
+  (it would fire a real MQTT command and block on the reply timeout).
+- **Leituras (telemetria)** → `CloudReadingViewModel` / `CloudReadingView` — pure push (subscribes
+  `RegisterValuesUpdated`, shows only the published G1..G20 quantities + last-update time). No polling, no
+  I/O/status tabs, no bus pausing.
+- **Configuração MQTT** → `CloudConfigureViewModel` / `CloudConfigureView` — only the MQTT-settable params via
+  the **999-999 named commands**: TP, TC, TL, TI, KE, THRS, RT, IA, relay `sd1`, `G1..G20`, plus action coils
+  (reset device 006 / reset energies 040 / init hourmeter 062 / reset MQTT buffer 091). Empty fields are left
+  unchanged; writes go through `ICloudCommandService.SendConfigAsync` (fire-and-forget).
+- `ICloudCommandService` is threaded by DI: `App.axaml.cs` → `DeviceListViewModel` → `DeviceHubViewModel` →
+  cloud VMs. DataTemplates for both cloud views added in `App.axaml`.
+
+### Add-device flow (cloud)
+`AddDeviceViewModel` gained a **"Nuvem (MQTT)"** transport option: broker host/port/TLS/credentials, serial
+(identifies topics), device model (gives the mapper its register map), and the configurable **data topic**.
+No RTU/UDP scan in this mode.
+
+### STILL PENDING from firmware (confirm before field test)
+- Exact topic for command RESPONSES (HRR/HRW replies) — currently assumed to be the same configurable data
+  topic; confirm and adjust `MqttConfig.ReplyTopic` if different.
+- Confirmation that single-flight correlation is acceptable (meter omits the request `id` in replies).
+
+### Cloud tests (`Modbus.Core.Tests/Cloud/`)
+`JsonTelemetryPayloadMapperTests` (array/metadata, aliases, `time`, log-ignore), `CloudModbusServiceTests`
+(delegation, NotSupported), `CloudCommandServiceTests` (HRR/HRW envelopes, Modicon conversion, hex codec,
+COIL, 999-999 config, timeout), `CloudPollingTests` (telemetry → `RegisterValuesUpdated`, no factory call).
+Total suite **284 tests passing**.
+
+---
+
 ### Pending / future features - Attention! Keep it in the end of the file
 - Mobile app (MAUI) connected to the same core as the desktop version with the same functions and styling

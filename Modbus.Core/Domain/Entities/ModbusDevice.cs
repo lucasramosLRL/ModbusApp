@@ -22,6 +22,7 @@ public class ModbusDevice
 
     public TcpConfig? Tcp { get; set; }
     public RtuConfig? Rtu { get; set; }
+    public MqttConfig? Mqtt { get; set; }
 
     public ICollection<RegisterValue> RegisterValues { get; set; } = [];
 }

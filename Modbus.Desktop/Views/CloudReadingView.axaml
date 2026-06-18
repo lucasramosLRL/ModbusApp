@@ -1,0 +1,133 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Modbus.Desktop.ViewModels"
+             xmlns:svc="using:Modbus.Desktop.Services"
+             x:Class="Modbus.Desktop.Views.CloudReadingView"
+             x:DataType="vm:CloudReadingViewModel">
+
+    <DockPanel Margin="{StaticResource MarginView}">
+
+        <!-- Header -->
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" Margin="0,0,0,16">
+            <Button Content="{Binding [Back], Source={x:Static svc:LocalizationService.Instance}}"
+                    Command="{Binding GoBackCommand}"
+                    Padding="{StaticResource PaddingButtonSmall}"
+                    VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Margin="20,0" VerticalAlignment="Center" Spacing="2">
+                <TextBlock Text="{Binding Device.Name}" Classes="page-title" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding [CloudReadingsTitle], Source={x:Static svc:LocalizationService.Instance}}"
+                               FontSize="{StaticResource FontSizeMeta}" Opacity="0.55" />
+                    <TextBlock Text="·" Opacity="0.35" />
+                    <TextBlock Text="{Binding LastUpdate}"
+                               FontSize="{StaticResource FontSizeMeta}" Opacity="0.55" />
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+
+        <ScrollViewer>
+            <StackPanel Spacing="12">
+
+                <!-- Waiting-for-telemetry hint -->
+                <Border Classes="card" IsVisible="{Binding !HasData}">
+                    <TextBlock Text="{Binding [CloudReadingsWaiting], Source={x:Static svc:LocalizationService.Instance}}"
+                               TextWrapping="Wrap" Opacity="0.7" />
+                </Border>
+
+                <!-- Real-time quantities -->
+                <ItemsControl ItemsSource="{Binding ReadingGroups}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ReadingGroupViewModel">
+                            <Border Classes="reading-group" Margin="0,0,0,4">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="{Binding GroupName}"
+                                               FontSize="{StaticResource FontSizeGroupHeader}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource BrushTextPrimary}"
+                                               Opacity="0.85" />
+                                    <ItemsControl ItemsSource="{Binding Readings}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ElectricalReadingViewModel">
+                                                <Border Classes="reading-box" Margin="0,0,8,8" MinWidth="170">
+                                                    <StackPanel Spacing="4">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <TextBlock Text="{Binding Name}"
+                                                                       FontSize="{StaticResource FontSizeMeta}"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{StaticResource BrushTextMuted}" />
+                                                            <TextBlock Text="{Binding Description}"
+                                                                       FontSize="{StaticResource FontSizeLabelSmall}"
+                                                                       Opacity="0.45"
+                                                                       Foreground="{StaticResource BrushTextPrimary}"
+                                                                       VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding DisplayValue}"
+                                                                   FontSize="20" FontWeight="Medium"
+                                                                   Foreground="{StaticResource BrushTextPrimary}" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Energy / demand quantities -->
+                <ItemsControl ItemsSource="{Binding EnergyGroups}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ReadingGroupViewModel">
+                            <Border Classes="reading-group" Margin="0,0,0,4">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="{Binding GroupName}"
+                                               FontSize="{StaticResource FontSizeGroupHeader}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource BrushTextPrimary}"
+                                               Opacity="0.85" />
+                                    <ItemsControl ItemsSource="{Binding Readings}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ElectricalReadingViewModel">
+                                                <Border Classes="reading-box" Margin="0,0,8,8" MinWidth="170">
+                                                    <StackPanel Spacing="4">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <TextBlock Text="{Binding Name}"
+                                                                       FontSize="{StaticResource FontSizeMeta}"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{StaticResource BrushTextMuted}" />
+                                                            <TextBlock Text="{Binding Description}"
+                                                                       FontSize="{StaticResource FontSizeLabelSmall}"
+                                                                       Opacity="0.45"
+                                                                       Foreground="{StaticResource BrushTextPrimary}"
+                                                                       VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding DisplayValue}"
+                                                                   FontSize="20" FontWeight="Medium"
+                                                                   Foreground="{StaticResource BrushTextPrimary}" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+            </StackPanel>
+        </ScrollViewer>
+
+    </DockPanel>
+</UserControl>

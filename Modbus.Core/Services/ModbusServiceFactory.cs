@@ -1,3 +1,4 @@
+using Modbus.Core.Cloud;
 using Modbus.Core.Domain.Entities;
 using Modbus.Core.Domain.Enums;
 using Modbus.Core.Protocol.Framing;
@@ -11,8 +12,18 @@ namespace Modbus.Core.Services;
 
 public class ModbusServiceFactory : IModbusServiceFactory
 {
+    private readonly ICloudCommandService? _cloudCommands;
+
+    public ModbusServiceFactory(ICloudCommandService? cloudCommands = null)
+    {
+        _cloudCommands = cloudCommands;
+    }
+
     public IModbusService Create(ModbusDevice device)
     {
+        if (device.TransportType == TransportType.MqttCloud)
+            return CreateCloud(device);
+
         var (transport, builder, parser) = device.TransportType switch
         {
             TransportType.Tcp => CreateTcp(device),
@@ -20,6 +31,16 @@ public class ModbusServiceFactory : IModbusServiceFactory
             _ => throw new ArgumentOutOfRangeException(nameof(device), device.TransportType, "Unsupported transport type.")
         };
         return new ModbusService(transport, builder, parser);
+    }
+
+    private IModbusService CreateCloud(ModbusDevice device)
+    {
+        if (device.Mqtt is null)
+            throw new InvalidOperationException($"Device '{device.Name}' is configured as MqttCloud but has no MqttConfig.");
+        if (_cloudCommands is null)
+            throw new InvalidOperationException("Cloud transport requires an ICloudCommandService; none was provided to the factory.");
+
+        return new CloudModbusService(device, _cloudCommands);
     }
 
     private static (IModbusTransport, IModbusFrameBuilder, IModbusFrameParser) CreateTcp(ModbusDevice device)

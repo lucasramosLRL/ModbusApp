@@ -1,6 +1,7 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Modbus.Core.Cloud;
 using Modbus.Core.Domain.Repositories;
 using Modbus.Core.Polling;
 using Modbus.Core.Services;
@@ -21,6 +22,7 @@ public partial class DeviceListViewModel : ObservableObject
     private readonly IMassMemoryService _massMemoryService;
     private readonly IDeviceScanService _scanService;
     private readonly IModbusServiceFactory _serviceFactory;
+    private readonly ICloudCommandService _cloudCommandService;
     private readonly SettingsViewModel _settingsViewModel;
     private bool _pollingStarted;
 
@@ -40,6 +42,7 @@ public partial class DeviceListViewModel : ObservableObject
         IMassMemoryService massMemoryService,
         IDeviceScanService scanService,
         IModbusServiceFactory serviceFactory,
+        ICloudCommandService cloudCommandService,
         SettingsViewModel settingsViewModel)
     {
         _deviceRepository        = deviceRepository;
@@ -50,6 +53,7 @@ public partial class DeviceListViewModel : ObservableObject
         _massMemoryService       = massMemoryService;
         _scanService             = scanService;
         _serviceFactory          = serviceFactory;
+        _cloudCommandService     = cloudCommandService;
         _settingsViewModel       = settingsViewModel;
 
         _pollingEngine.RegisterValuesUpdated += OnRegisterValuesUpdated;
@@ -98,7 +102,7 @@ public partial class DeviceListViewModel : ObservableObject
     [RelayCommand]
     private void OpenDeviceDetail(DeviceItemViewModel device)
     {
-        var hub = new DeviceHubViewModel(device, _registerValueRepository, _pollingEngine, _configService, _massMemoryService, _deviceRepository, this);
+        var hub = new DeviceHubViewModel(device, _registerValueRepository, _pollingEngine, _configService, _massMemoryService, _deviceRepository, _cloudCommandService, this);
         hub.NavigationRequested += (_, vm) => NavigationRequested?.Invoke(this, vm);
         NavigationRequested?.Invoke(this, hub);
     }

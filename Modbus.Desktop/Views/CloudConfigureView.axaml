@@ -1,0 +1,152 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Modbus.Desktop.ViewModels"
+             xmlns:svc="using:Modbus.Desktop.Services"
+             x:Class="Modbus.Desktop.Views.CloudConfigureView"
+             x:DataType="vm:CloudConfigureViewModel">
+
+    <DockPanel Margin="{StaticResource MarginView}">
+
+        <!-- Header -->
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" Margin="0,0,0,16">
+            <Button Content="{Binding [Back], Source={x:Static svc:LocalizationService.Instance}}"
+                    Command="{Binding GoBackCommand}"
+                    Padding="{StaticResource PaddingButtonSmall}"
+                    VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Margin="20,0" VerticalAlignment="Center" Spacing="2">
+                <TextBlock Text="{Binding Device.Name}" Classes="page-title" />
+                <TextBlock Text="{Binding [CloudConfigTitle], Source={x:Static svc:LocalizationService.Instance}}"
+                           FontSize="{StaticResource FontSizeMeta}" Opacity="0.55" />
+            </StackPanel>
+        </Grid>
+
+        <ScrollViewer>
+            <StackPanel Spacing="16">
+
+                <!-- Measurement / general -->
+                <Border Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="{Binding [CfgMeasurement], Source={x:Static svc:LocalizationService.Instance}}"
+                                   Classes="section-title" />
+                        <WrapPanel Orientation="Horizontal">
+                            <StackPanel Spacing="4" Width="200" Margin="0,0,12,12">
+                                <TextBlock Text="{Binding [CfgTP], Source={x:Static svc:LocalizationService.Instance}}" Classes="label-small" />
+                                <TextBox Text="{Binding Tp}" Watermark="1.00–9999.99" />
+                            </StackPanel>
+                            <StackPanel Spacing="4" Width="200" Margin="0,0,12,12">
+                                <TextBlock Text="{Binding [CfgTC], Source={x:Static svc:LocalizationService.Instance}}" Classes="label-small" />
+                                <TextBox Text="{Binding Tc}" Watermark="1.00–9999.99" />
+                            </StackPanel>
+                            <StackPanel Spacing="4" Width="200" Margin="0,0,12,12">
+                                <TextBlock Text="{Binding [CfgTL], Source={x:Static svc:LocalizationService.Instance}}" Classes="label-small" />
+                                <TextBox Text="{Binding Tl}" />
+                            </StackPanel>
+                            <StackPanel Spacing="4" Width="200" Margin="0,0,12,12">
+                                <TextBlock Text="{Binding [CfgTI], Source={x:Static svc:LocalizationService.Instance}}" Classes="label-small" />
+                                <TextBox Text="{Binding Ti}" Watermark="1–60" />
+                            </StackPanel>
+                            <StackPanel Spacing="4" Width="200" Margin="0,0,12,12">
+                                <TextBlock Text="{Binding [CfgKE], Source={x:Static svc:LocalizationService.Instance}}" Classes="label-small" />
+                                <TextBox Text="{Binding Ke}" Watermark="0–65535" />
+                            </StackPanel>
+                            <StackPanel Spacing="4" Width="200" Margin="0,0,12,12">
+                                <TextBlock Text="{Binding [CfgTHRS], Source={x:Static svc:LocalizationService.Instance}}" Classes="label-small" />
+                                <TextBox Text="{Binding Thrs}" />
+                            </StackPanel>
+                            <StackPanel Spacing="4" Width="200" Margin="0,0,12,12">
+                                <TextBlock Text="{Binding [CfgRT], Source={x:Static svc:LocalizationService.Instance}}" Classes="label-small" />
+                                <TextBox Text="{Binding Rt}" Watermark="0–65535" />
+                            </StackPanel>
+                            <StackPanel Spacing="4" Width="200" Margin="0,0,12,12">
+                                <TextBlock Text="{Binding [CfgIA], Source={x:Static svc:LocalizationService.Instance}}" Classes="label-small" />
+                                <TextBox Text="{Binding Ia}" Watermark="1–65535" />
+                            </StackPanel>
+                        </WrapPanel>
+                        <Button Content="{Binding [CfgApply], Source={x:Static svc:LocalizationService.Instance}}"
+                                Command="{Binding ApplyGeneralCommand}"
+                                Padding="{StaticResource PaddingButton}"
+                                HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Digital output (relay) -->
+                <Border Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="{Binding [CfgRelay], Source={x:Static svc:LocalizationService.Instance}}"
+                                   Classes="section-title" />
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <CheckBox Content="{Binding [CfgRelayOn], Source={x:Static svc:LocalizationService.Instance}}"
+                                      IsChecked="{Binding RelayOn}" VerticalAlignment="Center" />
+                            <Button Content="{Binding [CfgApply], Source={x:Static svc:LocalizationService.Instance}}"
+                                    Command="{Binding ApplyRelayCommand}"
+                                    Padding="{StaticResource PaddingButton}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Cloud quantities G1..G20 -->
+                <Border Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="{Binding [CfgGrandezas], Source={x:Static svc:LocalizationService.Instance}}"
+                                   Classes="section-title" />
+                        <TextBlock Text="{Binding [CfgGrandezasHint], Source={x:Static svc:LocalizationService.Instance}}"
+                                   FontSize="{StaticResource FontSizeMeta}" Opacity="0.6" TextWrapping="Wrap" />
+                        <ItemsControl ItemsSource="{Binding Grandezas}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CloudConfigureViewModel+GrandezaSlot">
+                                    <StackPanel Spacing="4" Width="116" Margin="0,0,10,10">
+                                        <TextBlock Text="{Binding Label}" Classes="label-small" />
+                                        <TextBox Text="{Binding Value}" Watermark="30003" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Content="{Binding [CfgApplyGrandezas], Source={x:Static svc:LocalizationService.Instance}}"
+                                Command="{Binding ApplyGrandezasCommand}"
+                                Padding="{StaticResource PaddingButton}"
+                                HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Actions (coils) -->
+                <Border Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="{Binding [CfgActions], Source={x:Static svc:LocalizationService.Instance}}"
+                                   Classes="section-title" />
+                        <WrapPanel Orientation="Horizontal">
+                            <Button Content="{Binding [CfgResetDevice], Source={x:Static svc:LocalizationService.Instance}}"
+                                    Command="{Binding ResetDeviceCommand}"
+                                    Padding="{StaticResource PaddingButton}" Margin="0,0,8,8" />
+                            <Button Content="{Binding [CfgResetEnergies], Source={x:Static svc:LocalizationService.Instance}}"
+                                    Command="{Binding ResetEnergiesCommand}"
+                                    Padding="{StaticResource PaddingButton}" Margin="0,0,8,8" />
+                            <Button Content="{Binding [CfgInitHourmeter], Source={x:Static svc:LocalizationService.Instance}}"
+                                    Command="{Binding InitHourmeterCommand}"
+                                    Padding="{StaticResource PaddingButton}" Margin="0,0,8,8" />
+                            <Button Content="{Binding [CfgResetMqttBuffer], Source={x:Static svc:LocalizationService.Instance}}"
+                                    Command="{Binding ResetMqttBufferCommand}"
+                                    Padding="{StaticResource PaddingButton}" Margin="0,0,8,8" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Footer: reset note + feedback -->
+                <StackPanel Spacing="6" Margin="0,0,0,20">
+                    <TextBlock Text="{Binding [CfgResetNote], Source={x:Static svc:LocalizationService.Instance}}"
+                               FontSize="{StaticResource FontSizeMeta}" Opacity="0.55" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Feedback}"
+                               Foreground="{Binding FeedbackColorHex}"
+                               IsVisible="{Binding Feedback, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               FontSize="{StaticResource FontSizeSectionTitle}" />
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+
+    </DockPanel>
+</UserControl>

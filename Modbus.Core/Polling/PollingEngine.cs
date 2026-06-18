@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Modbus.Core.Cloud;
 using Modbus.Core.Domain.Entities;
 using Modbus.Core.Domain.Enums;
 using Modbus.Core.Services;
@@ -9,8 +10,11 @@ public class PollingEngine : IPollingEngine
 {
     private readonly IModbusServiceFactory _factory;
     private readonly TimeSpan _pollInterval;
+    private readonly IMqttBrokerClient? _brokerClient;
+    private readonly ITelemetryPayloadMapper? _telemetryMapper;
 
     private readonly ConcurrentDictionary<int, DeviceContext> _devices = new();
+    private readonly ConcurrentDictionary<int, CloudSubscription> _cloudDevices = new();
     private readonly SemaphoreSlim _rtuGate = new(1, 1);
     private CancellationTokenSource? _cts;
     private Task? _loopTask;
@@ -18,14 +22,26 @@ public class PollingEngine : IPollingEngine
     public event EventHandler<RegisterValuesUpdatedEventArgs>? RegisterValuesUpdated;
     public event EventHandler<DeviceConnectionFailedEventArgs>? DeviceConnectionFailed;
 
-    public PollingEngine(IModbusServiceFactory factory, TimeSpan pollInterval)
+    public PollingEngine(
+        IModbusServiceFactory factory,
+        TimeSpan pollInterval,
+        IMqttBrokerClient? brokerClient = null,
+        ITelemetryPayloadMapper? telemetryMapper = null)
     {
-        _factory      = factory;
-        _pollInterval = pollInterval;
+        _factory         = factory;
+        _pollInterval    = pollInterval;
+        _brokerClient    = brokerClient;
+        _telemetryMapper = telemetryMapper;
     }
 
     public void AddDevice(ModbusDevice device)
     {
+        if (device.TransportType == TransportType.MqttCloud)
+        {
+            AddCloudDevice(device);
+            return;
+        }
+
         if (_devices.ContainsKey(device.Id))
             return; // Already tracked — keep the active connection.
 
@@ -37,6 +53,73 @@ public class PollingEngine : IPollingEngine
     {
         if (_devices.TryRemove(deviceId, out var ctx))
             ctx.Service.Dispose();
+
+        if (_cloudDevices.TryRemove(deviceId, out var cloud))
+            _ = cloud.DisposeAsync();
+    }
+
+    // ── Cloud (event-driven, no polling) ──────────────────────────────────────
+
+    private void AddCloudDevice(ModbusDevice device)
+    {
+        if (_cloudDevices.ContainsKey(device.Id))
+            return;
+        if (_brokerClient is null || _telemetryMapper is null || device.Mqtt is null)
+            return; // Cloud support not wired (e.g. unit tests) — nothing to subscribe.
+
+        var subscription = new CloudSubscription(device);
+        _cloudDevices[device.Id] = subscription;
+
+        var telemetryTopic = MqttTopics.Resolve(device.Mqtt.TelemetryTopic, device);
+
+        // Fire-and-forget subscribe; report a failed broker connection as a device failure.
+        subscription.SubscribeTask = Task.Run(async () =>
+        {
+            try
+            {
+                subscription.Handle = await _brokerClient.SubscribeAsync(
+                    device.Mqtt, telemetryTopic,
+                    payload => OnTelemetryAsync(device, payload));
+            }
+            catch (Exception ex)
+            {
+                DeviceConnectionFailed?.Invoke(this, new DeviceConnectionFailedEventArgs
+                {
+                    Device    = device,
+                    Exception = ex
+                });
+            }
+        });
+    }
+
+    private Task OnTelemetryAsync(ModbusDevice device, string payload)
+    {
+        try
+        {
+            var timestamp = DateTime.UtcNow;
+            var values    = _telemetryMapper!.Map(device, payload, timestamp);
+
+            // Non-data messages (e.g. KS log lines) map to nothing — skip to avoid UI noise.
+            if (values.Count == 0)
+                return Task.CompletedTask;
+
+            RegisterValuesUpdated?.Invoke(this, new RegisterValuesUpdatedEventArgs
+            {
+                Device    = device,
+                Values    = values,
+                Timestamp = timestamp
+            });
+        }
+        catch (Exception ex)
+        {
+            DeviceConnectionFailed?.Invoke(this, new DeviceConnectionFailedEventArgs
+            {
+                Device    = device,
+                Exception = ex
+            });
+        }
+
+        return Task.CompletedTask;
     }
 
     public Task StartAsync(CancellationToken cancellationToken = default)
@@ -64,7 +147,11 @@ public class PollingEngine : IPollingEngine
             ctx.Lock.Dispose();
         }
 
+        foreach (var cloud in _cloudDevices.Values)
+            await cloud.DisposeAsync();
+
         _devices.Clear();
+        _cloudDevices.Clear();
         _rtuGate.Dispose();
     }
 
@@ -338,6 +425,21 @@ public class PollingEngine : IPollingEngine
         public ModbusDevice   Device  { get; } = device;
         public IModbusService Service { get; } = service;
         public SemaphoreSlim  Lock    { get; } = new SemaphoreSlim(1, 1);
+    }
+
+    /// <summary>Tracks a cloud device's telemetry subscription so it can be torn down on removal/shutdown.</summary>
+    private sealed class CloudSubscription(ModbusDevice device)
+    {
+        public ModbusDevice      Device        { get; } = device;
+        public Task?             SubscribeTask { get; set; }
+        public IAsyncDisposable? Handle        { get; set; }
+
+        public async ValueTask DisposeAsync()
+        {
+            try { if (SubscribeTask is not null) await SubscribeTask; } catch { }
+            if (Handle is not null)
+                try { await Handle.DisposeAsync(); } catch { }
+        }
     }
 
     internal readonly record struct ReadBlock(

@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Modbus.Core.Cloud;
 using Modbus.Core.Domain.Enums;
 using Modbus.Core.Domain.Repositories;
 using Modbus.Core.Polling;
@@ -16,6 +17,7 @@ public partial class DeviceHubViewModel : ObservableObject
     private readonly IDeviceConfigService _configService;
     private readonly IMassMemoryService _massMemoryService;
     private readonly IDeviceRepository _deviceRepository;
+    private readonly ICloudCommandService _cloudCommandService;
     private readonly DeviceListViewModel _parent;
 
     // Cached per-hub: null = not yet read; read once on first open that needs it.
@@ -31,6 +33,12 @@ public partial class DeviceHubViewModel : ObservableObject
 
     public double MassMemoryCardOpacity => IsMassMemoryEnabled ? 1.0 : 0.45;
 
+    /// <summary>Cloud (MQTT) devices expose a different screen set than local RTU/TCP devices.</summary>
+    public bool IsCloud => Device.Device.TransportType == TransportType.MqttCloud;
+
+    /// <summary>Mass memory (FC14 file records) has no MQTT equivalent — hidden for cloud devices.</summary>
+    public bool IsMassMemoryVisible => !IsCloud;
+
     public event EventHandler<object>? NavigationRequested;
 
     public DeviceItemViewModel Device { get; }
@@ -42,6 +50,7 @@ public partial class DeviceHubViewModel : ObservableObject
         IDeviceConfigService configService,
         IMassMemoryService massMemoryService,
         IDeviceRepository deviceRepository,
+        ICloudCommandService cloudCommandService,
         DeviceListViewModel parent)
     {
         Device = device;
@@ -50,6 +59,7 @@ public partial class DeviceHubViewModel : ObservableObject
         _configService = configService;
         _massMemoryService = massMemoryService;
         _deviceRepository = deviceRepository;
+        _cloudCommandService = cloudCommandService;
         _parent = parent;
 
         _ = LoadCapabilitiesAsync();
@@ -63,6 +73,15 @@ public partial class DeviceHubViewModel : ObservableObject
 
     private async Task OpenReadingsAsync()
     {
+        if (IsCloud)
+        {
+            var cloudReadings = new CloudReadingViewModel(
+                Device, _pollingEngine,
+                onGoBack: () => NavigationRequested?.Invoke(this, this));
+            NavigationRequested?.Invoke(this, cloudReadings);
+            return;
+        }
+
         bool isRtu = Device.Device.TransportType == TransportType.Rtu;
         ushort inOutCfg = await LoadInOutCfgIfNeededAsync(isRtu);
 
@@ -89,6 +108,15 @@ public partial class DeviceHubViewModel : ObservableObject
 
     private async Task OpenConfigureAsync()
     {
+        if (IsCloud)
+        {
+            var cloudConfigure = new CloudConfigureViewModel(
+                Device, _cloudCommandService,
+                onGoBack: () => NavigationRequested?.Invoke(this, this));
+            NavigationRequested?.Invoke(this, cloudConfigure);
+            return;
+        }
+
         bool isRtu = Device.Device.TransportType == TransportType.Rtu;
         ushort inOutCfg = await LoadInOutCfgIfNeededAsync(isRtu);
 
@@ -137,6 +165,14 @@ public partial class DeviceHubViewModel : ObservableObject
     /// </summary>
     private async Task LoadCapabilitiesAsync()
     {
+        // Cloud devices have no mass memory and no FC 0x79 capability read — skip entirely.
+        // (Probing over MQTT would fire a real command and block on the reply timeout.)
+        if (IsCloud)
+        {
+            IsMassMemoryEnabled = false;
+            return;
+        }
+
         bool isRtu = Device.Device.TransportType == TransportType.Rtu;
 
         if (isRtu) await _pollingEngine.SuspendRtuPollingAsync();

@@ -27,6 +27,19 @@ public class ModbusDeviceConfiguration : IEntityTypeConfiguration<ModbusDevice>
             rtu.Property(r => r.StopBits).HasColumnName("RtuStopBits").HasConversion<string>();
         });
 
+        builder.OwnsOne(d => d.Mqtt, mqtt =>
+        {
+            mqtt.Property(m => m.BrokerHost).HasColumnName("MqttBrokerHost").HasMaxLength(255);
+            mqtt.Property(m => m.Port).HasColumnName("MqttPort");
+            mqtt.Property(m => m.UseTls).HasColumnName("MqttUseTls");
+            mqtt.Property(m => m.ClientId).HasColumnName("MqttClientId").HasMaxLength(128);
+            mqtt.Property(m => m.Username).HasColumnName("MqttUsername").HasMaxLength(128);
+            mqtt.Property(m => m.Password).HasColumnName("MqttPassword").HasMaxLength(256);
+            mqtt.Property(m => m.TelemetryTopic).HasColumnName("MqttTelemetryTopic").HasMaxLength(255);
+            mqtt.Property(m => m.CommandTopic).HasColumnName("MqttCommandTopic").HasMaxLength(255);
+            mqtt.Property(m => m.ReplyTopic).HasColumnName("MqttReplyTopic").HasMaxLength(255);
+        });
+
         builder.HasOne(d => d.DeviceModel)
                .WithMany(m => m.Devices)
                .HasForeignKey(d => d.DeviceModelId)

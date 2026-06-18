@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modbus.Core.Cloud;
 using Modbus.Core.Domain.Repositories;
 using Modbus.Core.Persistence;
 using Modbus.Core.Persistence.Repositories;
@@ -72,11 +73,20 @@ public partial class App : Application
         services.AddTransient<IDeviceScanService, DeviceScanService>();
         services.AddTransient<IDeviceConfigService, DeviceConfigService>();
         services.AddTransient<IMassMemoryService, MassMemoryService>();
+
+        // Cloud (MQTT broker) layer — shared across all cloud devices.
+        services.AddSingleton<IMqttBrokerClient, MqttBrokerClient>();
+        services.AddSingleton<ITelemetryPayloadMapper, JsonTelemetryPayloadMapper>();
+        services.AddSingleton<ICloudCommandService>(sp =>
+            new CloudCommandService(sp.GetRequiredService<IMqttBrokerClient>()));
+
         services.AddSingleton<IModbusServiceFactory, ModbusServiceFactory>();
         services.AddSingleton<IPollingEngine>(sp =>
             new PollingEngine(
                 sp.GetRequiredService<IModbusServiceFactory>(),
-                TimeSpan.FromSeconds(5)));
+                TimeSpan.FromSeconds(5),
+                sp.GetRequiredService<IMqttBrokerClient>(),
+                sp.GetRequiredService<ITelemetryPayloadMapper>()));
 
         services.AddSingleton(_ => LocalizationService.Instance);
         services.AddSingleton(_ => RtuSettingsService.Instance);

@@ -32,6 +32,12 @@
         <DataTemplate DataType="{x:Type vm:MassMemoryViewModel}">
             <views:MassMemoryView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CloudReadingViewModel}">
+            <views:CloudReadingView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CloudConfigureViewModel}">
+            <views:CloudConfigureView />
+        </DataTemplate>
     </Application.DataTemplates>
 
 </Application>

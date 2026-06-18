@@ -43,6 +43,9 @@
                             <RadioButton Content="{Binding [TcpOption], Source={x:Static svc:LocalizationService.Instance}}"
                                          IsChecked="{Binding IsTcp, Mode=TwoWay}"
                                          GroupName="Transport" />
+                            <RadioButton Content="{Binding [CloudOption], Source={x:Static svc:LocalizationService.Instance}}"
+                                         IsChecked="{Binding IsCloud, Mode=TwoWay}"
+                                         GroupName="Transport" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -114,8 +117,85 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Cloud (MQTT broker) settings -->
+                <Border Classes="card" IsVisible="{Binding IsCloud}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="{Binding [CloudSettings], Source={x:Static svc:LocalizationService.Instance}}"
+                                   Classes="section-title" />
+                        <TextBlock Text="{Binding [CloudSettingsHint], Source={x:Static svc:LocalizationService.Instance}}"
+                                   FontSize="{StaticResource FontSizeMeta}"
+                                   Opacity="0.6"
+                                   TextWrapping="Wrap" />
+
+                        <Grid ColumnDefinitions="*,140">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="{Binding [BrokerHost], Source={x:Static svc:LocalizationService.Instance}}"
+                                           Classes="label-small" />
+                                <TextBox Text="{Binding BrokerHost}"
+                                         Watermark="{Binding [BrokerHostWatermark], Source={x:Static svc:LocalizationService.Instance}}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
+                                <TextBlock Text="{Binding [BrokerPort], Source={x:Static svc:LocalizationService.Instance}}"
+                                           Classes="label-small" />
+                                <NumericUpDown Value="{Binding BrokerPort}"
+                                               Minimum="1" Maximum="65535" Increment="1"
+                                               FormatString="0"
+                                               HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                        </Grid>
+
+                        <CheckBox Content="{Binding [BrokerUseTls], Source={x:Static svc:LocalizationService.Instance}}"
+                                  IsChecked="{Binding BrokerUseTls}" />
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="{Binding [TelemetryTopic], Source={x:Static svc:LocalizationService.Instance}}"
+                                       Classes="label-small" />
+                            <TextBox Text="{Binding TelemetryTopic}" />
+                            <TextBlock Text="{Binding [TelemetryTopicHint], Source={x:Static svc:LocalizationService.Instance}}"
+                                       FontSize="{StaticResource FontSizeMeta}"
+                                       Opacity="0.6"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="*,*">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="{Binding [BrokerUsername], Source={x:Static svc:LocalizationService.Instance}}"
+                                           Classes="label-small" />
+                                <TextBox Text="{Binding BrokerUsername}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
+                                <TextBlock Text="{Binding [BrokerPassword], Source={x:Static svc:LocalizationService.Instance}}"
+                                           Classes="label-small" />
+                                <TextBox Text="{Binding BrokerPassword}" PasswordChar="•" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,*">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="{Binding [CloudSerial], Source={x:Static svc:LocalizationService.Instance}}"
+                                           Classes="label-small" />
+                                <TextBox Text="{Binding CloudSerial}"
+                                         Watermark="{Binding [CloudSerialWatermark], Source={x:Static svc:LocalizationService.Instance}}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
+                                <TextBlock Text="{Binding [DeviceModel], Source={x:Static svc:LocalizationService.Instance}}"
+                                           Classes="label-small" />
+                                <ComboBox ItemsSource="{Binding AvailableModels}"
+                                          SelectedItem="{Binding SelectedModel}"
+                                          HorizontalAlignment="Stretch">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Name}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
                 <!-- Scan action row -->
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="8" IsVisible="{Binding !IsCloud}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Content="{Binding [SearchNetwork], Source={x:Static svc:LocalizationService.Instance}}"
                                 Command="{Binding ScanCommand}"
@@ -135,7 +215,7 @@
                 </StackPanel>
 
                 <!-- Scan results -->
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="8" IsVisible="{Binding !IsCloud}">
                     <TextBlock Text="{Binding [FoundDevices], Source={x:Static svc:LocalizationService.Instance}}"
                                FontSize="14"
                                FontWeight="SemiBold" />

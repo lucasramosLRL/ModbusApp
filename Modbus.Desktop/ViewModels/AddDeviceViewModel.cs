@@ -35,10 +35,14 @@ public partial class AddDeviceViewModel : ObservableObject
     [ObservableProperty]
     private bool _isTcp = false;
 
+    [ObservableProperty]
+    private bool _isCloud = false;
+
     partial void OnSelectedTransportChanged(TransportType value)
     {
-        IsRtu = value == TransportType.Rtu;
-        IsTcp = value == TransportType.Tcp;
+        IsRtu   = value == TransportType.Rtu;
+        IsTcp   = value == TransportType.Tcp;
+        IsCloud = value == TransportType.MqttCloud;
 
         if (IsScanning)
             _scanCts?.Cancel();
@@ -62,6 +66,40 @@ public partial class AddDeviceViewModel : ObservableObject
         if (value)
             SlaveId = 255;
     }
+
+    partial void OnIsCloudChanged(bool value)
+    {
+        if (value && SelectedTransport != TransportType.MqttCloud)
+            SelectedTransport = TransportType.MqttCloud;
+    }
+
+    // ── Cloud (MQTT broker) parameters ────────────────────────────────────────
+
+    [ObservableProperty]
+    private string _brokerHost = "";
+
+    [ObservableProperty]
+    private int _brokerPort = 8883;
+
+    [ObservableProperty]
+    private bool _brokerUseTls = true;
+
+    [ObservableProperty]
+    private string _brokerUsername = "";
+
+    [ObservableProperty]
+    private string _brokerPassword = "";
+
+    [ObservableProperty]
+    private string _cloudSerial = "";
+
+    [ObservableProperty]
+    private string _telemetryTopic = "ks";
+
+    public ObservableCollection<DeviceModel> AvailableModels { get; } = [];
+
+    [ObservableProperty]
+    private DeviceModel? _selectedModel;
 
     // ── RTU address range ─────────────────────────────────────────────────────
 
@@ -301,6 +339,12 @@ public partial class AddDeviceViewModel : ObservableObject
 
         try
         {
+            if (IsCloud)
+            {
+                await SaveCloudDeviceAsync(loc);
+                return;
+            }
+
             string effectiveIp = IsTcp ? (SelectedResult?.Result.Tcp?.IpAddress ?? DeviceIp) : "";
             uint? serialNumber;
 
@@ -464,6 +508,57 @@ public partial class AddDeviceViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Saves a cloud (MQTT broker) device. No bus probe/scan — the device is identified by its
+    /// serial number (used to resolve broker topics) and an explicitly chosen device model
+    /// (provides the register map the telemetry mapper uses).
+    /// </summary>
+    private async Task SaveCloudDeviceAsync(LocalizationService loc)
+    {
+        if (string.IsNullOrWhiteSpace(BrokerHost) ||
+            !uint.TryParse(CloudSerial, out var serial))
+        {
+            SetFeedback(loc["CloudSerialRequired"], isError: true);
+            return;
+        }
+
+        if (await _deviceRepository.ExistsBySerialNumberAsync(serial))
+        {
+            SetFeedback(string.Format(loc["DuplicateSerial"], serial), isError: true);
+            return;
+        }
+
+        var device = new ModbusDevice
+        {
+            Name          = DeviceName,
+            SlaveId       = SlaveId,
+            TransportType = TransportType.MqttCloud,
+            SerialNumber  = serial,
+            IsActive      = true,
+            DeviceModelId = SelectedModel?.Id,
+            Mqtt          = new MqttConfig
+            {
+                BrokerHost     = BrokerHost.Trim(),
+                Port           = BrokerPort,
+                UseTls         = BrokerUseTls,
+                Username       = string.IsNullOrWhiteSpace(BrokerUsername) ? null : BrokerUsername,
+                Password       = string.IsNullOrWhiteSpace(BrokerPassword) ? null : BrokerPassword,
+                // Command topic stays the KS default (ks-01/{serial}/reply); the data topic is
+                // installation-specific (here it was simply "ks") and is used for telemetry + responses.
+                TelemetryTopic = string.IsNullOrWhiteSpace(TelemetryTopic) ? "ks" : TelemetryTopic.Trim(),
+                ReplyTopic     = string.IsNullOrWhiteSpace(TelemetryTopic) ? "ks" : TelemetryTopic.Trim()
+            }
+        };
+
+        await _deviceRepository.AddAsync(device);
+        await _parent.LoadDevicesAsync();
+
+        DeviceName  = "";
+        CloudSerial = "";
+        ScanStatus  = loc["DeviceSaved"];
+        SetFeedback(loc["DeviceSaved"], isError: false);
+    }
+
+    /// <summary>
     /// Connects to the device and reads the NS register (FC04 addr 0), returning the serial
     /// number or null on failure. Pass <paramref name="overrideSlaveId"/> to probe a specific
     /// RTU address without changing the observable <see cref="SlaveId"/> property.
@@ -526,5 +621,23 @@ public partial class AddDeviceViewModel : ObservableObject
 
         RtuSettingsService.Instance.PropertyChanged += (_, _) =>
             OnPropertyChanged(nameof(IsRtuPortUnavailable));
+
+        _ = LoadAvailableModelsAsync();
+    }
+
+    private async Task LoadAvailableModelsAsync()
+    {
+        try
+        {
+            var models = await _deviceModelRepository.GetAllAsync();
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                AvailableModels.Clear();
+                foreach (var model in models)
+                    AvailableModels.Add(model);
+                SelectedModel ??= AvailableModels.FirstOrDefault();
+            });
+        }
+        catch { /* model list is optional; cloud device can be saved without it */ }
     }
 }
