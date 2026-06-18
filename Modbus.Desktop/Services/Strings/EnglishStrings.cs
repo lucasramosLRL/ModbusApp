@@ -55,7 +55,7 @@ internal static class EnglishStrings
         ["TelemetryTopicHint"]   = "Topic the meter publishes telemetry/responses on (installation-specific, e.g. \"ks\").",
         // Cloud readings / configuration screens
         ["CloudReadingsTitle"]   = "Telemetry",
-        ["CloudReadingsWaiting"] = "Waiting for telemetry from the meter… Only the quantities configured for the cloud (G1..G20) will appear.",
+        ["CloudReadingsWaiting"] = "Waiting for telemetry from the meter… Only the quantities the meter publishes to the broker will appear.",
         ["CloudConfigTitle"]     = "MQTT Configuration",
         ["CfgMeasurement"]       = "Measurement",
         ["CfgCloud"]             = "Cloud (telemetry)",
@@ -147,6 +147,7 @@ internal static class EnglishStrings
         ["GroupPowerFactor"]     = "Power Factor",
         ["GroupEnergies"]        = "Energies",
         ["GroupDemands"]         = "Demands",
+        ["GroupOther"]           = "Other",
 
         // Hourmeter Tab
         ["HmTitle"]              = "Load 1",

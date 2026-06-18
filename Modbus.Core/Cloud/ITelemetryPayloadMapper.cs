@@ -15,4 +15,11 @@ public interface ITelemetryPayloadMapper
     /// fields are ignored. If the payload carries no timestamp, <paramref name="fallbackTimestamp"/> is used.
     /// </summary>
     IReadOnlyList<RegisterValue> Map(ModbusDevice device, string jsonPayload, DateTime fallbackTimestamp);
+
+    /// <summary>
+    /// Maps every numeric field in <paramref name="jsonPayload"/> to a <see cref="TelemetryReading"/>,
+    /// preserving the original payload field name and including fields with no register definition.
+    /// Used by the cloud reading screen to display exactly what the meter publishes.
+    /// </summary>
+    IReadOnlyList<TelemetryReading> MapReadings(ModbusDevice device, string jsonPayload);
 }

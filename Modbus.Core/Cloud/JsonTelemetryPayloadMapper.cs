@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using System.Text.Json;
 using Modbus.Core.Domain.Entities;
 
@@ -82,6 +83,51 @@ public class JsonTelemetryPayloadMapper : ITelemetryPayloadMapper
         }
 
         return results;
+    }
+
+    public IReadOnlyList<TelemetryReading> MapReadings(ModbusDevice device, string jsonPayload)
+    {
+        if (string.IsNullOrWhiteSpace(jsonPayload))
+            return Array.Empty<TelemetryReading>();
+
+        JsonElement element;
+        try
+        {
+            using var doc = JsonDocument.Parse(jsonPayload);
+            element = Unwrap(doc.RootElement).Clone();
+        }
+        catch (JsonException)
+        {
+            return Array.Empty<TelemetryReading>();
+        }
+
+        if (element.ValueKind != JsonValueKind.Object)
+            return Array.Empty<TelemetryReading>();
+
+        // Grandezas live under "metadata" in the KS data payload. Requiring it (rather than falling
+        // back to the element) keeps log messages ({"param":"log","ID":...}) from surfacing junk
+        // readings — since we now show fields even without a register definition.
+        if (!element.TryGetProperty("metadata", out var fieldSource) || fieldSource.ValueKind != JsonValueKind.Object)
+            return Array.Empty<TelemetryReading>();
+
+        // Index register definitions by name (case-insensitive) so payload fields resolve to a known
+        // quantity. Fields with no match still surface — with a null definition.
+        var byName = new Dictionary<string, RegisterDefinition>(StringComparer.OrdinalIgnoreCase);
+        foreach (var def in device.DeviceModel?.Registers ?? Enumerable.Empty<RegisterDefinition>())
+            byName.TryAdd(def.Name, def);
+
+        var readings = new List<TelemetryReading>();
+        foreach (var prop in fieldSource.EnumerateObject())
+        {
+            if (!TryGetNumber(prop.Value, out var value))
+                continue;
+
+            var canonical = FieldAliases.TryGetValue(prop.Name, out var aliased) ? aliased : prop.Name;
+            byName.TryGetValue(canonical, out var definition);
+            readings.Add(new TelemetryReading(prop.Name, value, definition));
+        }
+
+        return readings;
     }
 
     /// <summary>If the payload is an array (KS data messages are), take its first object element.</summary>

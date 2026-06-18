@@ -55,7 +55,7 @@ internal static class PortugueseStrings
         ["TelemetryTopicHint"]   = "Tópico onde o medidor publica telemetria/respostas (específico da instalação, ex.: \"ks\").",
         // Telas de leitura / configuração de nuvem
         ["CloudReadingsTitle"]   = "Telemetria",
-        ["CloudReadingsWaiting"] = "Aguardando telemetria do medidor… Só aparecem as grandezas configuradas para a nuvem (G1..G20).",
+        ["CloudReadingsWaiting"] = "Aguardando telemetria do medidor… Só aparecem as grandezas que o medidor publicar no broker.",
         ["CloudConfigTitle"]     = "Configuração MQTT",
         ["CfgMeasurement"]       = "Medição",
         ["CfgCloud"]             = "Nuvem (telemetria)",
@@ -147,6 +147,7 @@ internal static class PortugueseStrings
         ["GroupPowerFactor"]     = "Fator de Potência",
         ["GroupEnergies"]        = "Energias",
         ["GroupDemands"]         = "Demandas",
+        ["GroupOther"]           = "Outros",
 
         // Hourmeter Tab
         ["HmTitle"]              = "Carga 1",

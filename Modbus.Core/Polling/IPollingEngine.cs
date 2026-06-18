@@ -7,6 +7,9 @@ public interface IPollingEngine : IAsyncDisposable
     event EventHandler<RegisterValuesUpdatedEventArgs>? RegisterValuesUpdated;
     event EventHandler<DeviceConnectionFailedEventArgs>? DeviceConnectionFailed;
 
+    /// <summary>Raised for each cloud telemetry message, carrying every published field (see <see cref="TelemetryReceivedEventArgs"/>).</summary>
+    event EventHandler<TelemetryReceivedEventArgs>? TelemetryReceived;
+
     void AddDevice(ModbusDevice device);
     void RemoveDevice(int deviceId);
 

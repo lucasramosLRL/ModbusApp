@@ -21,6 +21,7 @@ public class PollingEngine : IPollingEngine
 
     public event EventHandler<RegisterValuesUpdatedEventArgs>? RegisterValuesUpdated;
     public event EventHandler<DeviceConnectionFailedEventArgs>? DeviceConnectionFailed;
+    public event EventHandler<TelemetryReceivedEventArgs>? TelemetryReceived;
 
     public PollingEngine(
         IModbusServiceFactory factory,
@@ -97,18 +98,42 @@ public class PollingEngine : IPollingEngine
         try
         {
             var timestamp = DateTime.UtcNow;
-            var values    = _telemetryMapper!.Map(device, payload, timestamp);
+            var readings  = _telemetryMapper!.MapReadings(device, payload);
 
             // Non-data messages (e.g. KS log lines) map to nothing — skip to avoid UI noise.
-            if (values.Count == 0)
+            if (readings.Count == 0)
                 return Task.CompletedTask;
 
-            RegisterValuesUpdated?.Invoke(this, new RegisterValuesUpdatedEventArgs
+            // Full set (including fields without a register definition) for the cloud reading screen.
+            TelemetryReceived?.Invoke(this, new TelemetryReceivedEventArgs
             {
                 Device    = device,
-                Values    = values,
+                Readings  = readings,
                 Timestamp = timestamp
             });
+
+            // Cataloged fields also flow through the register-value pipeline so connection status /
+            // last-seen keep updating like local devices.
+            var values = readings
+                .Where(r => r.Definition is not null)
+                .Select(r => new RegisterValue
+                {
+                    DeviceId     = device.Id,
+                    Address      = r.Definition!.Address,
+                    RegisterType = r.Definition.RegisterType,
+                    Value        = r.Value,
+                    RawWords     = Array.Empty<ushort>(),
+                    Timestamp    = timestamp
+                })
+                .ToList();
+
+            if (values.Count > 0)
+                RegisterValuesUpdated?.Invoke(this, new RegisterValuesUpdatedEventArgs
+                {
+                    Device    = device,
+                    Values    = values,
+                    Timestamp = timestamp
+                });
         }
         catch (Exception ex)
         {

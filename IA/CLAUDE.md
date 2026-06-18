@@ -610,7 +610,10 @@ Cloud devices are NOT polled and do NOT reuse the standard screens — see UI di
 ### Cloud layer (`Modbus.Core/Cloud/`)
 - `IMqttBrokerClient` / `MqttBrokerClient` — **MQTTnet 5** wrapper (NuGet on Modbus.Core). One connection per
   broker (keyed host/port/user), multiplexes topic subscriptions + publishes, auto-reconnect + re-subscribe.
-- `ITelemetryPayloadMapper` / `JsonTelemetryPayloadMapper` — telemetry JSON → `RegisterValue[]` (see format).
+- `ITelemetryPayloadMapper` / `JsonTelemetryPayloadMapper` — telemetry JSON → values (see format). Two methods:
+  `Map(...)` → `RegisterValue[]` (cataloged fields only, for the register pipeline); `MapReadings(...)` →
+  `TelemetryReading[]` (**every** numeric `metadata` field, keeping its raw payload code, with the matching
+  `RegisterDefinition` or `null` when uncataloged). The cloud reading screen drives off `MapReadings`.
 - `ICloudCommandService` / `CloudCommandService` — the KS MQTT command protocol (HRR/HRW/COIL/999-999).
 - `CloudModbusService : IModbusService` — adapts the service contract to the command channel (read=HRR,
   write=HRW, coil=COIL); input-register reads → `NotSupportedException` (those arrive via telemetry).
@@ -620,8 +623,12 @@ Cloud devices are NOT polled and do NOT reuse the standard screens — see UI di
 ### Reads = event-driven (no polling)
 `PollingEngine` takes optional `IMqttBrokerClient` + `ITelemetryPayloadMapper`. Cloud devices are kept in a
 separate `_cloudDevices` map (NOT the 5s timer set): on `AddDevice` it subscribes to the telemetry topic and,
-per message, maps JSON → values and raises the **same** `RegisterValuesUpdated`. Empty maps (log lines) are
-skipped. So the reading pipeline/event surface is unchanged; only the source differs.
+per message, calls `MapReadings` and raises **two** events:
+- `TelemetryReceived` (`TelemetryReceivedEventArgs`, all published fields incl. uncataloged) — consumed by
+  the cloud reading screen so it shows exactly what the meter publishes.
+- `RegisterValuesUpdated` (cataloged fields only) — keeps device-list connection status / last-seen working
+  like local devices, unchanged. Skipped when no cataloged field is present.
+Empty payloads (log lines) raise nothing.
 
 ### KS MQTT command protocol (from firmware doc)
 App PUBLISHES commands to the meter's subscribe topic `MqttConfig.CommandTopic` = `ks-01/{serial}/reply`:
@@ -646,7 +653,9 @@ Data payload is a JSON **array** wrapping one object; values live under `metadat
    "metadata":{ "U0":201.80, "I0":0.00, "F1":59.99, "P0":0.00, "FP0":0.00, "EA":0.00, "CE":1 } }]
 ```
 - `JsonTelemetryPayloadMapper` unwraps array→`metadata`, parses `time` (`yyyy-MM-dd HH:mm:ss`), and matches
-  fields to register-definition names. Log lines (`{"param":"log",…}`) and unknown fields are ignored.
+  fields to register-definition names. `Map` ignores log lines and uncataloged fields; `MapReadings` requires
+  a `metadata` object (so log lines stay empty) but **surfaces uncataloged fields** (e.g. `CE`) with a null
+  definition so the screen can show them under "Outros".
 - **Field aliases** (telemetry name → register name, the rest match directly):
   `F1→Freq`, `EA→EA+`, `ER→ER+`, `EAN→EA-`, `ERN→ER-`.
 - The **data topic is installation-configurable** (a capture used just `ks`) — entered in the Add-device UI
@@ -656,9 +665,12 @@ Data payload is a JSON **array** wrapping one object; values live under `metadat
 `DeviceHubViewModel.IsCloud` branches the per-device hub:
 - **Mass-memory card hidden** (no FC14 equivalent); hub **skips the FC 0x79 capability probe** for cloud
   (it would fire a real MQTT command and block on the reply timeout).
-- **Leituras (telemetria)** → `CloudReadingViewModel` / `CloudReadingView` — pure push (subscribes
-  `RegisterValuesUpdated`, shows only the published G1..G20 quantities + last-update time). No polling, no
-  I/O/status tabs, no bus pausing.
+- **Leituras (telemetria)** → `CloudReadingViewModel` / `CloudReadingView` — pure push, **fully dynamic**:
+  subscribes `TelemetryReceived` and creates one row the first time each quantity appears in a payload, so
+  it shows **only** what the meter actually publishes (its user-selected G1..G50) + last-update time.
+  Rows are grouped by code prefix (Tensões/Correntes/… and Energias/Demandas); fields with no register
+  definition land in **"Outros"** using the raw payload code as label. Empty until the first message
+  (`HasData` gates the "aguardando telemetria" hint). No polling, no I/O/status tabs, no bus pausing.
 - **Configuração MQTT** → `CloudConfigureViewModel` / `CloudConfigureView` — only the MQTT-settable params via
   the **999-999 named commands**: TP, TC, TL, TI, KE, THRS, RT, IA, relay `sd1`, `G1..G20`, plus action coils
   (reset device 006 / reset energies 040 / init hourmeter 062 / reset MQTT buffer 091). Empty fields are left
@@ -677,10 +689,11 @@ No RTU/UDP scan in this mode.
 - Confirmation that single-flight correlation is acceptable (meter omits the request `id` in replies).
 
 ### Cloud tests (`Modbus.Core.Tests/Cloud/`)
-`JsonTelemetryPayloadMapperTests` (array/metadata, aliases, `time`, log-ignore), `CloudModbusServiceTests`
-(delegation, NotSupported), `CloudCommandServiceTests` (HRR/HRW envelopes, Modicon conversion, hex codec,
-COIL, 999-999 config, timeout), `CloudPollingTests` (telemetry → `RegisterValuesUpdated`, no factory call).
-Total suite **284 tests passing**.
+`JsonTelemetryPayloadMapperTests` (array/metadata, aliases, `time`, log-ignore, **plus `MapReadings`**:
+published-only/order, uncataloged field surfaces with null def, alias keeps raw code, works with no model,
+log-ignore), `CloudModbusServiceTests` (delegation, NotSupported), `CloudCommandServiceTests` (HRR/HRW
+envelopes, Modicon conversion, hex codec, COIL, 999-999 config, timeout), `CloudPollingTests` (telemetry →
+`RegisterValuesUpdated`, no factory call). Total suite **289 tests passing**.
 
 ### Where I left off (resume here) — feature is WIP, not field-validated
 Done: Core layer + both cloud UI screens implemented; `dotnet build` compiles; 284 Core tests pass.
@@ -695,8 +708,10 @@ Next session, in order:
 3. **Confirm with firmware** and adjust if needed: the command RESPONSE topic (code currently assumes the
    same configurable data topic as telemetry → `MqttConfig.ReplyTopic`) and that single-flight correlation
    is acceptable (replies omit the request `id`).
-4. Known rough edges to revisit: telemetry `time` is parsed as wall-clock (no timezone); G1..G20 have no
-   read-back/confirmation UI yet; config writes are fire-and-forget (no success feedback from the meter).
+4. Known rough edges to revisit: telemetry `time` is parsed as wall-clock (no timezone) — the reading screen
+   instead stamps `LastUpdate` with the receive time; the readings screen is now payload-driven (shows what
+   the meter actually publishes, including uncataloged fields under "Outros"), but the **config** screen still
+   has no G1..G50 read-back; config writes are fire-and-forget (no success feedback from the meter).
 
 ---
 
