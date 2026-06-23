@@ -43,7 +43,7 @@
                                     <TextBlock Text="{Binding GroupName}"
                                                FontSize="{StaticResource FontSizeGroupHeader}"
                                                FontWeight="SemiBold"
-                                               Foreground="{StaticResource BrushTextPrimary}"
+                                               Foreground="{DynamicResource BrushTextPrimary}"
                                                Opacity="0.85" />
                                     <ItemsControl ItemsSource="{Binding Readings}">
                                         <ItemsControl.ItemsPanel>
@@ -59,16 +59,16 @@
                                                             <TextBlock Text="{Binding Name}"
                                                                        FontSize="{StaticResource FontSizeMeta}"
                                                                        FontWeight="SemiBold"
-                                                                       Foreground="{StaticResource BrushTextMuted}" />
+                                                                       Foreground="{DynamicResource BrushTextMuted}" />
                                                             <TextBlock Text="{Binding Description}"
                                                                        FontSize="{StaticResource FontSizeLabelSmall}"
                                                                        Opacity="0.45"
-                                                                       Foreground="{StaticResource BrushTextPrimary}"
+                                                                       Foreground="{DynamicResource BrushTextPrimary}"
                                                                        VerticalAlignment="Center" />
                                                         </StackPanel>
                                                         <TextBlock Text="{Binding DisplayValue}"
                                                                    FontSize="20" FontWeight="Medium"
-                                                                   Foreground="{StaticResource BrushTextPrimary}" />
+                                                                   Foreground="{DynamicResource BrushTextPrimary}" />
                                                     </StackPanel>
                                                 </Border>
                                             </DataTemplate>
@@ -89,7 +89,7 @@
                                     <TextBlock Text="{Binding GroupName}"
                                                FontSize="{StaticResource FontSizeGroupHeader}"
                                                FontWeight="SemiBold"
-                                               Foreground="{StaticResource BrushTextPrimary}"
+                                               Foreground="{DynamicResource BrushTextPrimary}"
                                                Opacity="0.85" />
                                     <ItemsControl ItemsSource="{Binding Readings}">
                                         <ItemsControl.ItemsPanel>
@@ -105,16 +105,16 @@
                                                             <TextBlock Text="{Binding Name}"
                                                                        FontSize="{StaticResource FontSizeMeta}"
                                                                        FontWeight="SemiBold"
-                                                                       Foreground="{StaticResource BrushTextMuted}" />
+                                                                       Foreground="{DynamicResource BrushTextMuted}" />
                                                             <TextBlock Text="{Binding Description}"
                                                                        FontSize="{StaticResource FontSizeLabelSmall}"
                                                                        Opacity="0.45"
-                                                                       Foreground="{StaticResource BrushTextPrimary}"
+                                                                       Foreground="{DynamicResource BrushTextPrimary}"
                                                                        VerticalAlignment="Center" />
                                                         </StackPanel>
                                                         <TextBlock Text="{Binding DisplayValue}"
                                                                    FontSize="20" FontWeight="Medium"
-                                                                   Foreground="{StaticResource BrushTextPrimary}" />
+                                                                   Foreground="{DynamicResource BrushTextPrimary}" />
                                                     </StackPanel>
                                                 </Border>
                                             </DataTemplate>

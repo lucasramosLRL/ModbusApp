@@ -40,22 +40,22 @@
                 <StackPanel Grid.Column="0" Spacing="4">
                     <TextBlock Text="{Binding [Transport], Source={x:Static svc:LocalizationService.Instance}}"
                                Classes="label-small" />
-                    <TextBlock Text="{Binding Device.TransportType}" FontWeight="Medium" Foreground="{StaticResource BrushTextPrimary}" />
+                    <TextBlock Text="{Binding Device.TransportType}" FontWeight="Medium" Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4">
                     <TextBlock Text="{Binding [Connection], Source={x:Static svc:LocalizationService.Instance}}"
                                Classes="label-small" />
-                    <TextBlock Text="{Binding Device.ConnectionAddress}" FontWeight="Medium" Foreground="{StaticResource BrushTextPrimary}" />
+                    <TextBlock Text="{Binding Device.ConnectionAddress}" FontWeight="Medium" Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Spacing="4">
                     <TextBlock Text="{Binding [SlaveAddress], Source={x:Static svc:LocalizationService.Instance}}"
                                Classes="label-small" />
-                    <TextBlock Text="{Binding Device.SlaveId}" FontWeight="Medium" Foreground="{StaticResource BrushTextPrimary}" />
+                    <TextBlock Text="{Binding Device.SlaveId}" FontWeight="Medium" Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
                 <StackPanel Grid.Column="3" Spacing="4">
                     <TextBlock Text="{Binding [Model], Source={x:Static svc:LocalizationService.Instance}}"
                                Classes="label-small" />
-                    <TextBlock Text="{Binding Device.ModelDisplayName}" FontWeight="Medium" Foreground="{StaticResource BrushTextPrimary}" />
+                    <TextBlock Text="{Binding Device.ModelDisplayName}" FontWeight="Medium" Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -89,7 +89,7 @@
                                             <TextBlock Text="{Binding GroupName}"
                                                        FontSize="{StaticResource FontSizeGroupHeader}"
                                                        FontWeight="SemiBold"
-                                                       Foreground="{StaticResource BrushTextPrimary}"
+                                                       Foreground="{DynamicResource BrushTextPrimary}"
                                                        Opacity="0.85" />
 
                                             <!-- Readings grid -->
@@ -109,17 +109,17 @@
                                                                     <TextBlock Text="{Binding Name}"
                                                                                FontSize="{StaticResource FontSizeMeta}"
                                                                                FontWeight="SemiBold"
-                                                                               Foreground="{StaticResource BrushTextMuted}" />
+                                                                               Foreground="{DynamicResource BrushTextMuted}" />
                                                                     <TextBlock Text="{Binding Description}"
                                                                                FontSize="{StaticResource FontSizeLabelSmall}"
                                                                                Opacity="0.45"
-                                                                               Foreground="{StaticResource BrushTextPrimary}"
+                                                                               Foreground="{DynamicResource BrushTextPrimary}"
                                                                                VerticalAlignment="Center" />
                                                                 </StackPanel>
                                                                 <TextBlock Text="{Binding DisplayValue}"
                                                                            FontSize="20"
                                                                            FontWeight="Medium"
-                                                                           Foreground="{StaticResource BrushTextPrimary}" />
+                                                                           Foreground="{DynamicResource BrushTextPrimary}" />
                                                             </StackPanel>
                                                         </Border>
                                                     </DataTemplate>
@@ -159,7 +159,7 @@
                                             <TextBlock Text="{Binding GroupName}"
                                                        FontSize="{StaticResource FontSizeGroupHeader}"
                                                        FontWeight="SemiBold"
-                                                       Foreground="{StaticResource BrushTextPrimary}"
+                                                       Foreground="{DynamicResource BrushTextPrimary}"
                                                        Opacity="0.85" />
 
                                             <ItemsControl ItemsSource="{Binding Readings}">
@@ -178,17 +178,17 @@
                                                                     <TextBlock Text="{Binding Name}"
                                                                                FontSize="{StaticResource FontSizeMeta}"
                                                                                FontWeight="SemiBold"
-                                                                               Foreground="{StaticResource BrushTextMuted}" />
+                                                                               Foreground="{DynamicResource BrushTextMuted}" />
                                                                     <TextBlock Text="{Binding Description}"
                                                                                FontSize="{StaticResource FontSizeLabelSmall}"
                                                                                Opacity="0.45"
-                                                                               Foreground="{StaticResource BrushTextPrimary}"
+                                                                               Foreground="{DynamicResource BrushTextPrimary}"
                                                                                VerticalAlignment="Center" />
                                                                 </StackPanel>
                                                                 <TextBlock Text="{Binding DisplayValue}"
                                                                            FontSize="20"
                                                                            FontWeight="Medium"
-                                                                           Foreground="{StaticResource BrushTextPrimary}" />
+                                                                           Foreground="{DynamicResource BrushTextPrimary}" />
                                                             </StackPanel>
                                                         </Border>
                                                     </DataTemplate>
@@ -220,7 +220,7 @@
                                 <TextBlock Text="{Binding [IoSectionInputs], Source={x:Static svc:LocalizationService.Instance}}"
                                            FontSize="{StaticResource FontSizeGroupHeader}"
                                            FontWeight="SemiBold"
-                                           Foreground="{StaticResource BrushTextPrimary}"
+                                           Foreground="{DynamicResource BrushTextPrimary}"
                                            Opacity="0.85" />
 
                                 <ItemsControl ItemsSource="{Binding DigitalInputs}">
@@ -236,7 +236,7 @@
                                                     <TextBlock Text="{Binding Name}"
                                                                FontSize="{StaticResource FontSizeMeta}"
                                                                FontWeight="SemiBold"
-                                                               Foreground="{StaticResource BrushTextMuted}" />
+                                                               Foreground="{DynamicResource BrushTextMuted}" />
 
                                                     <StackPanel Spacing="4">
                                                         <StackPanel Orientation="Horizontal" Spacing="6">
@@ -244,21 +244,21 @@
                                                                        Classes="label-small" />
                                                             <TextBlock Text="{Binding StatusText}"
                                                                        FontWeight="Medium"
-                                                                       Foreground="{StaticResource BrushTextPrimary}" />
+                                                                       Foreground="{DynamicResource BrushTextPrimary}" />
                                                         </StackPanel>
                                                         <StackPanel Orientation="Horizontal" Spacing="6">
                                                             <TextBlock Text="{Binding [IoCounter], Source={x:Static svc:LocalizationService.Instance}}"
                                                                        Classes="label-small" />
                                                             <TextBlock Text="{Binding CounterText}"
                                                                        FontWeight="Medium"
-                                                                       Foreground="{StaticResource BrushTextPrimary}" />
+                                                                       Foreground="{DynamicResource BrushTextPrimary}" />
                                                         </StackPanel>
                                                         <StackPanel Orientation="Horizontal" Spacing="6">
                                                             <TextBlock Text="{Binding [IoPulseWidth], Source={x:Static svc:LocalizationService.Instance}}"
                                                                        Classes="label-small" />
                                                             <TextBlock Text="{Binding PulseText}"
                                                                        FontWeight="Medium"
-                                                                       Foreground="{StaticResource BrushTextPrimary}" />
+                                                                       Foreground="{DynamicResource BrushTextPrimary}" />
                                                         </StackPanel>
                                                     </StackPanel>
 
@@ -281,7 +281,7 @@
                                 <TextBlock Text="{Binding [IoSectionOutputs], Source={x:Static svc:LocalizationService.Instance}}"
                                            FontSize="{StaticResource FontSizeGroupHeader}"
                                            FontWeight="SemiBold"
-                                           Foreground="{StaticResource BrushTextPrimary}"
+                                           Foreground="{DynamicResource BrushTextPrimary}"
                                            Opacity="0.85" />
 
                                 <ItemsControl ItemsSource="{Binding DigitalOutputs}">
@@ -297,14 +297,14 @@
                                                     <TextBlock Text="{Binding Name}"
                                                                FontSize="{StaticResource FontSizeMeta}"
                                                                FontWeight="SemiBold"
-                                                               Foreground="{StaticResource BrushTextMuted}" />
+                                                               Foreground="{DynamicResource BrushTextMuted}" />
 
                                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                                         <TextBlock Text="{Binding [IoStatus], Source={x:Static svc:LocalizationService.Instance}}"
                                                                    Classes="label-small" />
                                                         <TextBlock Text="{Binding StatusText}"
                                                                    FontWeight="Medium"
-                                                                   Foreground="{StaticResource BrushTextPrimary}" />
+                                                                   Foreground="{DynamicResource BrushTextPrimary}" />
                                                     </StackPanel>
 
                                                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -351,7 +351,7 @@
                                 <TextBlock Text="{Binding [HmTitle], Source={x:Static svc:LocalizationService.Instance}}"
                                            FontSize="{StaticResource FontSizeGroupHeader}"
                                            FontWeight="SemiBold"
-                                           Foreground="{StaticResource BrushTextPrimary}"
+                                           Foreground="{DynamicResource BrushTextPrimary}"
                                            Opacity="0.85" />
 
                                 <WrapPanel Orientation="Horizontal">
@@ -362,17 +362,17 @@
                                             <TextBlock Text="{Binding [HmHourmeter], Source={x:Static svc:LocalizationService.Instance}}"
                                                        FontSize="{StaticResource FontSizeMeta}"
                                                        FontWeight="SemiBold"
-                                                       Foreground="{StaticResource BrushTextMuted}" />
+                                                       Foreground="{DynamicResource BrushTextMuted}" />
                                             <TextBlock Text="{Binding HourText}"
                                                        FontSize="22"
                                                        FontWeight="Medium"
-                                                       Foreground="{StaticResource BrushTextPrimary}" />
+                                                       Foreground="{DynamicResource BrushTextPrimary}" />
                                             <StackPanel Orientation="Horizontal" Spacing="6">
                                                 <TextBlock Text="{Binding [IoStatus], Source={x:Static svc:LocalizationService.Instance}}"
                                                            Classes="label-small" />
                                                 <TextBlock Text="{Binding StatusText}"
                                                            FontWeight="Medium"
-                                                           Foreground="{StaticResource BrushTextPrimary}" />
+                                                           Foreground="{DynamicResource BrushTextPrimary}" />
                                             </StackPanel>
                                             <Button Content="{Binding [IoReset], Source={x:Static svc:LocalizationService.Instance}}"
                                                     Command="{Binding ZeroCommand}"
@@ -407,13 +407,13 @@
                                 <TextBlock Text="{Binding [StsMeterTitle], Source={x:Static svc:LocalizationService.Instance}}"
                                            FontSize="{StaticResource FontSizeGroupHeader}"
                                            FontWeight="SemiBold"
-                                           Foreground="{StaticResource BrushTextPrimary}"
+                                           Foreground="{DynamicResource BrushTextPrimary}"
                                            Opacity="0.85" />
 
                                 <TextBlock Text="{Binding [StsCodeHeader], Source={x:Static svc:LocalizationService.Instance}}"
                                            Classes="label-small" />
 
-                                <Border Background="#1A1A2E"
+                                <Border Background="{DynamicResource BrushBgDark}"
                                         CornerRadius="4"
                                         Padding="8"
                                         MinHeight="120">
@@ -426,7 +426,7 @@
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="{Binding}"
-                                                               Foreground="{StaticResource BrushTextPrimary}"
+                                                               Foreground="{DynamicResource BrushTextPrimary}"
                                                                Margin="0,0,0,4" />
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
@@ -444,13 +444,13 @@
                                 <TextBlock Text="{Binding [StsModuleTitle], Source={x:Static svc:LocalizationService.Instance}}"
                                            FontSize="{StaticResource FontSizeGroupHeader}"
                                            FontWeight="SemiBold"
-                                           Foreground="{StaticResource BrushTextPrimary}"
+                                           Foreground="{DynamicResource BrushTextPrimary}"
                                            Opacity="0.85" />
 
                                 <TextBlock Text="{Binding [StsCodeHeader], Source={x:Static svc:LocalizationService.Instance}}"
                                            Classes="label-small" />
 
-                                <Border Background="#1A1A2E"
+                                <Border Background="{DynamicResource BrushBgDark}"
                                         CornerRadius="4"
                                         Padding="8"
                                         MinHeight="120">
@@ -463,7 +463,7 @@
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="{Binding}"
-                                                               Foreground="{StaticResource BrushTextPrimary}"
+                                                               Foreground="{DynamicResource BrushTextPrimary}"
                                                                Margin="0,0,0,4" />
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>

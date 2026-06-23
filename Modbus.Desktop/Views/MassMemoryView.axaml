@@ -44,7 +44,7 @@
                                Classes="label-small" />
                     <TextBlock Text="{Binding SerialNumber}"
                                FontWeight="Medium"
-                               Foreground="{StaticResource BrushTextPrimary}" />
+                               Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
                 <!-- Endereço -->
                 <StackPanel Grid.Column="1" Spacing="4">
@@ -52,7 +52,7 @@
                                Classes="label-small" />
                     <TextBlock Text="{Binding Address}"
                                FontWeight="Medium"
-                               Foreground="{StaticResource BrushTextPrimary}" />
+                               Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
                 <!-- Descrição -->
                 <StackPanel Grid.Column="2" Spacing="4">
@@ -60,7 +60,7 @@
                                Classes="label-small" />
                     <TextBlock Text="{Binding Description}"
                                FontWeight="Medium"
-                               Foreground="{StaticResource BrushTextPrimary}" />
+                               Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
                 <!-- IA — Intervalo de Armazenamento -->
                 <StackPanel Grid.Column="3" Spacing="4">
@@ -68,7 +68,7 @@
                                Classes="label-small" />
                     <TextBlock Text="{Binding StorageInterval}"
                                FontWeight="Medium"
-                               Foreground="{StaticResource BrushTextPrimary}" />
+                               Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
                 <!-- MA — Modo de Armazenamento -->
                 <StackPanel Grid.Column="4" Spacing="4">
@@ -76,7 +76,7 @@
                                Classes="label-small" />
                     <TextBlock Text="{Binding StorageMode}"
                                FontWeight="Medium"
-                               Foreground="{StaticResource BrushTextPrimary}" />
+                               Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
             </Grid>
         </Border>

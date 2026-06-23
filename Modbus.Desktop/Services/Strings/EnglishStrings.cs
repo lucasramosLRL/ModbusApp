@@ -339,6 +339,9 @@ internal static class EnglishStrings
         // SettingsView
         ["SettingsTitle"]        = "Settings",
         ["Language"]             = "Language",
+        ["Theme"]                = "Theme",
+        ["ThemeDark"]            = "Dark",
+        ["ThemeLight"]           = "Light",
         ["ChangeInSettings"]     = "Change in Settings",
         ["NoPortConfigured"]     = "No COM port configured.",
         ["PortUnavailable"]      = "Port not connected. Make sure the device is plugged in.",

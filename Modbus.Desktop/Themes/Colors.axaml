@@ -1,0 +1,112 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ════════════════════════════════════════════════════════════════════════
+         Theme-variant colors. Each color key exists in BOTH the Dark and Light
+         dictionaries. The brushes below are declared ONCE and resolve their color
+         via DynamicResource, so switching Application.RequestedThemeVariant swaps
+         every brush live (views must reference the brushes with DynamicResource).
+
+         Light palette is derived from the K-GTWB CustomTkinter "Blue" theme:
+         light-gray canvas, white cards, teal #068CB1 accent, near-black text.
+         ════════════════════════════════════════════════════════════════════════ -->
+    <ResourceDictionary.ThemeDictionaries>
+
+        <!-- ── DARK (current look — unchanged) ──────────────────────────────── -->
+        <ResourceDictionary x:Key="Dark">
+            <Color x:Key="ColorCanvas">#121225</Color>
+            <Color x:Key="ColorBgDark">#1A1A2E</Color>
+            <Color x:Key="ColorBgElevated">#252540</Color>
+            <Color x:Key="ColorBgSelected">#2E2E5A</Color>
+            <Color x:Key="ColorBgSeparator">#2A2A4A</Color>
+            <Color x:Key="ColorCardBorder">#1A1A2E</Color>
+            <Color x:Key="ColorTextPrimary">#FFFFFF</Color>
+            <Color x:Key="ColorTextMuted">#7070A0</Color>
+            <Color x:Key="ColorTextSubtle">#9090B0</Color>
+            <Color x:Key="ColorErrorRed">#D32F2F</Color>
+            <Color x:Key="ColorErrorLight">#E57373</Color>
+            <Color x:Key="ColorWarningOrange">#FFB300</Color>
+            <Color x:Key="ColorSuccessGreen">#388E3C</Color>
+
+            <!-- Status banners -->
+            <Color x:Key="ColorBannerErrorBg">#3A1A1A</Color>
+            <Color x:Key="ColorBannerErrorBorder">#C24040</Color>
+            <Color x:Key="ColorBannerErrorText">#F5B0B0</Color>
+            <Color x:Key="ColorBannerErrorTextSubtle">#E8C8C8</Color>
+            <Color x:Key="ColorBannerSuccessBg">#1A3A1F</Color>
+            <Color x:Key="ColorBannerSuccessBorder">#3FA055</Color>
+            <Color x:Key="ColorBannerSuccessText">#BFE8C5</Color>
+        </ResourceDictionary>
+
+        <!-- ── LIGHT (new — K-GTWB "Blue" inspired) ─────────────────────────── -->
+        <ResourceDictionary x:Key="Light">
+            <Color x:Key="ColorCanvas">#DCDCE1</Color>
+            <Color x:Key="ColorBgDark">#FFFFFF</Color>
+            <Color x:Key="ColorBgElevated">#EDEDF0</Color>
+            <Color x:Key="ColorBgSelected">#B9DEEC</Color>
+            <Color x:Key="ColorBgSeparator">#D0D0D6</Color>
+            <Color x:Key="ColorCardBorder">#D5D5DC</Color>
+            <Color x:Key="ColorTextPrimary">#1A1A1A</Color>
+            <Color x:Key="ColorTextMuted">#6E6E80</Color>
+            <Color x:Key="ColorTextSubtle">#54546A</Color>
+            <Color x:Key="ColorErrorRed">#C62828</Color>
+            <Color x:Key="ColorErrorLight">#C62828</Color>
+            <Color x:Key="ColorWarningOrange">#E08600</Color>
+            <Color x:Key="ColorSuccessGreen">#2E7D32</Color>
+
+            <!-- Status banners (pastel on light) -->
+            <Color x:Key="ColorBannerErrorBg">#FBE9E9</Color>
+            <Color x:Key="ColorBannerErrorBorder">#D32F2F</Color>
+            <Color x:Key="ColorBannerErrorText">#B71C1C</Color>
+            <Color x:Key="ColorBannerErrorTextSubtle">#8C3A3A</Color>
+            <Color x:Key="ColorBannerSuccessBg">#E6F4EA</Color>
+            <Color x:Key="ColorBannerSuccessBorder">#2E7D32</Color>
+            <Color x:Key="ColorBannerSuccessText">#1B5E20</Color>
+
+            <!-- Teal accent for Fluent controls (comboboxes, checkboxes, radios, focus) -->
+            <Color x:Key="SystemAccentColor">#068CB1</Color>
+            <Color x:Key="SystemAccentColorLight1">#2C9DBE</Color>
+            <Color x:Key="SystemAccentColorLight2">#51AECB</Color>
+            <Color x:Key="SystemAccentColorLight3">#77BFD8</Color>
+            <Color x:Key="SystemAccentColorDark1">#057A9B</Color>
+            <Color x:Key="SystemAccentColorDark2">#046985</Color>
+            <Color x:Key="SystemAccentColorDark3">#03576F</Color>
+
+            <!-- Teal standard buttons (Light only — Dark keeps the neutral Fluent button) -->
+            <SolidColorBrush x:Key="ButtonBackground"            Color="#068CB1"/>
+            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#0A7E9E"/>
+            <SolidColorBrush x:Key="ButtonBackgroundPressed"     Color="#096B86"/>
+            <SolidColorBrush x:Key="ButtonForeground"            Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="ButtonForegroundPressed"     Color="#EAEAEA"/>
+            <SolidColorBrush x:Key="ButtonBorderBrush"            Color="#068CB1"/>
+            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#0A7E9E"/>
+            <SolidColorBrush x:Key="ButtonBorderBrushPressed"     Color="#096B86"/>
+        </ResourceDictionary>
+
+    </ResourceDictionary.ThemeDictionaries>
+
+    <!-- ── Brushes (single declaration; color resolved per active variant) ──── -->
+    <SolidColorBrush x:Key="BrushCanvas"        Color="{DynamicResource ColorCanvas}"/>
+    <SolidColorBrush x:Key="BrushBgDark"        Color="{DynamicResource ColorBgDark}"/>
+    <SolidColorBrush x:Key="BrushBgElevated"    Color="{DynamicResource ColorBgElevated}"/>
+    <SolidColorBrush x:Key="BrushBgSelected"    Color="{DynamicResource ColorBgSelected}"/>
+    <SolidColorBrush x:Key="BrushBgSeparator"   Color="{DynamicResource ColorBgSeparator}"/>
+    <SolidColorBrush x:Key="BrushCardBorder"    Color="{DynamicResource ColorCardBorder}"/>
+    <SolidColorBrush x:Key="BrushTextPrimary"   Color="{DynamicResource ColorTextPrimary}"/>
+    <SolidColorBrush x:Key="BrushTextMuted"     Color="{DynamicResource ColorTextMuted}"/>
+    <SolidColorBrush x:Key="BrushTextSubtle"    Color="{DynamicResource ColorTextSubtle}"/>
+    <SolidColorBrush x:Key="BrushErrorRed"      Color="{DynamicResource ColorErrorRed}"/>
+    <SolidColorBrush x:Key="BrushErrorLight"    Color="{DynamicResource ColorErrorLight}"/>
+    <SolidColorBrush x:Key="BrushWarningOrange" Color="{DynamicResource ColorWarningOrange}"/>
+    <SolidColorBrush x:Key="BrushSuccessGreen"  Color="{DynamicResource ColorSuccessGreen}"/>
+
+    <SolidColorBrush x:Key="BrushBannerErrorBg"         Color="{DynamicResource ColorBannerErrorBg}"/>
+    <SolidColorBrush x:Key="BrushBannerErrorBorder"     Color="{DynamicResource ColorBannerErrorBorder}"/>
+    <SolidColorBrush x:Key="BrushBannerErrorText"       Color="{DynamicResource ColorBannerErrorText}"/>
+    <SolidColorBrush x:Key="BrushBannerErrorTextSubtle" Color="{DynamicResource ColorBannerErrorTextSubtle}"/>
+    <SolidColorBrush x:Key="BrushBannerSuccessBg"       Color="{DynamicResource ColorBannerSuccessBg}"/>
+    <SolidColorBrush x:Key="BrushBannerSuccessBorder"   Color="{DynamicResource ColorBannerSuccessBorder}"/>
+    <SolidColorBrush x:Key="BrushBannerSuccessText"     Color="{DynamicResource ColorBannerSuccessText}"/>
+
+</ResourceDictionary>

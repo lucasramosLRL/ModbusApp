@@ -55,7 +55,7 @@
                     <TextBlock Text="{Binding Device.ModelDisplayName}"
                                FontSize="{StaticResource FontSizeSectionTitle}"
                                FontWeight="Medium"
-                               Foreground="{StaticResource BrushTextPrimary}" />
+                               Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
                 <StackPanel Spacing="2">
                     <TextBlock Classes="label-small"
@@ -64,7 +64,7 @@
                                FontSize="{StaticResource FontSizeSectionTitle}"
                                FontWeight="Medium"
                                FontFamily="Consolas, Courier New, monospace"
-                               Foreground="{StaticResource BrushTextPrimary}" />
+                               Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
                 <StackPanel Spacing="2">
                     <TextBlock Classes="label-small"
@@ -72,7 +72,7 @@
                     <TextBlock Text="{Binding FirmwareText}"
                                FontSize="{StaticResource FontSizeSectionTitle}"
                                FontWeight="Medium"
-                               Foreground="{StaticResource BrushTextPrimary}" />
+                               Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
                 <StackPanel Spacing="2">
                     <TextBlock Classes="label-small"
@@ -80,7 +80,7 @@
                     <TextBlock Text="{Binding HardwareText}"
                                FontSize="{StaticResource FontSizeSectionTitle}"
                                FontWeight="Medium"
-                               Foreground="{StaticResource BrushTextPrimary}" />
+                               Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -89,8 +89,8 @@
              Stays visible until the user re-enters the screen (LoadAsync resets LoadError). -->
         <Border DockPanel.Dock="Top"
                 IsVisible="{Binding LoadError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                Background="#3A1A1A"
-                BorderBrush="#C24040"
+                Background="{DynamicResource BrushBannerErrorBg}"
+                BorderBrush="{DynamicResource BrushBannerErrorBorder}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource RadiusCard}"
                 Padding="14,10"
@@ -99,10 +99,10 @@
                 <StackPanel Grid.Column="0" Spacing="4">
                     <TextBlock Text="Leitura incompleta — não grave configurações"
                                FontWeight="SemiBold"
-                               Foreground="#F5B0B0" />
+                               Foreground="{DynamicResource BrushBannerErrorText}" />
                     <TextBlock Text="{Binding LoadError}"
                                TextWrapping="Wrap"
-                               Foreground="#E8C8C8"
+                               Foreground="{DynamicResource BrushBannerErrorTextSubtle}"
                                FontSize="{StaticResource FontSizeMeta}" />
                 </StackPanel>
                 <Button Grid.Column="1"
@@ -118,8 +118,8 @@
         <!-- Save error banner -->
         <Border DockPanel.Dock="Top"
                 IsVisible="{Binding SaveError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                Background="#3A1A1A"
-                BorderBrush="#C24040"
+                Background="{DynamicResource BrushBannerErrorBg}"
+                BorderBrush="{DynamicResource BrushBannerErrorBorder}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource RadiusCard}"
                 Padding="14,10"
@@ -127,10 +127,10 @@
             <StackPanel Spacing="4">
                 <TextBlock Text="{Binding [CfgSaveError], Source={x:Static svc:LocalizationService.Instance}}"
                            FontWeight="SemiBold"
-                           Foreground="#F5B0B0" />
+                           Foreground="{DynamicResource BrushBannerErrorText}" />
                 <TextBlock Text="{Binding SaveError}"
                            TextWrapping="Wrap"
-                           Foreground="#E8C8C8"
+                           Foreground="{DynamicResource BrushBannerErrorTextSubtle}"
                            FontSize="{StaticResource FontSizeMeta}" />
             </StackPanel>
         </Border>
@@ -138,15 +138,15 @@
         <!-- Save success banner -->
         <Border DockPanel.Dock="Top"
                 IsVisible="{Binding SaveSuccess, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                Background="#1A3A1F"
-                BorderBrush="#3FA055"
+                Background="{DynamicResource BrushBannerSuccessBg}"
+                BorderBrush="{DynamicResource BrushBannerSuccessBorder}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource RadiusCard}"
                 Padding="14,10"
                 Margin="0,0,0,16">
             <TextBlock Text="{Binding SaveSuccess}"
                        FontWeight="SemiBold"
-                       Foreground="#BFE8C5" />
+                       Foreground="{DynamicResource BrushBannerSuccessText}" />
         </Border>
 
         <!-- Sidebar + content -->
@@ -154,7 +154,7 @@
 
             <!-- Left nav sidebar -->
             <Border Grid.Column="0"
-                    Background="{StaticResource BrushBgDark}"
+                    Background="{DynamicResource BrushBgDark}"
                     CornerRadius="{StaticResource RadiusCard}"
                     Margin="0,0,16,0">
                 <ListBox Background="Transparent"
@@ -165,17 +165,17 @@
                         <Style Selector="ListBoxItem">
                             <Setter Property="Padding"      Value="12,10" />
                             <Setter Property="CornerRadius" Value="{StaticResource RadiusCardSmall}" />
-                            <Setter Property="Foreground"   Value="{StaticResource BrushTextSubtle}" />
+                            <Setter Property="Foreground"   Value="{DynamicResource BrushTextSubtle}" />
                             <Setter Property="FontSize"     Value="{StaticResource FontSizeSectionTitle}" />
                         </Style>
                         <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-                            <Setter Property="Background" Value="{StaticResource BrushBgElevated}" />
+                            <Setter Property="Background" Value="{DynamicResource BrushBgElevated}" />
                         </Style>
                         <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
-                            <Setter Property="Background" Value="{StaticResource BrushBgSelected}" />
+                            <Setter Property="Background" Value="{DynamicResource BrushBgSelected}" />
                         </Style>
                         <Style Selector="ListBoxItem:selected">
-                            <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
+                            <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}" />
                         </Style>
                     </ListBox.Styles>
                 </ListBox>
@@ -200,7 +200,7 @@
                                                FontSize="{StaticResource FontSizeSectionTitle}"
                                                FontWeight="Medium"
                                                FontFamily="Consolas, Courier New, monospace"
-                                               Foreground="{StaticResource BrushTextPrimary}"
+                                               Foreground="{DynamicResource BrushTextPrimary}"
                                                Margin="0,6,0,0" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4" Margin="24,0,0,0"
@@ -214,7 +214,7 @@
                                 </StackPanel>
                             </Grid>
 
-                            <Border Height="1" Background="{StaticResource BrushBgSeparator}" Margin="-16,0" />
+                            <Border Height="1" Background="{DynamicResource BrushBgSeparator}" Margin="-16,0" />
 
                             <!-- Descrição -->
                             <StackPanel Spacing="4">
@@ -264,7 +264,7 @@
                                 <CheckBox Content="{Binding [CfgCurrentInvert], Source={x:Static svc:LocalizationService.Instance}}"
                                           IsChecked="{Binding CurrentInvert}"
                                           VerticalAlignment="Bottom"
-                                          Foreground="{StaticResource BrushTextPrimary}" />
+                                          Foreground="{DynamicResource BrushTextPrimary}" />
                             </StackPanel>
 
                             <!-- Seq. PF — all 4 ComboBoxes share AllPfBytes; selecting a value
@@ -288,13 +288,13 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <Border Height="1" Background="{StaticResource BrushBgSeparator}" Margin="-16,0" />
+                            <Border Height="1" Background="{DynamicResource BrushBgSeparator}" Margin="-16,0" />
 
                             <!-- Horímetro -->
                             <TextBlock Text="{Binding [TabHourmeter], Source={x:Static svc:LocalizationService.Instance}}"
                                        FontSize="{StaticResource FontSizeSectionTitle}"
                                        FontWeight="SemiBold"
-                                       Foreground="{StaticResource BrushTextPrimary}"
+                                       Foreground="{DynamicResource BrushTextPrimary}"
                                        Opacity="0.7" />
                             <StackPanel Spacing="4">
                                 <TextBlock Classes="label-small"
@@ -314,22 +314,22 @@
                             <TextBlock Text="{Binding [CfgEthernet], Source={x:Static svc:LocalizationService.Instance}}"
                                        Classes="section-title" />
 
-                            <Border Background="{StaticResource BrushBgElevated}"
+                            <Border Background="{DynamicResource BrushBgElevated}"
                                     CornerRadius="{StaticResource RadiusCardSmall}"
                                     Padding="16">
                                 <StackPanel Spacing="14">
                                     <TextBlock Text="Ethernet"
                                                FontSize="{StaticResource FontSizeSectionTitle}"
                                                FontWeight="SemiBold"
-                                               Foreground="{StaticResource BrushTextPrimary}"
+                                               Foreground="{DynamicResource BrushTextPrimary}"
                                                Opacity="0.7" />
 
                                     <!-- DHCP -->
                                     <CheckBox Content="DHCP"
                                               IsChecked="{Binding EthDhcp}"
-                                              Foreground="{StaticResource BrushTextPrimary}" />
+                                              Foreground="{DynamicResource BrushTextPrimary}" />
 
-                                    <Border Height="1" Background="{StaticResource BrushBgSeparator}" Margin="-16,0" />
+                                    <Border Height="1" Background="{DynamicResource BrushBgSeparator}" Margin="-16,0" />
 
                                     <!-- IP / Mask / Gateway (disabled when DHCP is on) -->
                                     <StackPanel Spacing="4">
@@ -367,7 +367,7 @@
                                                    FontFamily="Consolas, Courier New, monospace"
                                                    FontSize="{StaticResource FontSizeSectionTitle}"
                                                    FontWeight="Medium"
-                                                   Foreground="{StaticResource BrushTextPrimary}"
+                                                   Foreground="{DynamicResource BrushTextPrimary}"
                                                    Opacity="0.45" />
                                     </StackPanel>
 
@@ -375,7 +375,7 @@
                                     <StackPanel Spacing="6">
                                         <CheckBox Content="{Binding [CfgDns], Source={x:Static svc:LocalizationService.Instance}}"
                                                   IsChecked="{Binding WifiDnsEnabled}"
-                                                  Foreground="{StaticResource BrushTextPrimary}" />
+                                                  Foreground="{DynamicResource BrushTextPrimary}" />
                                         <TextBox Text="{Binding WifiDns}"
                                                  Classes.invalid="{Binding HasInvalidWifiDns}"
                                                  IsEnabled="{Binding WifiDnsEnabled}"
@@ -401,21 +401,21 @@
                                           SelectedItem="{Binding WirelessMode}" />
                             </StackPanel>
 
-                            <Border Height="1" Background="{StaticResource BrushBgSeparator}" Margin="-16,0" />
+                            <Border Height="1" Background="{DynamicResource BrushBgSeparator}" Margin="-16,0" />
 
                             <!-- Wi-Fi + Bluetooth side by side -->
                             <Grid ColumnDefinitions="*,16,*">
 
                                 <!-- Wi-Fi -->
                                 <Border Grid.Column="0"
-                                        Background="{StaticResource BrushBgElevated}"
+                                        Background="{DynamicResource BrushBgElevated}"
                                         CornerRadius="{StaticResource RadiusCardSmall}"
                                         Padding="16">
                                     <StackPanel Spacing="14">
                                         <TextBlock Text="Wi-Fi"
                                                    FontSize="{StaticResource FontSizeSectionTitle}"
                                                    FontWeight="SemiBold"
-                                                   Foreground="{StaticResource BrushTextPrimary}"
+                                                   Foreground="{DynamicResource BrushTextPrimary}"
                                                    Opacity="0.7" />
 
                                         <!-- SSID + Security + Password -->
@@ -456,11 +456,11 @@
                                             <TextBlock Text="{Binding ModuleVersion, FallbackValue=—, TargetNullValue=—}"
                                                        FontSize="{StaticResource FontSizeSectionTitle}"
                                                        FontWeight="Medium"
-                                                       Foreground="{StaticResource BrushTextPrimary}"
+                                                       Foreground="{DynamicResource BrushTextPrimary}"
                                                        Opacity="0.45" />
                                         </StackPanel>
 
-                                        <Border Height="1" Background="{StaticResource BrushBgSeparator}" Margin="-16,0" />
+                                        <Border Height="1" Background="{DynamicResource BrushBgSeparator}" Margin="-16,0" />
 
                                         <!-- IP / Mask / Gateway (disabled when DHCP is on) -->
                                         <StackPanel Spacing="4">
@@ -499,13 +499,13 @@
                                                            FontFamily="Consolas, Courier New, monospace"
                                                            FontSize="{StaticResource FontSizeSectionTitle}"
                                                            FontWeight="Medium"
-                                                           Foreground="{StaticResource BrushTextPrimary}"
+                                                           Foreground="{DynamicResource BrushTextPrimary}"
                                                            Opacity="0.45" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Spacing="4" Margin="10,0,0,0">
                                                 <CheckBox Content="DHCP"
                                                           IsChecked="{Binding WifiDhcp}"
-                                                          Foreground="{StaticResource BrushTextPrimary}" />
+                                                          Foreground="{DynamicResource BrushTextPrimary}" />
                                             </StackPanel>
                                         </Grid>
 
@@ -513,7 +513,7 @@
                                         <StackPanel Spacing="6">
                                             <CheckBox Content="{Binding [CfgDns], Source={x:Static svc:LocalizationService.Instance}}"
                                                       IsChecked="{Binding WifiDnsEnabled}"
-                                                      Foreground="{StaticResource BrushTextPrimary}" />
+                                                      Foreground="{DynamicResource BrushTextPrimary}" />
                                             <TextBox Text="{Binding WifiDns}"
                                                      IsEnabled="{Binding WifiDnsEnabled}"
                                                      Watermark="208.67.222.222" />
@@ -523,14 +523,14 @@
 
                                 <!-- Bluetooth -->
                                 <Border Grid.Column="2"
-                                        Background="{StaticResource BrushBgElevated}"
+                                        Background="{DynamicResource BrushBgElevated}"
                                         CornerRadius="{StaticResource RadiusCardSmall}"
                                         Padding="16">
                                     <StackPanel Spacing="14">
                                         <TextBlock Text="Bluetooth"
                                                    FontSize="{StaticResource FontSizeSectionTitle}"
                                                    FontWeight="SemiBold"
-                                                   Foreground="{StaticResource BrushTextPrimary}"
+                                                   Foreground="{DynamicResource BrushTextPrimary}"
                                                    Opacity="0.7" />
 
                                         <StackPanel Spacing="4">
@@ -550,7 +550,7 @@
                                                        FontFamily="Consolas, Courier New, monospace"
                                                        FontSize="{StaticResource FontSizeSectionTitle}"
                                                        FontWeight="Medium"
-                                                       Foreground="{StaticResource BrushTextPrimary}"
+                                                       Foreground="{DynamicResource BrushTextPrimary}"
                                                        Opacity="0.45" />
                                         </StackPanel>
                                     </StackPanel>
@@ -577,7 +577,7 @@
                                 <CheckBox Grid.Row="0" Grid.Column="1"
                                           Content="{Binding [CfgEnabled], Source={x:Static svc:LocalizationService.Instance}}"
                                           IsChecked="{Binding SntpEnabled}"
-                                          Foreground="{StaticResource BrushTextPrimary}" />
+                                          Foreground="{DynamicResource BrushTextPrimary}" />
 
                                 <!-- Timezone -->
                                 <TextBlock Grid.Row="2" Grid.Column="0"
@@ -636,7 +636,7 @@
                                     <TextBlock Classes="label-small" Text="IoT" />
                                     <CheckBox Content="{Binding [CfgEnabled], Source={x:Static svc:LocalizationService.Instance}}"
                                               IsChecked="{Binding IotEnabled}"
-                                              Foreground="{StaticResource BrushTextPrimary}" />
+                                              Foreground="{DynamicResource BrushTextPrimary}" />
                                 </StackPanel>
                                 <!-- Send interval -->
                                 <StackPanel Grid.Column="2" Spacing="4">
@@ -656,7 +656,7 @@
                                             Spacing="20" VerticalAlignment="Bottom">
                                     <CheckBox Content="{Binding [CfgSendOnHour], Source={x:Static svc:LocalizationService.Instance}}"
                                               IsChecked="{Binding SendOnHour}"
-                                              Foreground="{StaticResource BrushTextPrimary}" />
+                                              Foreground="{DynamicResource BrushTextPrimary}" />
                                     <Button Content="{Binding [CfgClearBuffer], Source={x:Static svc:LocalizationService.Instance}}"
                                             Padding="{StaticResource PaddingButtonSmall}" />
                                 </StackPanel>
@@ -732,12 +732,12 @@
                                                         VerticalAlignment="Top">
                                                 <CheckBox Content="{Binding [CfgKeepAlive], Source={x:Static svc:LocalizationService.Instance}}"
                                                           IsChecked="{Binding KeepAlive}"
-                                                          Foreground="{StaticResource BrushTextPrimary}" />
+                                                          Foreground="{DynamicResource BrushTextPrimary}" />
                                                 <CheckBox Content="{Binding [CfgKronCloud], Source={x:Static svc:LocalizationService.Instance}}"
-                                                          Foreground="{StaticResource BrushTextPrimary}" />
+                                                          Foreground="{DynamicResource BrushTextPrimary}" />
                                                 <CheckBox Content="{Binding [CfgTls], Source={x:Static svc:LocalizationService.Instance}}"
                                                           IsChecked="{Binding Tls}"
-                                                          Foreground="{StaticResource BrushTextPrimary}" />
+                                                          Foreground="{DynamicResource BrushTextPrimary}" />
                                             </StackPanel>
 
                                         </Grid>
@@ -762,7 +762,7 @@
 
                             </TabControl>
 
-                            <Border Height="1" Background="{StaticResource BrushBgSeparator}" Margin="-16,0" />
+                            <Border Height="1" Background="{DynamicResource BrushBgSeparator}" Margin="-16,0" />
 
                             <!-- Variable selection panel (two-list layout mirroring the old KRON software) -->
                             <Grid ColumnDefinitions="*,Auto,*" MinHeight="320"
@@ -776,7 +776,7 @@
                                              Height="300"
                                              ItemsSource="{Binding AvailableFlat}"
                                              SelectionMode="Multiple"
-                                             Background="{StaticResource BrushBgElevated}">
+                                             Background="{DynamicResource BrushBgElevated}">
                                         <ListBox.ItemTemplate>
                                             <DataTemplate DataType="vm:DeviceConfigureViewModel+GrandezaItemViewModel">
                                                 <Grid ColumnDefinitions="80,*">
@@ -826,7 +826,7 @@
                                              Height="300"
                                              ItemsSource="{Binding SelectedOrdered}"
                                              SelectionMode="Multiple"
-                                             Background="{StaticResource BrushBgElevated}">
+                                             Background="{DynamicResource BrushBgElevated}">
                                         <ListBox.ItemTemplate>
                                             <DataTemplate DataType="vm:DeviceConfigureViewModel+GrandezaItemViewModel">
                                                 <Grid ColumnDefinitions="32,80,*">
@@ -861,7 +861,7 @@
                             <TextBlock Text="{Binding [CfgClock], Source={x:Static svc:LocalizationService.Instance}}"
                                        Classes="section-title" />
 
-                            <Border Background="{StaticResource BrushBgElevated}"
+                            <Border Background="{DynamicResource BrushBgElevated}"
                                     CornerRadius="{StaticResource RadiusCardSmall}"
                                     Padding="20,16">
                                 <StackPanel Spacing="14">
@@ -888,7 +888,7 @@
                                                     HorizontalAlignment="Left" />
                                     </Grid>
 
-                                    <Border Height="1" Background="{StaticResource BrushBgSeparator}" Margin="-20,4" />
+                                    <Border Height="1" Background="{DynamicResource BrushBgSeparator}" Margin="-20,4" />
 
                                     <!-- Sync source: when "PC" is selected, a 1s timer pushes
                                          the current PC clock into the display above. "Manual"
@@ -896,11 +896,11 @@
                                     <StackPanel Orientation="Horizontal" Spacing="20">
                                         <RadioButton Content="{Binding [CfgManual], Source={x:Static svc:LocalizationService.Instance}}"
                                                      GroupName="ClockSync"
-                                                     Foreground="{StaticResource BrushTextPrimary}" />
+                                                     Foreground="{DynamicResource BrushTextPrimary}" />
                                         <RadioButton Content="PC"
                                                      GroupName="ClockSync"
                                                      IsChecked="{Binding ClockSyncFromPc}"
-                                                     Foreground="{StaticResource BrushTextPrimary}" />
+                                                     Foreground="{DynamicResource BrushTextPrimary}" />
                                         <Button Content="{Binding [CfgUseNow], Source={x:Static svc:LocalizationService.Instance}}"
                                                 Command="{Binding UseNowCommand}"
                                                 IsEnabled="{Binding !ClockSyncFromPc}"

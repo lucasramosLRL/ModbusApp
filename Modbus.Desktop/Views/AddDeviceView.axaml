@@ -62,7 +62,7 @@
                                 <!-- Summary from RtuSettingsService (e.g. "COM5  9600  8N2") -->
                                 <TextBlock FontSize="{StaticResource FontSizeGroupHeader}"
                                            FontWeight="SemiBold"
-                                           Foreground="{StaticResource BrushTextPrimary}">
+                                           Foreground="{DynamicResource BrushTextPrimary}">
                                     <TextBlock.Text>
                                         <MultiBinding StringFormat="{}{0}">
                                             <Binding Path="Summary" Source="{x:Static svc:RtuSettingsService.Instance}" />
@@ -71,11 +71,11 @@
                                 </TextBlock>
                                 <TextBlock Text="{Binding [NoPortConfigured], Source={x:Static svc:LocalizationService.Instance}}"
                                            FontSize="{StaticResource FontSizeSectionTitle}"
-                                           Foreground="{StaticResource BrushErrorLight}"
+                                           Foreground="{DynamicResource BrushErrorLight}"
                                            IsVisible="{Binding Summary, Source={x:Static svc:RtuSettingsService.Instance}, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                                 <TextBlock Text="{Binding [PortUnavailable], Source={x:Static svc:LocalizationService.Instance}}"
                                            FontSize="{StaticResource FontSizeSectionTitle}"
-                                           Foreground="{StaticResource BrushWarningOrange}"
+                                           Foreground="{DynamicResource BrushWarningOrange}"
                                            IsVisible="{Binding IsRtuPortUnavailable}" />
                             </StackPanel>
                             <Button Grid.Column="1"

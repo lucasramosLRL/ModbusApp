@@ -1,33 +1,11 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+    <!-- Theme-variant colors and brushes live in /Themes/Colors.axaml
+         (merged into Application.Resources). Reference those brushes with
+         DynamicResource so they swap live when the theme variant changes. -->
+
     <Styles.Resources>
-
-        <!-- ── Colors ────────────────────────────────────────────────────── -->
-        <Color x:Key="ColorBgDark">#1A1A2E</Color>
-        <Color x:Key="ColorBgElevated">#252540</Color>
-        <Color x:Key="ColorBgSelected">#2E2E5A</Color>
-        <Color x:Key="ColorBgSeparator">#2A2A4A</Color>
-        <Color x:Key="ColorTextPrimary">#FFFFFF</Color>
-        <Color x:Key="ColorTextMuted">#7070A0</Color>
-        <Color x:Key="ColorTextSubtle">#9090B0</Color>
-        <Color x:Key="ColorErrorRed">#D32F2F</Color>
-        <Color x:Key="ColorErrorLight">#E57373</Color>
-        <Color x:Key="ColorWarningOrange">#FFB300</Color>
-        <Color x:Key="ColorSuccessGreen">#388E3C</Color>
-
-        <!-- ── Brushes ───────────────────────────────────────────────────── -->
-        <SolidColorBrush x:Key="BrushBgDark"      Color="{StaticResource ColorBgDark}"/>
-        <SolidColorBrush x:Key="BrushBgElevated"  Color="{StaticResource ColorBgElevated}"/>
-        <SolidColorBrush x:Key="BrushBgSelected"  Color="{StaticResource ColorBgSelected}"/>
-        <SolidColorBrush x:Key="BrushBgSeparator" Color="{StaticResource ColorBgSeparator}"/>
-        <SolidColorBrush x:Key="BrushTextPrimary" Color="{StaticResource ColorTextPrimary}"/>
-        <SolidColorBrush x:Key="BrushTextMuted"   Color="{StaticResource ColorTextMuted}"/>
-        <SolidColorBrush x:Key="BrushTextSubtle"  Color="{StaticResource ColorTextSubtle}"/>
-        <SolidColorBrush x:Key="BrushErrorRed"    Color="{StaticResource ColorErrorRed}"/>
-        <SolidColorBrush x:Key="BrushErrorLight"  Color="{StaticResource ColorErrorLight}"/>
-        <SolidColorBrush x:Key="BrushWarningOrange" Color="{StaticResource ColorWarningOrange}"/>
-        <SolidColorBrush x:Key="BrushSuccessGreen"  Color="{StaticResource ColorSuccessGreen}"/>
 
         <!-- ── Corner Radii ──────────────────────────────────────────────── -->
         <CornerRadius x:Key="RadiusCard">8</CornerRadius>
@@ -55,10 +33,12 @@
 
     <!-- ── Component Styles ──────────────────────────────────────────────── -->
 
-    <!-- Standard card: dark background, rounded corners, standard padding -->
+    <!-- Standard card: surface background, rounded corners, standard padding.
+         BorderBrush is invisible in dark (== background) and a subtle outline in
+         light (BrushCardBorder) so cards stay defined on the light-gray canvas. -->
     <Style Selector="Border.card">
-        <Setter Property="Background"       Value="{StaticResource BrushBgDark}"/>
-        <Setter Property="BorderBrush"      Value="{StaticResource BrushBgDark}"/>
+        <Setter Property="Background"       Value="{DynamicResource BrushBgDark}"/>
+        <Setter Property="BorderBrush"      Value="{DynamicResource BrushCardBorder}"/>
         <Setter Property="BorderThickness"  Value="1"/>
         <Setter Property="CornerRadius"     Value="{StaticResource RadiusCard}"/>
         <Setter Property="Padding"          Value="{StaticResource PaddingCard}"/>
@@ -66,8 +46,8 @@
 
     <!-- Hub feature card: larger padding and corner radius -->
     <Style Selector="Border.card-hub">
-        <Setter Property="Background"       Value="{StaticResource BrushBgDark}"/>
-        <Setter Property="BorderBrush"      Value="{StaticResource BrushBgDark}"/>
+        <Setter Property="Background"       Value="{DynamicResource BrushBgDark}"/>
+        <Setter Property="BorderBrush"      Value="{DynamicResource BrushCardBorder}"/>
         <Setter Property="BorderThickness"  Value="1"/>
         <Setter Property="CornerRadius"     Value="{StaticResource RadiusCardLarge}"/>
         <Setter Property="Padding"          Value="{StaticResource PaddingCardHub}"/>
@@ -75,14 +55,14 @@
 
     <!-- Reading group container: elevated background, card radius -->
     <Style Selector="Border.reading-group">
-        <Setter Property="Background"   Value="{StaticResource BrushBgElevated}"/>
+        <Setter Property="Background"   Value="{DynamicResource BrushBgElevated}"/>
         <Setter Property="CornerRadius" Value="{StaticResource RadiusCard}"/>
         <Setter Property="Padding"      Value="{StaticResource PaddingCard}"/>
     </Style>
 
     <!-- Individual electrical reading value box -->
     <Style Selector="Border.reading-box">
-        <Setter Property="Background"   Value="{StaticResource BrushBgDark}"/>
+        <Setter Property="Background"   Value="{DynamicResource BrushBgDark}"/>
         <Setter Property="CornerRadius" Value="{StaticResource RadiusCardSmall}"/>
         <Setter Property="Padding"      Value="14,10"/>
     </Style>
@@ -103,14 +83,14 @@
     <Style Selector="TextBlock.section-title">
         <Setter Property="FontSize"   Value="{StaticResource FontSizeSectionTitle}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}"/>
+        <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
     </Style>
 
     <!-- Small label above a form field: 11pt dimmed white -->
     <Style Selector="TextBlock.label-small">
         <Setter Property="FontSize"   Value="{StaticResource FontSizeLabelSmall}"/>
         <Setter Property="Opacity"    Value="0.55"/>
-        <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}"/>
+        <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
     </Style>
 
     <!-- Invalid input border: applied via Classes.invalid="{Binding HasInvalidXxx}".

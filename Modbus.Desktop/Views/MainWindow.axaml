@@ -9,27 +9,27 @@
         WindowStartupLocation="CenterScreen"
         Icon="/Assets/app.ico">
 
-    <Grid ColumnDefinitions="220,*">
+    <Grid ColumnDefinitions="220,*" Background="{DynamicResource BrushCanvas}">
 
         <!-- Sidebar -->
-        <Border Grid.Column="0" Background="{StaticResource BrushBgDark}">
+        <Border Grid.Column="0" Background="{DynamicResource BrushBgDark}">
             <DockPanel>
 
                 <!-- App title -->
                 <Border DockPanel.Dock="Top" Padding="20,24,20,16">
                     <StackPanel Spacing="2">
                         <TextBlock Text="ModbusApp"
-                                   Foreground="{StaticResource BrushTextPrimary}"
+                                   Foreground="{DynamicResource BrushTextPrimary}"
                                    FontSize="{StaticResource FontSizeAppTitle}"
                                    FontWeight="SemiBold" />
                         <TextBlock Text="{Binding AppSubtitle}"
-                                   Foreground="{StaticResource BrushTextSubtle}"
+                                   Foreground="{DynamicResource BrushTextSubtle}"
                                    FontSize="{StaticResource FontSizeLabelSmall}" />
                     </StackPanel>
                 </Border>
 
                 <!-- Separator -->
-                <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BrushBgSeparator}" Margin="16,0" />
+                <Border DockPanel.Dock="Top" Height="1" Background="{DynamicResource BrushBgSeparator}" Margin="16,0" />
 
                 <!-- Nav items -->
                 <ListBox Background="Transparent"
@@ -40,16 +40,16 @@
                         <Style Selector="ListBoxItem">
                             <Setter Property="Padding" Value="12,10" />
                             <Setter Property="CornerRadius" Value="{StaticResource RadiusCardSmall}" />
-                            <Setter Property="Foreground" Value="{StaticResource BrushTextSubtle}" />
+                            <Setter Property="Foreground" Value="{DynamicResource BrushTextSubtle}" />
                         </Style>
                         <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-                            <Setter Property="Background" Value="{StaticResource BrushBgElevated}" />
+                            <Setter Property="Background" Value="{DynamicResource BrushBgElevated}" />
                         </Style>
                         <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
-                            <Setter Property="Background" Value="{StaticResource BrushBgSelected}" />
+                            <Setter Property="Background" Value="{DynamicResource BrushBgSelected}" />
                         </Style>
                         <Style Selector="ListBoxItem:selected">
-                            <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
+                            <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}" />
                         </Style>
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>

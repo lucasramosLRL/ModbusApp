@@ -12,11 +12,13 @@ public partial class SettingsViewModel : ObservableObject
 {
     private readonly LocalizationService _loc;
     private readonly RtuSettingsService  _rtu;
+    private readonly ThemeService        _theme;
 
     // ── Localized labels ──────────────────────────────────────────────────────
 
     [ObservableProperty] private string _settingsTitle        = string.Empty;
     [ObservableProperty] private string _languageLabel        = string.Empty;
+    [ObservableProperty] private string _themeLabel           = string.Empty;
     [ObservableProperty] private string _serialPortSettings   = string.Empty;
     [ObservableProperty] private string _comPortLabel         = string.Empty;
     [ObservableProperty] private string _baudRateLabel        = string.Empty;
@@ -31,6 +33,7 @@ public partial class SettingsViewModel : ObservableObject
         var loc = LocalizationService.Instance;
         SettingsTitle        = loc["SettingsTitle"];
         LanguageLabel        = loc["Language"];
+        ThemeLabel           = loc["Theme"];
         SerialPortSettings   = loc["SerialPortSettings"];
         ComPortLabel         = loc["ComPort"];
         BaudRateLabel        = loc["BaudRate"];
@@ -52,6 +55,21 @@ public partial class SettingsViewModel : ObservableObject
         {
             if (_loc.CurrentLanguage == value) return;
             _loc.CurrentLanguage = value;
+            OnPropertyChanged();
+        }
+    }
+
+    // ── Theme ───────────────────────────────────────────────────────────────────
+
+    public AppTheme[] AvailableThemes { get; } = Enum.GetValues<AppTheme>();
+
+    public AppTheme SelectedTheme
+    {
+        get => _theme.CurrentTheme;
+        set
+        {
+            if (_theme.CurrentTheme == value) return;
+            _theme.CurrentTheme = value;
             OnPropertyChanged();
         }
     }
@@ -116,10 +134,11 @@ public partial class SettingsViewModel : ObservableObject
 
     // ── Constructor ───────────────────────────────────────────────────────────
 
-    public SettingsViewModel(LocalizationService loc, RtuSettingsService rtu)
+    public SettingsViewModel(LocalizationService loc, RtuSettingsService rtu, ThemeService theme)
     {
-        _loc = loc;
-        _rtu = rtu;
+        _loc   = loc;
+        _rtu   = rtu;
+        _theme = theme;
 
         // Populate port list; always include the saved port even if not currently connected,
         // so the ComboBox binding doesn't reset it to null and overwrite the persisted value.

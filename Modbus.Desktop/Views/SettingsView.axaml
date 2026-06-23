@@ -29,6 +29,25 @@
             </StackPanel>
         </Border>
 
+        <!-- Theme selection -->
+        <Border Classes="card"
+                Width="320"
+                HorizontalAlignment="Left">
+            <StackPanel Spacing="10">
+                <TextBlock Text="{Binding ThemeLabel}"
+                           Classes="section-title" />
+                <ComboBox ItemsSource="{Binding AvailableThemes}"
+                          SelectedItem="{Binding SelectedTheme}"
+                          HorizontalAlignment="Stretch">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type svc:AppTheme}">
+                            <TextBlock Text="{Binding Converter={x:Static svc:AppThemeConverter.Instance}}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+        </Border>
+
         <!-- COM port settings -->
         <Border Classes="card" HorizontalAlignment="Left">
             <StackPanel Spacing="12">
@@ -91,7 +110,7 @@
                 </Grid>
                 <TextBlock Text="{Binding PortUnavailableLabel}"
                            FontSize="{StaticResource FontSizeMeta}"
-                           Foreground="{StaticResource BrushWarningOrange}"
+                           Foreground="{DynamicResource BrushWarningOrange}"
                            IsVisible="{Binding IsPortUnavailable}"
                            Margin="0,6,0,0" />
             </StackPanel>

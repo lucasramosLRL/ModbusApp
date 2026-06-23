@@ -52,7 +52,7 @@
                                    Opacity="0.6"
                                    TextWrapping="Wrap"
                                    Margin="0,6,0,0"
-                                   Foreground="{StaticResource BrushTextPrimary}" />
+                                   Foreground="{DynamicResource BrushTextPrimary}" />
                         <Button DockPanel.Dock="Bottom"
                                 Content="{Binding [Open], Source={x:Static svc:LocalizationService.Instance}}"
                                 Command="{Binding OpenReadingsCommand}"
@@ -78,7 +78,7 @@
                                    Opacity="0.6"
                                    TextWrapping="Wrap"
                                    Margin="0,6,0,0"
-                                   Foreground="{StaticResource BrushTextPrimary}" />
+                                   Foreground="{DynamicResource BrushTextPrimary}" />
                         <Button DockPanel.Dock="Bottom"
                                 Content="{Binding [Open], Source={x:Static svc:LocalizationService.Instance}}"
                                 Command="{Binding OpenMassMemoryCommand}"
@@ -103,7 +103,7 @@
                                    Opacity="0.6"
                                    TextWrapping="Wrap"
                                    Margin="0,6,0,0"
-                                   Foreground="{StaticResource BrushTextPrimary}" />
+                                   Foreground="{DynamicResource BrushTextPrimary}" />
                         <Button DockPanel.Dock="Bottom"
                                 Content="{Binding [Open], Source={x:Static svc:LocalizationService.Instance}}"
                                 Command="{Binding OpenConfigureCommand}"

@@ -36,6 +36,9 @@ public partial class App : Application
         var seeder = new DeviceModelSeeder(Services.GetRequiredService<IDeviceModelRepository>());
         seeder.SeedAsync().GetAwaiter().GetResult();
 
+        // Apply the persisted theme before the main window is created.
+        ThemeService.Instance.Apply();
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = new MainWindow
@@ -90,6 +93,7 @@ public partial class App : Application
 
         services.AddSingleton(_ => LocalizationService.Instance);
         services.AddSingleton(_ => RtuSettingsService.Instance);
+        services.AddSingleton(_ => ThemeService.Instance);
         services.AddSingleton<DeviceListViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainViewModel>();
