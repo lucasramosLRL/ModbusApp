@@ -40,7 +40,7 @@
                 <StackPanel Grid.Column="0" Spacing="4">
                     <TextBlock Text="{Binding [Transport], Source={x:Static svc:LocalizationService.Instance}}"
                                Classes="label-small" />
-                    <TextBlock Text="{Binding Device.TransportType}" FontWeight="Medium" Foreground="{DynamicResource BrushTextPrimary}" />
+                    <TextBlock Text="{Binding Device.TransportTypeDisplay}" FontWeight="Medium" Foreground="{DynamicResource BrushTextPrimary}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4">
                     <TextBlock Text="{Binding [Connection], Source={x:Static svc:LocalizationService.Instance}}"

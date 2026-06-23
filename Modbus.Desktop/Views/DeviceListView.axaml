@@ -57,7 +57,7 @@
                                                Opacity="0.65"
                                                Foreground="{DynamicResource BrushTextPrimary}" />
                                     <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <TextBlock Text="{Binding TransportType}"
+                                        <TextBlock Text="{Binding TransportTypeDisplay}"
                                                    FontSize="{StaticResource FontSizeMeta}"
                                                    Opacity="0.55"
                                                    Foreground="{DynamicResource BrushTextPrimary}" />

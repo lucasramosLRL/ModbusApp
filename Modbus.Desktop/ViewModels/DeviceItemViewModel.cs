@@ -56,6 +56,15 @@ public partial class DeviceItemViewModel : ObservableObject, IDisposable
     public byte SlaveId => Device.SlaveId;
     public TransportType TransportType => Device.TransportType;
 
+    // Uppercase label shown in the device list.
+    public string TransportTypeDisplay => Device.TransportType switch
+    {
+        TransportType.Tcp       => "TCP",
+        TransportType.Rtu       => "RTU",
+        TransportType.MqttCloud => "MQTT",
+        _                       => Device.TransportType.ToString().ToUpperInvariant()
+    };
+
     public string ModelDisplayName =>
         Device.DeviceModel?.Name ?? LocalizationService.Instance["UnknownModel"];
 
