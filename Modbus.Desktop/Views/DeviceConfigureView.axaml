@@ -734,6 +734,7 @@
                                                           IsChecked="{Binding KeepAlive}"
                                                           Foreground="{DynamicResource BrushTextPrimary}" />
                                                 <CheckBox Content="{Binding [CfgKronCloud], Source={x:Static svc:LocalizationService.Instance}}"
+                                                          IsChecked="{Binding IsKronCloud}"
                                                           Foreground="{DynamicResource BrushTextPrimary}" />
                                                 <CheckBox Content="{Binding [CfgTls], Source={x:Static svc:LocalizationService.Instance}}"
                                                           IsChecked="{Binding Tls}"

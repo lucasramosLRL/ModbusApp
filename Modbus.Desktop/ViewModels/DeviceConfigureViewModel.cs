@@ -296,6 +296,56 @@ public partial class DeviceConfigureViewModel : ObservableObject
     [ObservableProperty] private string? _mqttUser;
     [ObservableProperty] private string? _mqttToken;
 
+    // KRON Cloud (Tago) preset: checking the box fills URL/port/topic with the fixed
+    // Tago values, remembering what was there before; unchecking restores those previous
+    // values (a toggle, not a clear — mirroring how RevertIotMemoryFields restores on
+    // cancel). On read, the box starts checked when the three already match the preset.
+    private const string KronCloudUrl   = "mqtt.tago.io";
+    private const string KronCloudPort  = "1883";
+    private const string KronCloudTopic = "tago/data/post";
+
+    [ObservableProperty] private bool _isKronCloud;
+
+    private bool _suppressKronCloudToggle;
+    private string? _preKronCloudUrl;
+    private string? _preKronCloudPort;
+    private string? _preKronCloudTopic;
+
+    partial void OnIsKronCloudChanged(bool value)
+    {
+        if (_suppressKronCloudToggle) return; // programmatic sync (load/revert), no fill/restore
+        if (value)
+        {
+            _preKronCloudUrl   = MqttUrl;
+            _preKronCloudPort  = MqttPort;
+            _preKronCloudTopic = MqttTopic;
+            MqttUrl   = KronCloudUrl;
+            MqttPort  = KronCloudPort;
+            MqttTopic = KronCloudTopic;
+        }
+        else
+        {
+            MqttUrl   = _preKronCloudUrl;
+            MqttPort  = _preKronCloudPort;
+            MqttTopic = _preKronCloudTopic;
+        }
+    }
+
+    // Sets the checkbox to reflect the current MQTT fields without running the
+    // fill/restore side-effects. Captures the current values as the restore target.
+    private void SyncKronCloudFromFields()
+    {
+        bool match = string.Equals(MqttUrl,   KronCloudUrl,   StringComparison.OrdinalIgnoreCase)
+            && MqttPort == KronCloudPort
+            && string.Equals(MqttTopic, KronCloudTopic, StringComparison.OrdinalIgnoreCase);
+        _preKronCloudUrl   = MqttUrl;
+        _preKronCloudPort  = MqttPort;
+        _preKronCloudTopic = MqttTopic;
+        _suppressKronCloudToggle = true;
+        IsKronCloud = match;
+        _suppressKronCloudToggle = false;
+    }
+
     // ── Grandezas selecionadas (MQTT/LoRa) ──────────────────────────────────
     public sealed partial class GrandezaItemViewModel : ObservableObject
     {
@@ -981,6 +1031,7 @@ public partial class DeviceConfigureViewModel : ObservableObject
         MqttTopic   = p.AddrMqttTopic?.ExtractString(regs);
         MqttUser    = p.AddrMqttUser?.ExtractString(regs);
         MqttToken   = p.AddrMqttToken?.ExtractString(regs);
+        SyncKronCloudFromFields(); // check the box if the meter already has the Tago preset
 
         // ── Clock ────────────────────────────────────────────────────────────
         if (p.AddrClockTime is RegisterField ct
