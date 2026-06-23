@@ -20,14 +20,16 @@
         <Thickness x:Key="MarginView">28,20</Thickness>
 
         <!-- ── Font Sizes ────────────────────────────────────────────────── -->
+        <!-- Large titles kept as-is; smaller body/meta/label tiers bumped +1
+             so secondary text reads larger (was perceived as too small). -->
         <x:Double x:Key="FontSizeMainTitle">26</x:Double>
         <x:Double x:Key="FontSizePageTitle">24</x:Double>
         <x:Double x:Key="FontSizeAppTitle">18</x:Double>
-        <x:Double x:Key="FontSizeCardTitle">16</x:Double>
-        <x:Double x:Key="FontSizeGroupHeader">15</x:Double>
-        <x:Double x:Key="FontSizeSectionTitle">13</x:Double>
-        <x:Double x:Key="FontSizeMeta">12</x:Double>
-        <x:Double x:Key="FontSizeLabelSmall">11</x:Double>
+        <x:Double x:Key="FontSizeCardTitle">17</x:Double>
+        <x:Double x:Key="FontSizeGroupHeader">16</x:Double>
+        <x:Double x:Key="FontSizeSectionTitle">14</x:Double>
+        <x:Double x:Key="FontSizeMeta">13</x:Double>
+        <x:Double x:Key="FontSizeLabelSmall">12</x:Double>
 
     </Styles.Resources>
 
