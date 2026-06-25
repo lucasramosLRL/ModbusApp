@@ -101,6 +101,10 @@ public class DeviceScanService : IDeviceScanService
     private const int UdpDiscoveryPort = 30718;
     private const int ModbusTcpPort = 502;
 
+    // Pausa entre abrir o socket TCP e enviar o ReportSlaveId, dando um tempinho para o
+    // medidor "pensar" antes da primeira requisição. Ver nota no CLAUDE.md.
+    private const int TcpPostConnectDelayMs = 500;
+
     public async IAsyncEnumerable<DeviceScanResult> ScanTcpAsync(
         IProgress<ScanProgress>? progress = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -190,6 +194,8 @@ public class DeviceScanService : IDeviceScanService
                 perIpCts.CancelAfter(TimeSpan.FromMilliseconds(2000));
 
                 await service.ConnectAsync(perIpCts.Token);
+                // Dá um tempinho para o medidor antes do ReportSlaveId (ver nota no CLAUDE.md)
+                await Task.Delay(TcpPostConnectDelayMs, perIpCts.Token);
                 var slaveIdData = await service.ReportSlaveIdAsync(tcpUnitId, perIpCts.Token);
                 var serialNumber = await TryReadSerialNumberAsync(service, tcpUnitId, cancellationToken);
                 result = BuildResult(tcpUnitId, slaveIdData.RawData, serialNumber, tcpConfig, null);

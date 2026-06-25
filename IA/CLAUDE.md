@@ -120,6 +120,25 @@ Services/
 KS-3000 over TCP requires Modbus Unit ID **255** (not 1).
 All TCP paths enforce this: scan service, add device defaults, scan result selection.
 
+### TCP scan — pausa pós-conexão antes do ReportSlaveId
+No scan TCP (`DeviceScanService.ScanTcpAsync`), depois do broadcast UDP descobrir os IPs, para cada
+medidor o fluxo é: `ConnectAsync` (abre o socket) → `ReportSlaveIdAsync` (FC17, lê firmware) →
+leitura do serial. Disparar o ReportSlaveId **imediatamente** após abrir o socket fazia o medidor
+não responder a tempo — o firmware (vindo do `rawData[2]` do ReportSlaveId) ficava em branco de
+forma intermitente, principalmente no **Konect 120**.
+
+A correção é um `await Task.Delay(TcpPostConnectDelayMs)` entre `ConnectAsync` e `ReportSlaveIdAsync`
+— o medidor precisa de um instante após a conexão antes de aceitar a primeira requisição.
+
+**Valor calibrado empiricamente = `TcpPostConnectDelayMs` (500ms):**
+- **500ms** → 100% confiável (KS-3000 e Konect 120) — valor escolhido pela máxima confiabilidade
+- 300ms → margem acima do ponto de falha, mas não tão folgado quanto 500ms
+- 250ms → falhou a leitura de firmware do KS-3000 ~1x em algumas tentativas
+
+**Em aberto:** avaliar se essa mesma pausa pós-`Connect` deve ser aplicada em TODO socket TCP recém
+-criado (não só no scan), para evitar que a primeira leitura saia rápido demais logo após conectar
+(ex.: `PollingEngine` ao reconectar TCP, `DeviceConfigService` que abre/fecha conexão por chamada).
+
 ### SQPF (Sequência do Ponto Flutuante)
 Float32 byte order is configurable on the device via holding register **42.901**
 (FC03, 0-based Modbus address = **2900**).
