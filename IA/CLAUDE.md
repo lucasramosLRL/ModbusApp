@@ -734,5 +734,44 @@ Next session, in order:
 
 ---
 
+## Mobile Roadmap — experimento paralelo (Avalonia + MAUI)
+
+**Objetivo:** dois apps mobile **independentes** consumindo o mesmo `Modbus.Core`, para comparar as
+duas tecnologias ponta a ponta. Decisões fixadas com o usuário:
+- **Apps independentes** — cada app tem suas próprias ViewModels (copiadas/adaptadas do desktop). Só
+  `Modbus.Core` é compartilhado. Divergência entre as VMs dos apps é esperada e aceita.
+- **Transportes no mobile:** **TCP + Cloud (MQTT)**. RTU/serial descartado (inviável iOS, complexo
+  Android) → sem `IDeviceScanService`/`System.IO.Ports` no mobile.
+- **MVP (fatia vertical):** Adicionar dispositivo → Lista com status → Leituras em tempo real. Config,
+  memória de massa e abas de I/O ficam para depois.
+- **Ordem:** Avalonia primeiro, depois MAUI espelhando as mesmas fases.
+
+**Notas técnicas para retomar:**
+- `Modbus.Core` é net8.0 puro (sem UI) — referenciar direto. DB path
+  `Environment.SpecialFolder.LocalApplicationData` + `ModbusApp/modbusapp.db` funciona em Android/iOS.
+  Rodar `DatabaseInitializer.Initialize` + `DeviceModelSeeder` no startup (padrão de `Modbus.Desktop/App.axaml.cs`).
+- DI mínimo do MVP: `ModbusDbContext`, repos (`IDeviceRepository`/`IDeviceModelRepository`/`IRegisterValueRepository`),
+  `IModbusServiceFactory`, `IPollingEngine`, Cloud (`IMqttBrokerClient`/`ITelemetryPayloadMapper`/`ICloudCommandService`),
+  `DeviceModelSeeder`. Pular config/massmemory/scan no MVP.
+- Acoplamento Avalonia a tratar nas VMs: `Dispatcher.UIThread.InvokeAsync` (DeviceList/AddDevice/CloudReading)
+  — no **Avalonia mobile** funciona igual; no **MAUI** vira `MainThread.BeginInvokeOnMainThread`.
+- Manter Avalonia mobile alinhado ao desktop (**11.2.3**). Validar SQLite (SQLitePCLRaw bundle) na Fase A1.
+
+**Estado das fases** (atualizar a cada sessão — TODO/DOING/DONE):
+- [DONE] **Fase 0** — Registrar este roadmap no CLAUDE.md
+- [TODO] **Fase A1** (Avalonia) — Scaffold (head Android + UI compartilhada) + DI mínimo + DB migra/seed; app sobe no emulador. Adicionar projetos ao `ModbusApp.sln`.
+- [TODO] **Fase A2** (Avalonia) — Lista de dispositivos + Adicionar (TCP + Cloud; sem RTU). Persistência via repos do Core.
+- [TODO] **Fase A3** (Avalonia) — Leituras em tempo real + polling (TCP) + telemetria Cloud. **Fecha o MVP do app A.**
+- [TODO] **Fase A4** (Avalonia, opcional) — Localização, tema, back-stack, deploy em device físico.
+- [TODO] **Fase M1** (MAUI) — Scaffold + DI + DB (espelha A1; `MauiProgram.cs`, workloads MAUI).
+- [TODO] **Fase M2** (MAUI) — Lista + Adicionar (espelha A2; `MainThread` no lugar de `Dispatcher`).
+- [TODO] **Fase M3** (MAUI) — Leituras em tempo real + polling. **Fecha o MVP do app B.**
+- [TODO] **Fase C** — Avaliação comparativa (esforço, tamanho, performance, fidelidade visual, integração); registrar conclusão aqui.
+
+**Riscos:** Android Wi-Fi exige celular na mesma rede do medidor (TCP local); scan UDP broadcast pode
+precisar de `WifiManager.MulticastLock` → MVP pode começar com IP manual.
+
+---
+
 ### Pending / future features - Attention! Keep it in the end of the file
-- Mobile app (MAUI) connected to the same core as the desktop version with the same functions and styling
+- ~~Mobile app (MAUI) connected to the same core as the desktop~~ → ver "Mobile Roadmap" acima (em execução por fases)
