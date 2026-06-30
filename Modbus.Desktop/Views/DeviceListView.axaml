@@ -71,6 +71,13 @@
                                                    FontSize="{StaticResource FontSizeMeta}"
                                                    Opacity="0.55"
                                                    Foreground="{DynamicResource BrushTextPrimary}" />
+                                        <TextBlock Text="·" Opacity="0.35" Foreground="{DynamicResource BrushTextPrimary}"
+                                                   IsVisible="{Binding FirmwareText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        <TextBlock Text="{Binding FirmwareText}"
+                                                   FontSize="{StaticResource FontSizeMeta}"
+                                                   Opacity="0.55"
+                                                   Foreground="{DynamicResource BrushTextPrimary}"
+                                                   IsVisible="{Binding FirmwareText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                     </StackPanel>
                                 </StackPanel>
 

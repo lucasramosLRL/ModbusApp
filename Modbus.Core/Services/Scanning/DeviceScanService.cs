@@ -161,6 +161,9 @@ public class DeviceScanService : IDeviceScanService
         int total = deviceList.Count;
         int found = 0;
 
+        // No ReportSlaveId per device here — the UDP broadcast response already carries the serial
+        // number and device code (→ model). Identity that needs a Modbus connection (firmware via
+        // ReportSlaveId) is deferred to save-time via ProbeTcpDeviceAsync, keeping the scan fast.
         for (int i = 0; i < deviceList.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -178,55 +181,62 @@ public class DeviceScanService : IDeviceScanService
 
             const byte tcpUnitId = 255;
             var tcpConfig = new TcpConfig { IpAddress = ip, Port = ModbusTcpPort };
-            var tempDevice = new ModbusDevice
+
+            string? modelName = udpInfo.DeviceCode.HasValue
+                ? DeviceCodeRegistry.GetModelName(udpInfo.DeviceCode.Value)
+                : null;
+
+            string suggestedName = (modelName, udpInfo.SerialNumber) switch
             {
-                Name = "scan-probe",
-                SlaveId = tcpUnitId,
-                TransportType = TransportType.Tcp,
-                Tcp = tcpConfig
+                (not null, not null) => $"{modelName} #{udpInfo.SerialNumber.Value:D7}",
+                (not null, null)     => $"{modelName} @ {ip}",
+                _                    => $"Device @ {ip}"
             };
 
-            DeviceScanResult result;
-            using var service = _factory.Create(tempDevice);
-            try
-            {
-                using var perIpCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                perIpCts.CancelAfter(TimeSpan.FromMilliseconds(2000));
-
-                await service.ConnectAsync(perIpCts.Token);
-                // Dá um tempinho para o medidor antes do ReportSlaveId (ver nota no CLAUDE.md)
-                await Task.Delay(TcpPostConnectDelayMs, perIpCts.Token);
-                var slaveIdData = await service.ReportSlaveIdAsync(tcpUnitId, perIpCts.Token);
-                var serialNumber = await TryReadSerialNumberAsync(service, tcpUnitId, cancellationToken);
-                result = BuildResult(tcpUnitId, slaveIdData.RawData, serialNumber, tcpConfig, null);
-            }
-            catch (Exception)
-            {
-                // Modbus TCP failed — use device info parsed from UDP response
-                string? modelName = udpInfo.DeviceCode.HasValue
-                    ? DeviceCodeRegistry.GetModelName(udpInfo.DeviceCode.Value)
-                    : null;
-
-                string suggestedName = (modelName, udpInfo.SerialNumber) switch
-                {
-                    (not null, not null) => $"{modelName} #{udpInfo.SerialNumber.Value:D7}",
-                    (not null, null)     => $"{modelName} @ {ip}",
-                    _                    => $"Device @ {ip}"
-                };
-
-                result = new DeviceScanResult
-                {
-                    SlaveId = tcpUnitId,
-                    DeviceCode = udpInfo.DeviceCode,
-                    ModelName = modelName,
-                    SerialNumber = udpInfo.SerialNumber,
-                    SuggestedName = suggestedName,
-                    Tcp = tcpConfig
-                };
-            }
-
             found++;
-            yield return result;
+            yield return new DeviceScanResult
+            {
+                SlaveId = tcpUnitId,
+                DeviceCode = udpInfo.DeviceCode,
+                ModelName = modelName,
+                SerialNumber = udpInfo.SerialNumber,
+                SuggestedName = suggestedName,
+                Tcp = tcpConfig
+            };
+        }
+    }
+
+    public async Task<DeviceScanResult?> ProbeTcpDeviceAsync(
+        string ipAddress,
+        int port = ModbusTcpPort,
+        CancellationToken cancellationToken = default)
+    {
+        const byte tcpUnitId = 255;
+        var tcpConfig = new TcpConfig { IpAddress = ipAddress, Port = port };
+        var tempDevice = new ModbusDevice
+        {
+            Name = "scan-probe",
+            SlaveId = tcpUnitId,
+            TransportType = TransportType.Tcp,
+            Tcp = tcpConfig
+        };
+
+        using var service = _factory.Create(tempDevice);
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+
+            await service.ConnectAsync(cts.Token);
+            // Dá um tempinho para o medidor antes do ReportSlaveId (ver nota no CLAUDE.md)
+            await Task.Delay(TcpPostConnectDelayMs, cts.Token);
+            var slaveIdData = await service.ReportSlaveIdAsync(tcpUnitId, cts.Token);
+            var serialNumber = await TryReadSerialNumberAsync(service, tcpUnitId, cancellationToken);
+            return BuildResult(tcpUnitId, slaveIdData.RawData, serialNumber, tcpConfig, null);
+        }
+        catch
+        {
+            return null;
         }
     }
 

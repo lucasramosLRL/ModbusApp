@@ -26,7 +26,6 @@ public partial class AddDeviceViewModel : ViewModelBase
     private readonly IDeviceScanService _scanService;
     private readonly IDeviceRepository _deviceRepository;
     private readonly IDeviceModelRepository _deviceModelRepository;
-    private readonly IModbusServiceFactory _serviceFactory;
     private readonly INetworkScanLock _scanLock;
     private readonly DeviceListViewModel _parent;
     private CancellationTokenSource? _scanCts;
@@ -236,8 +235,13 @@ public partial class AddDeviceViewModel : ViewModelBase
                 return;
             }
 
-            uint? serialNumber = SelectedResult?.Result.SerialNumber
-                                 ?? await ProbeSerialNumberAsync(effectiveIp);
+            // Connect once at save-time: ReportSlaveId (device code + firmware) + serial. The scan
+            // itself stays lightweight (UDP broadcast only); the serial/model come from the broadcast,
+            // the probe adds the firmware version.
+            int effectivePort = SelectedResult?.Result.Tcp?.Port ?? TcpPort;
+            var probe = await _scanService.ProbeTcpDeviceAsync(effectiveIp, effectivePort);
+
+            uint? serialNumber = SelectedResult?.Result.SerialNumber ?? probe?.SerialNumber;
 
             if (serialNumber is null)
             {
@@ -252,7 +256,7 @@ public partial class AddDeviceViewModel : ViewModelBase
             }
 
             int? deviceModelId = null;
-            if (SelectedResult?.Result.ModelName is { } modelName)
+            if ((SelectedResult?.Result.ModelName ?? probe?.ModelName) is { } modelName)
             {
                 var model = await _deviceModelRepository.GetByNameAsync(modelName);
                 deviceModelId = model?.Id;
@@ -264,13 +268,13 @@ public partial class AddDeviceViewModel : ViewModelBase
                 SlaveId         = SlaveId,
                 TransportType   = TransportType.Tcp,
                 SerialNumber    = serialNumber,
-                FirmwareVersion = SelectedResult?.Result.FirmwareVersion,
+                FirmwareVersion = probe?.FirmwareVersion ?? SelectedResult?.Result.FirmwareVersion,
                 IsActive        = true,
                 DeviceModelId   = deviceModelId,
                 Tcp             = new TcpConfig
                 {
                     IpAddress = effectiveIp,
-                    Port      = SelectedResult?.Result.Tcp?.Port ?? TcpPort
+                    Port      = effectivePort
                 }
             };
 
@@ -336,40 +340,6 @@ public partial class AddDeviceViewModel : ViewModelBase
         SetFeedback("Dispositivo salvo.", isError: false);
     }
 
-    /// <summary>Connects over TCP and reads the NS register (FC04 addr 0); null on failure.</summary>
-    private async Task<uint?> ProbeSerialNumberAsync(string effectiveIp)
-    {
-        var tempDevice = new ModbusDevice
-        {
-            Name = "",
-            SlaveId = SlaveId,
-            TransportType = TransportType.Tcp,
-            Tcp = new TcpConfig { IpAddress = effectiveIp, Port = TcpPort }
-        };
-
-        IModbusService? svc = null;
-        try
-        {
-            svc = _serviceFactory.Create(tempDevice);
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await svc.ConnectAsync(cts.Token);
-            var words = await svc.ReadInputRegistersAsync(SlaveId, 0, 2, cts.Token);
-            return (uint)((words[0] << 16) | words[1]);
-        }
-        catch
-        {
-            return null;
-        }
-        finally
-        {
-            if (svc is not null)
-            {
-                try { await svc.DisconnectAsync(); } catch { }
-                svc.Dispose();
-            }
-        }
-    }
-
     private bool CanSave() => !IsScanning && !IsSaving && !string.IsNullOrWhiteSpace(DeviceName);
 
     [RelayCommand]
@@ -391,14 +361,12 @@ public partial class AddDeviceViewModel : ViewModelBase
         IDeviceScanService scanService,
         IDeviceRepository deviceRepository,
         IDeviceModelRepository deviceModelRepository,
-        IModbusServiceFactory serviceFactory,
         INetworkScanLock scanLock,
         DeviceListViewModel parent)
     {
         _scanService           = scanService;
         _deviceRepository      = deviceRepository;
         _deviceModelRepository = deviceModelRepository;
-        _serviceFactory        = serviceFactory;
         _scanLock              = scanLock;
         _parent                = parent;
 

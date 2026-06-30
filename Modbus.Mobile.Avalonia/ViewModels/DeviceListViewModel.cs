@@ -16,7 +16,6 @@ public partial class DeviceListViewModel : ViewModelBase
 {
     private readonly IDeviceRepository _deviceRepository;
     private readonly IDeviceModelRepository _deviceModelRepository;
-    private readonly IModbusServiceFactory _serviceFactory;
     private readonly IPollingEngine _pollingEngine;
     private readonly IDeviceScanService _scanService;
     private readonly INetworkScanLock _scanLock;
@@ -38,14 +37,12 @@ public partial class DeviceListViewModel : ViewModelBase
     public DeviceListViewModel(
         IDeviceRepository deviceRepository,
         IDeviceModelRepository deviceModelRepository,
-        IModbusServiceFactory serviceFactory,
         IPollingEngine pollingEngine,
         IDeviceScanService scanService,
         INetworkScanLock scanLock)
     {
         _deviceRepository      = deviceRepository;
         _deviceModelRepository = deviceModelRepository;
-        _serviceFactory        = serviceFactory;
         _pollingEngine         = pollingEngine;
         _scanService           = scanService;
         _scanLock              = scanLock;
@@ -88,7 +85,7 @@ public partial class DeviceListViewModel : ViewModelBase
     {
         var vm = new AddDeviceViewModel(
             _scanService, _deviceRepository, _deviceModelRepository,
-            _serviceFactory, _scanLock, this);
+            _scanLock, this);
         NavigationRequested?.Invoke(this, vm);
     }
 

@@ -71,6 +71,10 @@ public partial class DeviceItemViewModel : ObservableObject, IDisposable
     public string SlaveIdText =>
         string.Format(LocalizationService.Instance["AddrPrefix"], Device.SlaveId);
 
+    public string? FirmwareText => Device.FirmwareVersion.HasValue
+        ? $"v{Device.FirmwareVersion.Value / 10}.{Device.FirmwareVersion.Value % 10}"
+        : null;
+
     public string LastSeenText => LastSeenAt.HasValue
         ? LastSeenAt.Value.ToString("HH:mm:ss")
         : LocalizationService.Instance["NeverSeen"];

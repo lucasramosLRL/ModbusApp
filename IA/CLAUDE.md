@@ -120,15 +120,25 @@ Services/
 KS-3000 over TCP requires Modbus Unit ID **255** (not 1).
 All TCP paths enforce this: scan service, add device defaults, scan result selection.
 
-### TCP scan — pausa pós-conexão antes do ReportSlaveId
-No scan TCP (`DeviceScanService.ScanTcpAsync`), depois do broadcast UDP descobrir os IPs, para cada
-medidor o fluxo é: `ConnectAsync` (abre o socket) → `ReportSlaveIdAsync` (FC17, lê firmware) →
-leitura do serial. Disparar o ReportSlaveId **imediatamente** após abrir o socket fazia o medidor
-não responder a tempo — o firmware (vindo do `rawData[2]` do ReportSlaveId) ficava em branco de
-forma intermitente, principalmente no **Konect 120**.
+### TCP scan = só broadcast UDP; ReportSlaveId/firmware vão para o SAVE
+**Decisão (com o usuário):** o scan TCP (`DeviceScanService.ScanTcpAsync`) **não** abre conexão Modbus
+nem dispara `ReportSlaveId` por medidor — ele monta cada `DeviceScanResult` **apenas** com o que a
+resposta do broadcast UDP já traz (serial + device code → model name). A lista de busca **não exibe
+firmware** (removido o `FirmwareText` das duas UIs). Isso deixa o scan rápido e sem o `Task.Delay`
+por dispositivo.
 
-A correção é um `await Task.Delay(TcpPostConnectDelayMs)` entre `ConnectAsync` e `ReportSlaveIdAsync`
-— o medidor precisa de um instante após a conexão antes de aceitar a primeira requisição.
+O `ReportSlaveId` (FC17, lê firmware do `rawData[2]`) + leitura do serial acontecem **uma única vez,
+ao pressionar Salvar**, via `IDeviceScanService.ProbeTcpDeviceAsync(ip, port)` — que faz
+`ConnectAsync` → `Task.Delay(TcpPostConnectDelayMs)` → `ReportSlaveIdAsync` → serial e devolve um
+`DeviceScanResult` (ou `null` se não responder). Tanto o desktop quanto o mobile chamam esse probe no
+save (caminho do scan: só completa o firmware, pois serial/modelo vieram do UDP; caminho de IP manual:
+obtém serial + firmware + modelo numa só conexão). **RTU não muda** — lá o `ReportSlaveId` ainda é o
+mecanismo de descoberta no `ScanRtuAsync`.
+
+**Pausa pós-conexão (mantida no probe):** disparar o ReportSlaveId **imediatamente** após abrir o
+socket fazia o medidor não responder a tempo — o firmware ficava em branco de forma intermitente,
+principalmente no **Konect 120**. A correção é o `await Task.Delay(TcpPostConnectDelayMs)` entre
+`ConnectAsync` e `ReportSlaveIdAsync` (agora dentro de `ProbeTcpDeviceAsync`).
 
 **Valor calibrado empiricamente = `TcpPostConnectDelayMs` (500ms):**
 - **500ms** → 100% confiável (KS-3000 e Konect 120) — valor escolhido pela máxima confiabilidade
@@ -829,8 +839,9 @@ parser com acentos/`•`/`—` sem BOM).
   aberta (`MainViewModel.IsAddDeviceOpen`), `shell.NavigateBack()` e `return` (senão `base`).
 - **Diálogos**: single-view não tem `Window`; o confirm de exclusão é um **overlay in-page**
   (Border full-screen com `IsVisible` ligado a `HasPendingDelete`).
-- **TCP**: ao salvar exige conexão ao vivo (lê NS via FC04 addr 0) quando não veio do scan;
-  do scan, usa o serial já lido. Cloud (MQTT) salva sem probe.
+- **TCP**: ao salvar, chama `ProbeTcpDeviceAsync` (ReportSlaveId p/ firmware + serial). Do scan,
+  serial/modelo já vieram do broadcast UDP e o probe só acrescenta o firmware; no IP manual o probe
+  traz serial+firmware+modelo. Cloud (MQTT) salva sem probe. (Ver "TCP scan = só broadcast UDP" acima.)
 - **XAML/PowerShell ASCII**: aspas duplas literais dentro de atributo XAML quebram o parser
   (usar `StringFormat` sem `"`); manter strings com acento OK no XAML (UTF-8), só os `.ps1`
   precisam ser ASCII.

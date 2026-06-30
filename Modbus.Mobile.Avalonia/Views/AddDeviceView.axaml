@@ -58,8 +58,6 @@
                                             <TextBlock Text="{Binding AddressText}" FontSize="12" Opacity="0.6"/>
                                             <TextBlock Text="·" Opacity="0.3"/>
                                             <TextBlock Text="{Binding SerialText}" FontSize="12" Opacity="0.6"/>
-                                            <TextBlock Text="·" Opacity="0.3"/>
-                                            <TextBlock Text="{Binding FirmwareText}" FontSize="12" Opacity="0.6"/>
                                         </StackPanel>
                                     </StackPanel>
                                 </DataTemplate>

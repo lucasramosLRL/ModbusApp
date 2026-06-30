@@ -347,6 +347,8 @@ public partial class AddDeviceViewModel : ObservableObject
 
             string effectiveIp = IsTcp ? (SelectedResult?.Result.Tcp?.IpAddress ?? DeviceIp) : "";
             uint? serialNumber;
+            byte? firmwareVersion = SelectedResult?.Result.FirmwareVersion;
+            string? probedModelName = null;
 
             if (SelectedResult is not null)
             {
@@ -419,6 +421,16 @@ public partial class AddDeviceViewModel : ObservableObject
                         _parent.ResumeRtuPolling();
                     }
                 }
+
+                // TCP scan: the discovery scan no longer issues ReportSlaveId per device, so read
+                // the firmware now (serial/model already came from the UDP broadcast).
+                if (IsTcp)
+                {
+                    var probe = await _scanService.ProbeTcpDeviceAsync(
+                        effectiveIp, SelectedResult.Result.Tcp?.Port ?? TcpPort);
+                    if (probe is not null)
+                        firmwareVersion = probe.FirmwareVersion;
+                }
             }
             else
             {
@@ -441,8 +453,15 @@ public partial class AddDeviceViewModel : ObservableObject
                     {
                         await _parent.SuspendRtuPollingAsync();
                         rtuSuspended = true;
+                        serialNumber = await ProbeSerialNumberAsync(effectiveIp);
                     }
-                    serialNumber = await ProbeSerialNumberAsync(effectiveIp);
+                    else // TCP — one connection reads identity (serial + firmware + model)
+                    {
+                        var probe = await _scanService.ProbeTcpDeviceAsync(effectiveIp, TcpPort);
+                        serialNumber    = probe?.SerialNumber;
+                        firmwareVersion = probe?.FirmwareVersion;
+                        probedModelName = probe?.ModelName;
+                    }
                 }
                 finally
                 {
@@ -463,7 +482,7 @@ public partial class AddDeviceViewModel : ObservableObject
             }
 
             int? deviceModelId = null;
-            if (SelectedResult?.Result.ModelName is { } modelName)
+            if ((SelectedResult?.Result.ModelName ?? probedModelName) is { } modelName)
             {
                 var model = await _deviceModelRepository.GetByNameAsync(modelName);
                 deviceModelId = model?.Id;
@@ -475,7 +494,7 @@ public partial class AddDeviceViewModel : ObservableObject
                 SlaveId         = SlaveId,
                 TransportType   = SelectedTransport,
                 SerialNumber    = serialNumber,
-                FirmwareVersion = SelectedResult?.Result.FirmwareVersion,
+                FirmwareVersion = firmwareVersion,
                 IsActive        = true,
                 DeviceModelId   = deviceModelId
             };
