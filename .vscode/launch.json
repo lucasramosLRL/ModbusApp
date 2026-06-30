@@ -11,6 +11,13 @@
             "cwd": "${workspaceFolder}/Modbus.Desktop",
             "stopAtEntry": false,
             "console": "internalConsole"
+        },
+        {
+            "name": "Android: Build + Deploy + Run (Genymotion/USB)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${workspaceFolder}/scripts/run-android-avalonia.ps1\"",
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
