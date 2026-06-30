@@ -58,6 +58,8 @@
                                             <TextBlock Text="{Binding AddressText}" FontSize="12" Opacity="0.6"/>
                                             <TextBlock Text="·" Opacity="0.3"/>
                                             <TextBlock Text="{Binding SerialText}" FontSize="12" Opacity="0.6"/>
+                                            <TextBlock Text="·" Opacity="0.3"/>
+                                            <TextBlock Text="{Binding FirmwareText}" FontSize="12" Opacity="0.6"/>
                                         </StackPanel>
                                     </StackPanel>
                                 </DataTemplate>
@@ -107,7 +109,8 @@
                         <TextBlock Text="Nome"/>
                         <TextBox Text="{Binding DeviceName}" Watermark="Nome do dispositivo"/>
                         <Button Content="Salvar" Command="{Binding SaveCommand}"
-                                HorizontalAlignment="Stretch" Padding="0,10"/>
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                Padding="0,10"/>
                         <TextBlock Text="{Binding SaveFeedback}" TextWrapping="Wrap"
                                    IsVisible="{Binding SaveFeedback, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                     </StackPanel>

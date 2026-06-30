@@ -47,6 +47,10 @@ public partial class DeviceItemViewModel : ObservableObject
 
     public string SlaveIdText => $"Addr {Device.SlaveId}";
 
+    public string? FirmwareText => Device.FirmwareVersion.HasValue
+        ? $"v{Device.FirmwareVersion.Value / 10}.{Device.FirmwareVersion.Value % 10}"
+        : null;
+
     public string LastSeenText => LastSeenAt.HasValue
         ? LastSeenAt.Value.ToString("HH:mm:ss")
         : "nunca";

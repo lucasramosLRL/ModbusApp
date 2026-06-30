@@ -42,6 +42,10 @@
                                             <TextBlock Text="{Binding ModelDisplayName}" FontSize="12" Opacity="0.55"/>
                                             <TextBlock Text="·" Opacity="0.35"/>
                                             <TextBlock Text="{Binding SlaveIdText}" FontSize="12" Opacity="0.55"/>
+                                            <TextBlock Text="·" Opacity="0.35"
+                                                       IsVisible="{Binding FirmwareText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                            <TextBlock Text="{Binding FirmwareText}" FontSize="12" Opacity="0.55"
+                                                       IsVisible="{Binding FirmwareText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                                         </StackPanel>
                                     </StackPanel>
 
