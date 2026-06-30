@@ -7,31 +7,15 @@
              x:Class="Modbus.Mobile.Avalonia.Views.MainView"
              x:DataType="vm:MainViewModel">
 
-    <ScrollViewer>
-        <StackPanel Margin="24" Spacing="16" VerticalAlignment="Center">
-            <TextBlock Text="{Binding Title}"
-                       FontSize="22" FontWeight="SemiBold"
-                       HorizontalAlignment="Center" TextWrapping="Wrap"/>
+    <DockPanel>
+        <!-- Boot error banner (only if Core startup failed) -->
+        <Border DockPanel.Dock="Top"
+                Background="#D32F2F"
+                IsVisible="{Binding BootError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                Padding="12,8">
+            <TextBlock Text="{Binding BootError}" Foreground="White" TextWrapping="Wrap"/>
+        </Border>
 
-            <Border Background="#1F000000" CornerRadius="8" Padding="16">
-                <TextBlock Text="{Binding Status}"
-                           FontSize="15"
-                           HorizontalAlignment="Center"
-                           TextWrapping="Wrap"/>
-            </Border>
-
-            <TextBlock Text="Modelos no banco:" FontWeight="SemiBold" Margin="0,8,0,0"/>
-            <ItemsControl ItemsSource="{Binding Models}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding}" FontFamily="monospace" Margin="8,2"/>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <TextBlock Text="Fase A1 — scaffold + Core (DB/seed) no Genymotion"
-                       FontSize="12" Opacity="0.6"
-                       HorizontalAlignment="Center" Margin="0,16,0,0"/>
-        </StackPanel>
-    </ScrollViewer>
+        <ContentControl Content="{Binding CurrentPage}"/>
+    </DockPanel>
 </UserControl>

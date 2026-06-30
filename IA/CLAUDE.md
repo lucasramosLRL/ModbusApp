@@ -760,7 +760,7 @@ duas tecnologias ponta a ponta. Decisões fixadas com o usuário:
 **Estado das fases** (atualizar a cada sessão — TODO/DOING/DONE):
 - [DONE] **Fase 0** — Registrar este roadmap no CLAUDE.md
 - [DONE] **Fase A1** (Avalonia) — Scaffold (`Modbus.Mobile.Avalonia` compartilhado + `Modbus.Mobile.Avalonia.Android` head) + DI mínimo + DB migra/seed; **validado: app sobe no Genymotion** mostrando "DB inicializado · N modelos seedados" (Avalonia 11.2.3 + EF Core + SQLite nativo OK no device). Projetos adicionados ao `ModbusApp.sln`. Ver "Setup mobile Avalonia (A1)" abaixo.
-- [TODO] **Fase A2** (Avalonia) — Lista de dispositivos + Adicionar (TCP + Cloud; sem RTU). Persistência via repos do Core.
+- [DONE] **Fase A2** (Avalonia) — Lista de dispositivos + Adicionar. **Validado no Genymotion**: shell de navegação (`MainViewModel.CurrentPage`), lista com status de conexão vindo do polling, **scan TCP por broadcast** (achou 10 medidores reais via MulticastLock), selecionar→salvar→persistir→polar (KS-3000 #2257927 Conectado), overlay de exclusão e back do Android. **Inclui scan TCP** (decisão do usuário; RTU continua fora). Ver "Setup mobile Avalonia (A2)" abaixo.
 - [TODO] **Fase A3** (Avalonia) — Leituras em tempo real + polling (TCP) + telemetria Cloud. **Fecha o MVP do app A.**
 - [TODO] **Fase A4** (Avalonia, opcional) — Localização, tema, back-stack, deploy em device físico.
 - [TODO] **Fase M1** (MAUI) — Scaffold + DI + DB (espelha A1; `MauiProgram.cs`, workloads MAUI).
@@ -806,6 +806,37 @@ parser com acentos/`•`/`—` sem BOM).
   (install falha com `cmd: Can't find service: package` se a VM ainda estiver no boot animation).
 - Template `avalonia.xplat` (12.0.4) gera net10/Avalonia 12/Central Package Management — **não**
   usei direto; reescrevi os csproj fixando net8.0(-android) + Avalonia 11.2.3.
+
+### Setup mobile Avalonia (A2) — lista + adicionar (scan TCP + Cloud)
+**Estrutura** (`Modbus.Mobile.Avalonia`): shell `MainViewModel`(CurrentPage)+`MainView`
+(ContentControl resolvido pelo `ViewLocator`), `DeviceListViewModel`/`DeviceItemViewModel`
+(lista + status do polling + overlay de exclusão), `AddDeviceViewModel`/`ScanResultViewModel`
+(toggle TCP/Cloud, scan TCP, save), Views correspondentes. VMs **adaptadas** do desktop,
+**sem** `LocalizationService` (strings PT literais), **sem RTU**. DI em `App.axaml.cs` registra
+`IDeviceScanService`, `INetworkScanLock`, `DeviceListViewModel`, `MainViewModel`;
+`AddDeviceViewModel` é criado on-demand pela lista.
+
+**Gotchas / decisões (não repetir):**
+- **Scan TCP no Android exige `WifiManager.MulticastLock`**: sem ele o driver Wi-Fi filtra as
+  respostas de broadcast e o scan acha 0. Abstração `INetworkScanLock` (noop no shared) +
+  `AndroidNetworkScanLock` (head Android, via `Application.Context` WifiService), injetada por
+  `App.ConfigurePlatformServices` setado no `MainActivity.CustomizeAppBuilder`. Permissões
+  no manifest: `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE`, `CHANGE_WIFI_STATE`.
+  O `AddDeviceViewModel.ScanAsync` envolve `ScanTcpAsync` em `using (_scanLock.Acquire())`.
+  **Validado**: scan achou 10 medidores (KS-3000/Konect) na rede do emulador.
+- **Back do Android**: `TopLevel.BackRequested` (Avalonia 11.2.3) **não disparou** no Genymotion.
+  Solução confiável: sobrescrever `OnBackPressed()` no `MainActivity` → se a página Add está
+  aberta (`MainViewModel.IsAddDeviceOpen`), `shell.NavigateBack()` e `return` (senão `base`).
+- **Diálogos**: single-view não tem `Window`; o confirm de exclusão é um **overlay in-page**
+  (Border full-screen com `IsVisible` ligado a `HasPendingDelete`).
+- **TCP**: ao salvar exige conexão ao vivo (lê NS via FC04 addr 0) quando não veio do scan;
+  do scan, usa o serial já lido. Cloud (MQTT) salva sem probe.
+- **XAML/PowerShell ASCII**: aspas duplas literais dentro de atributo XAML quebram o parser
+  (usar `StringFormat` sem `"`); manter strings com acento OK no XAML (UTF-8), só os `.ps1`
+  precisam ser ASCII.
+- **Tap cego no Genymotion**: durante cold-start (splash do Avalonia + profile install) enviar
+  `input tap`/`keyevent` cedo demais causa ANR "does not have a focused window" — esperar o
+  app desenhar antes de automatizar toques (não é bug do app).
 
 ---
 

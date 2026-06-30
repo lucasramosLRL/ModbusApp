@@ -9,6 +9,8 @@ using Modbus.Core.Persistence;
 using Modbus.Core.Persistence.Repositories;
 using Modbus.Core.Polling;
 using Modbus.Core.Services;
+using Modbus.Core.Services.Scanning;
+using Modbus.Mobile.Avalonia.Services;
 using Modbus.Mobile.Avalonia.ViewModels;
 using Modbus.Mobile.Avalonia.Views;
 using System;
@@ -20,6 +22,13 @@ public partial class App : Application
 {
     public static IServiceProvider Services { get; private set; } = null!;
 
+    /// <summary>
+    /// Lets a platform head (e.g. Android) register platform-specific services
+    /// (such as <see cref="INetworkScanLock"/>) into the shared container. The last
+    /// registration wins for <c>GetRequiredService</c>.
+    /// </summary>
+    public static Action<IServiceCollection>? ConfigurePlatformServices { get; set; }
+
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override void OnFrameworkInitializationCompleted()
@@ -28,9 +37,7 @@ public partial class App : Application
         ConfigureServices(serviceCollection);
         Services = serviceCollection.BuildServiceProvider();
 
-        // Phase A1: boot the Core stack and surface the result on screen so we can
-        // confirm DB migration + model seeding work on the Android device itself.
-        var vm = new MainViewModel();
+        string? bootError = null;
         try
         {
             using (var db = Services.GetRequiredService<ModbusDbContext>())
@@ -40,30 +47,23 @@ public partial class App : Application
 
             var seeder = new DeviceModelSeeder(Services.GetRequiredService<IDeviceModelRepository>());
             seeder.SeedAsync().GetAwaiter().GetResult();
-
-            var models = Services.GetRequiredService<IDeviceModelRepository>()
-                .GetAllAsync().GetAwaiter().GetResult();
-
-            foreach (var m in models)
-                vm.Models.Add($"{m.Name}  (0x{m.DeviceCode:X2})");
-
-            vm.Status = $"DB inicializado · {models.Count} modelo(s) seedado(s)";
         }
         catch (Exception ex)
         {
-            vm.Status = "ERRO no boot: " + ex.Message;
+            bootError = "Erro no boot: " + ex.Message;
         }
 
+        var shell = Services.GetRequiredService<MainViewModel>();
+        shell.BootError = bootError;
+
         if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
-        {
-            singleView.MainView = new MainView { DataContext = vm };
-        }
+            singleView.MainView = new MainView { DataContext = shell };
 
         base.OnFrameworkInitializationCompleted();
     }
 
-    // MVP subset of the desktop DI (Modbus.Desktop/App.axaml.cs): no RTU scan,
-    // no configure/mass-memory services. TCP + Cloud (MQTT) only.
+    // MVP subset of the desktop DI (Modbus.Desktop/App.axaml.cs): TCP + Cloud (MQTT).
+    // RTU scan dropped; TCP broadcast scan kept. No configure/mass-memory services.
     private static void ConfigureServices(IServiceCollection services)
     {
         var dbPath = Path.Combine(
@@ -81,6 +81,11 @@ public partial class App : Application
         services.AddTransient<IDeviceModelRepository, DeviceModelRepository>();
         services.AddTransient<IRegisterValueRepository, RegisterValueRepository>();
 
+        services.AddTransient<IDeviceScanService, DeviceScanService>();
+
+        // No-op by default; the Android head replaces this with a MulticastLock-backed impl.
+        services.AddSingleton<INetworkScanLock, NoopNetworkScanLock>();
+
         // Cloud (MQTT broker) layer — shared across all cloud devices.
         services.AddSingleton<IMqttBrokerClient, MqttBrokerClient>();
         services.AddSingleton<ITelemetryPayloadMapper, JsonTelemetryPayloadMapper>();
@@ -94,5 +99,11 @@ public partial class App : Application
                 TimeSpan.FromSeconds(5),
                 sp.GetRequiredService<IMqttBrokerClient>(),
                 sp.GetRequiredService<ITelemetryPayloadMapper>()));
+
+        services.AddSingleton<DeviceListViewModel>();
+        services.AddSingleton<MainViewModel>();
+
+        // Platform-specific overrides (registered last so they win).
+        ConfigurePlatformServices?.Invoke(services);
     }
 }
