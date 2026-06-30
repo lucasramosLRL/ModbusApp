@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Modbus.Mobile.Avalonia.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="800"
+             x:Class="Modbus.Mobile.Avalonia.Views.MainView"
+             x:DataType="vm:MainViewModel">
+
+    <ScrollViewer>
+        <StackPanel Margin="24" Spacing="16" VerticalAlignment="Center">
+            <TextBlock Text="{Binding Title}"
+                       FontSize="22" FontWeight="SemiBold"
+                       HorizontalAlignment="Center" TextWrapping="Wrap"/>
+
+            <Border Background="#1F000000" CornerRadius="8" Padding="16">
+                <TextBlock Text="{Binding Status}"
+                           FontSize="15"
+                           HorizontalAlignment="Center"
+                           TextWrapping="Wrap"/>
+            </Border>
+
+            <TextBlock Text="Modelos no banco:" FontWeight="SemiBold" Margin="0,8,0,0"/>
+            <ItemsControl ItemsSource="{Binding Models}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" FontFamily="monospace" Margin="8,2"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="Fase A1 — scaffold + Core (DB/seed) no Genymotion"
+                       FontSize="12" Opacity="0.6"
+                       HorizontalAlignment="Center" Margin="0,16,0,0"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

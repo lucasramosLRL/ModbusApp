@@ -759,7 +759,7 @@ duas tecnologias ponta a ponta. Decisões fixadas com o usuário:
 
 **Estado das fases** (atualizar a cada sessão — TODO/DOING/DONE):
 - [DONE] **Fase 0** — Registrar este roadmap no CLAUDE.md
-- [TODO] **Fase A1** (Avalonia) — Scaffold (head Android + UI compartilhada) + DI mínimo + DB migra/seed; app sobe no emulador. Adicionar projetos ao `ModbusApp.sln`.
+- [DONE] **Fase A1** (Avalonia) — Scaffold (`Modbus.Mobile.Avalonia` compartilhado + `Modbus.Mobile.Avalonia.Android` head) + DI mínimo + DB migra/seed; **validado: app sobe no Genymotion** mostrando "DB inicializado · N modelos seedados" (Avalonia 11.2.3 + EF Core + SQLite nativo OK no device). Projetos adicionados ao `ModbusApp.sln`. Ver "Setup mobile Avalonia (A1)" abaixo.
 - [TODO] **Fase A2** (Avalonia) — Lista de dispositivos + Adicionar (TCP + Cloud; sem RTU). Persistência via repos do Core.
 - [TODO] **Fase A3** (Avalonia) — Leituras em tempo real + polling (TCP) + telemetria Cloud. **Fecha o MVP do app A.**
 - [TODO] **Fase A4** (Avalonia, opcional) — Localização, tema, back-stack, deploy em device físico.
@@ -770,6 +770,42 @@ duas tecnologias ponta a ponta. Decisões fixadas com o usuário:
 
 **Riscos:** Android Wi-Fi exige celular na mesma rede do medidor (TCP local); scan UDP broadcast pode
 precisar de `WifiManager.MulticastLock` → MVP pode começar com IP manual.
+
+### Setup mobile Avalonia (A1) — como buildar/rodar e achados
+**Projetos:** `Modbus.Mobile.Avalonia` (net8.0, compartilhado: App.axaml + DI + ViewLocator +
+MainView/MainViewModel) e `Modbus.Mobile.Avalonia.Android` (net8.0-android, head:
+`MainActivity : AvaloniaMainActivity<App>`, `ApplicationId = com.kron.modbusapp.avalonia`).
+Avalonia fixado em **11.2.3** (igual desktop). DI = subconjunto MVP do desktop (sem scan/config/massmemory).
+
+**Pré-requisitos do ambiente (já satisfeitos nesta máquina):**
+- Workload: `dotnet workload install android` (instalada — Microsoft.Android.Sdk 34.0.154).
+- Android SDK: `%LOCALAPPDATA%\Android\Sdk` (Android Studio); `adb` em `platform-tools\adb.exe`.
+- JDK 17: `C:\Program Files\Android\Android Studio\jbr` (exportar `JAVA_HOME` se o build reclamar).
+
+**Rodar/Debug (emulador OU celular USB):** ligar a VM Genymotion e/ou plugar o celular (com
+"Depuração USB" ativada e autorizada), então `Tasks: Android: Debug (build + deploy + run)` no
+VSCode (ou `pwsh scripts/run-android-avalonia.ps1`). O script
+([scripts/run-android-avalonia.ps1](../scripts/run-android-avalonia.ps1)) resolve o adb (SDK →
+fallback Genymotion), **lista os devices e escolhe** (auto se 1; menu se vários; ou `-Device <serial>`),
+checa `boot_completed`, faz `dotnet build -t:Install` no head, lança via `monkey` e streama
+`adb logcat --pid=<app>` (pega exceções gerenciadas + `Debug.WriteLine`). Flags: `-NoLogcat`,
+`-AllLog`, `-Device`, `-Configuration`. Não há F5/debug nativo (breakpoints) no A1 — o "launch" é
+build+deploy+run+logcat. **Importante:** o `.ps1` deve ficar só em ASCII (PowerShell 5.1 quebra o
+parser com acentos/`•`/`—` sem BOM).
+
+**Achados / gotchas (não repetir):**
+- **Tema da Activity**: `AvaloniaMainActivity` herda de `AppCompatActivity` → o tema em
+  `Resources/values/styles.xml` **precisa** descender de `Theme.AppCompat` (usei
+  `Theme.AppCompat.Light.NoActionBar`). Um `@android:style/Theme.Material...` causa crash no
+  startup: *"You need to use a Theme.AppCompat theme (or descendant)"*.
+- **SQLite nativo funciona** no Android via `Microsoft.EntityFrameworkCore.Sqlite`
+  (SQLitePCLRaw bundle) sem `Batteries_V2.Init()` manual. Os warnings
+  `monodroid-assembly: open_from_bundles: failed to load assembly ...` são probes benignos.
+- **Genymotion adb**: garantir que o Genymotion use o adb do SDK (Settings → ADB → custom SDK
+  tools) — o device aparece como `192.168.56.x:5555`. `sys.boot_completed=1` antes de instalar
+  (install falha com `cmd: Can't find service: package` se a VM ainda estiver no boot animation).
+- Template `avalonia.xplat` (12.0.4) gera net10/Avalonia 12/Central Package Management — **não**
+  usei direto; reescrevi os csproj fixando net8.0(-android) + Avalonia 11.2.3.
 
 ---
 

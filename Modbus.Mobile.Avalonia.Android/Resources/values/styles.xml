@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AvaloniaMainActivity derives from AppCompatActivity, so the theme must
+         descend from Theme.AppCompat (provided by AndroidX, pulled in by Avalonia.Android). -->
+    <style name="MyTheme.NoActionBar" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+    </style>
+</resources>

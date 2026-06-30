@@ -16,6 +16,23 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+        {
+            "label": "Android: Debug (build + deploy + run)",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-File", "${workspaceFolder}/scripts/run-android-avalonia.ps1"
+            ],
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            },
+            "group": "build"
         }
     ]
 }
